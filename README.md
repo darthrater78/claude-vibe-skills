@@ -6,11 +6,12 @@ Three Claude Code skills: a cost-discipline mode, a gate-based release workflow 
 
 | Skill | File | Description |
 |---|---|---|
+| `dev-mode` | [`dev-mode.skill`](skills/dev-mode.skill) | One-command launcher — loads all three skills simultaneously |
 | `cost-saver` | [`cost-saver.skill`](skills/cost-saver.skill) | Cost-discipline mode — bounds output, gates model to Sonnet 4.6, trims MCP overhead |
 | `vibe-coding-workflow` | [`vibe-coding-workflow.skill`](skills/vibe-coding-workflow.skill) | Gate-based release workflow enforcer |
 | `vibe-secure-vibe-coding` | [`vibe-secure-vibe-coding.skill`](skills/vibe-secure-vibe-coding.skill) | Security & Python best-practice guardrail |
 
-`vibe-coding-workflow` and `vibe-secure-vibe-coding` are **linked**: the workflow automatically invokes the security skill at Gate 3 after every successful build.
+Install all four and invoke `/dev-mode` (or say "dev mode") to activate the full suite at once. `vibe-coding-workflow` and `vibe-secure-vibe-coding` are also **linked**: the workflow automatically invokes the security skill at Gate 3 after every successful build.
 
 ---
 
@@ -20,6 +21,7 @@ Download both `.skill` files from the [latest release](../../releases/latest) an
 
 | File | Direct download |
 |---|---|
+| `dev-mode.skill` | [Download](../../releases/latest/download/dev-mode.skill) |
 | `cost-saver.skill` | [Download](../../releases/latest/download/cost-saver.skill) |
 | `vibe-coding-workflow.skill` | [Download](../../releases/latest/download/vibe-coding-workflow.skill) |
 | `vibe-secure-vibe-coding.skill` | [Download](../../releases/latest/download/vibe-secure-vibe-coding.skill) |
@@ -128,6 +130,29 @@ Skills are not natively supported in the **browser version** of claude.ai. As a 
    > "Please follow these instructions for this session: [paste SKILL.md content]"
 
 This gives Claude the same instructions for that session, though it won't persist across conversations and won't auto-trigger — you'll need to paste it each time.
+
+---
+
+## `dev-mode`
+
+One-command launcher that activates all three skills simultaneously. Use this instead of loading each skill individually at the start of a session.
+
+### Triggers
+
+- Invoke `/dev-mode` explicitly
+- Say "dev mode", "load dev mode", or "start dev mode"
+
+### What it loads
+
+1. **`cost-saver`** — model gating, output bounding, MCP overhead reporting, handoff prompts
+2. **`vibe-coding-workflow`** — 5-gate release process (version → build → security → release → push)
+3. **`vibe-secure-vibe-coding`** — inline security review + project audit mode
+
+After loading, gives a single combined status summary and asks "What are we building?"
+
+### Install note
+
+`dev-mode` also ships as a slash command for Claude Code CLI users. Copy [`dev-mode.md`](.claude/commands/dev-mode.md) to `~/.claude/commands/dev-mode.md` and invoke it with `/dev-mode` in any session — no skill install required.
 
 ---
 
@@ -366,4 +391,4 @@ vibe-coding-workflow
 
 ## Version
 
-`v1.2.0`
+`v1.3.0`
