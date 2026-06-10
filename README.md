@@ -131,6 +131,57 @@ This gives Claude the same instructions for that session, though it won't persis
 
 ---
 
+## `cost-saver`
+
+Cost-discipline mode. Keeps sessions cheap without losing quality by targeting the five biggest cost drivers: session length, model choice, effort level, output length, and context bloat.
+
+### Triggers
+
+Claude loads this skill automatically when you:
+
+- Mention cost, token usage, or expensive sessions
+- Say "keep it cheap", "save tokens", or similar
+- Ask to disable or trim MCP servers, connectors, or unused tools
+- Ask for a handoff summary to start a fresh session
+- Ask which model or effort level a task needs
+- Invoke `/cost-saver`
+
+### What it does
+
+**Bounds its own output.** Leads with the answer, skips preamble and recaps, shows diffs instead of whole files, reads only the files a task requires.
+
+**Model gating — Sonnet 4.6 ceiling.** At session start, checks the active model. If it's above Sonnet (Opus, Fable), immediately flags it:
+
+> "This session is running on [model], which exceeds the Sonnet 4.6 cost ceiling. Run `/model sonnet` to switch down, or tell me you want to stay on [model] for this task."
+
+Won't proceed with substantial work until you respond. Can also write `"model": "sonnet"` to `~/.claude/settings.json` so every new session defaults to Sonnet.
+
+**Phase-transition handoffs.** When work shifts phase (explore → implement → test → done), offers a fresh-session prompt:
+
+> "Good point to start a fresh session — this one's carrying N messages of history. Want a handoff summary?"
+
+If yes, produces a structured summary under 30 lines (goal / state / key files / decisions / next step) designed to replace the long history with a cheap restart.
+
+**MCP overhead reporting.** Distinguishes between:
+- **Active tools** (full schemas loaded): expensive — often thousands of tokens per server per request. Named and flagged for removal.
+- **Deferred tools** (name-only, loaded on demand): low overhead — reported as a count only, no action needed.
+
+For active servers not used in the current work, tells you exactly how to remove them (`claude mcp remove`, `disabledMcpjsonServers` in settings, Desktop UI toggle, or `claude --strict-mcp-config` for a zero-MCP session).
+
+**Effort fit.** Recommends `/effort high` or `xhigh` only for architecture, root-cause debugging, or security review. Flags medium as sufficient for routine edits.
+
+**End-of-task token estimate.** When a task wraps up, closes with 3–5 lines: per-request overhead × turns, files read vs. used, model multiplier, and the single highest-impact change for next time.
+
+```
+Token impact (rough estimate):
+✅ Saved ~40k — read only 2 relevant files instead of exploring the package
+✅ Saved ~25k/turn — session restarted at the implement phase
+⚠️ ~30k/turn overhead — 5 connected MCP servers, none used this session
+Biggest win next time: disable unused connectors (would cut ~60% of this session's tokens)
+```
+
+---
+
 ## `vibe-coding-workflow`
 
 Enforces a mandatory 5-gate release process for every vibe coding session. Gates must be cleared in order — none can be silently skipped.
