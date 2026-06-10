@@ -1,15 +1,16 @@
 # claude-vibe-skills
 
-Two linked Claude Code skills that enforce a disciplined, secure vibe coding workflow — mandatory versioning, automatic security scanning, formal releases, and explicit push confirmation.
+Three Claude Code skills: a cost-discipline mode, a gate-based release workflow enforcer, and a security guardrail — working together to keep vibe coding sessions cheap, safe, and properly shipped.
 
 ## Skills
 
 | Skill | File | Description |
 |---|---|---|
+| `cost-saver` | [`cost-saver.skill`](skills/cost-saver.skill) | Cost-discipline mode — bounds output, gates model to Sonnet 4.6, trims MCP overhead |
 | `vibe-coding-workflow` | [`vibe-coding-workflow.skill`](skills/vibe-coding-workflow.skill) | Gate-based release workflow enforcer |
 | `vibe-secure-vibe-coding` | [`vibe-secure-vibe-coding.skill`](skills/vibe-secure-vibe-coding.skill) | Security & Python best-practice guardrail |
 
-These two skills are **linked**: `vibe-coding-workflow` automatically invokes `vibe-secure-vibe-coding` at Gate 3 (Security) after every successful build.
+`vibe-coding-workflow` and `vibe-secure-vibe-coding` are **linked**: the workflow automatically invokes the security skill at Gate 3 after every successful build.
 
 ---
 
@@ -19,6 +20,7 @@ Download both `.skill` files from the [latest release](../../releases/latest) an
 
 | File | Direct download |
 |---|---|
+| `cost-saver.skill` | [Download](../../releases/latest/download/cost-saver.skill) |
 | `vibe-coding-workflow.skill` | [Download](../../releases/latest/download/vibe-coding-workflow.skill) |
 | `vibe-secure-vibe-coding.skill` | [Download](../../releases/latest/download/vibe-secure-vibe-coding.skill) |
 
@@ -313,4 +315,4 @@ vibe-coding-workflow
 
 ## Version
 
-`v1.1.0`
+`v1.2.0`
