@@ -145,7 +145,7 @@ One-command launcher that activates all three skills simultaneously. Use this in
 ### What it loads
 
 1. **`cost-saver`** — model gating, output bounding, MCP overhead reporting, handoff prompts
-2. **`vibe-coding-workflow`** — 5-gate release process (version → build → security → release → push)
+2. **`vibe-coding-workflow`** — 6-gate release process (version → build → security → docs → release → push)
 3. **`vibe-secure-vibe-coding`** — inline security review + project audit mode
 
 After loading, gives a single combined status summary and asks "What are we building?"
@@ -209,10 +209,10 @@ Biggest win next time: disable unused connectors (would cut ~60% of this session
 
 ## `vibe-coding-workflow`
 
-Enforces a mandatory 5-gate release process for every vibe coding session. Gates must be cleared in order — none can be silently skipped.
+Enforces a mandatory 6-gate release process for every vibe coding session. Gates must be cleared in order — none can be silently skipped. All commits go through feature branches and PRs — branch protection is enforced on all repos.
 
 ```
-🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📦 RELEASE  →  🚀 PUSH
+🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 PUSH
 ```
 
 ### Triggers
@@ -225,7 +225,7 @@ Claude loads this skill automatically when you:
 - Say "ship it", "done", or "ready to merge"
 - Try to skip a step ("just push it", "skip the version bump", "we can do security later")
 
-### The five gates
+### The six gates
 
 #### Gate 1 — Version 🔢
 
@@ -254,13 +254,17 @@ After every successful build, `vibe-secure-vibe-coding` is invoked automatically
 
 Gate passes only when Critical = 0 and High = 0.
 
-#### Gate 4 — Release 📦
+#### Gate 4 — Docs 📄
 
-Every security-cleared build must be formally published before the session ends. Claude tags the commit and creates a GitHub release (or equivalent) with notes and artifacts. "We'll release later" is blocked.
+Documentation must be accurate before release. Checks: version history entry with date and changes, new/changed feature docs updated, stale references to removed features cleaned up, architecture tables and external process docs still match the code.
 
-#### Gate 5 — Push 🚀
+#### Gate 5 — Release 📦
 
-Claude will **never push** without an explicit typed confirmation. "yeah" or "ok" is not enough — the user must type something unambiguous like "push" or "confirm push".
+Creates a feature branch, commits, pushes, and opens a PR against the default branch. Release notes are drafted in the PR body. The user approves before merge. After merge, the commit is tagged and a GitHub release is created with artifacts. "We'll release later" is blocked.
+
+#### Gate 6 — Push 🚀
+
+Claude will **never merge, push, or publish** without an explicit typed confirmation. "yeah" or "ok" is not enough — the user must type something unambiguous like "push" or "confirm push".
 
 ### Handling impatience
 
@@ -382,7 +386,8 @@ vibe-coding-workflow
        ◄──────────────────────
        │
        │  Gate 3 passes (0 Critical, 0 High)
-       └──► Gate 4 — Release
+       └──► Gate 4 — Docs
+       └──► Gate 5 — Release
 ```
 
 `vibe-secure-vibe-coding` also runs independently whenever you're writing code — it doesn't require the workflow to be active.
@@ -391,4 +396,4 @@ vibe-coding-workflow
 
 ## Version
 
-`v1.3.0`
+`v1.4.0`
