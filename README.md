@@ -396,4 +396,4 @@ vibe-coding-workflow
 
 ## Version
 
-`v1.4.0`
+`v1.4.1`
