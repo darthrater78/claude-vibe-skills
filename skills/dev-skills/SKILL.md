@@ -1,0 +1,659 @@
+---
+name: dev-skills
+description: >
+  Always-on development discipline: commit approval, versioned builds, security
+  scanning, cost control, and a strict gate workflow that never advances silently.
+  Trigger on ANY coding session — this is not optional. Also trigger explicitly on:
+  "dev mode", "dev skills", "start coding", "build", "ship it", "push", "release",
+  "commit", "done", "just push it", "skip the version", "audit", "security review",
+  "scan this", "check my code", or any attempt to bypass a gate.
+---
+
+# Dev Skills
+
+This skill is the contract for every coding session. It is always active. Gates
+cannot be skipped, commits cannot happen without approval, and security scans
+run after every build — not eventually, not later, now.
+
+---
+
+## 1. Commit discipline — NEVER commit without approval
+
+**This is the single most important rule.** Claude must NEVER run `git commit`,
+`git push`, `gh pr create`, or any git write operation without the user's
+explicit approval. Violations of this rule break trust.
+
+**Rules:**
+- Do NOT commit after every individual change. Batch related changes.
+- When work reaches a natural stopping point, show the user what changed and ask:
+  "Ready to commit these changes? Here's what's staged: [summary]"
+- Wait for an explicit "yes", "commit", or "go ahead" before running `git commit`.
+- NEVER create a PR until the Release Gate (Gate 5) is reached.
+- NEVER push to remote without passing through the Push Gate (Gate 6).
+- A vague "ok" or "sure" in response to something else is NOT commit approval.
+
+**When the user says "commit" or "save this":**
+1. Run `git status` and `git diff` to show what will be committed
+2. Draft a commit message and show it
+3. Wait for explicit approval before executing
+
+---
+
+## 2. The six gates
+
+Every session that produces a build, release, or push moves through these gates
+in order. A gate cannot be silently skipped. If the user tries to jump ahead,
+show the gate tracker and surface the blocking gate.
+
+```
+🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 PUSH
+```
+
+Gate indicators:
+- ✅ PASSED
+- 🚫 BLOCKED — hard stop
+- ⏳ IN PROGRESS
+- ⬜ PENDING
+
+### Gate 1 — Version 🔢
+
+No build starts until versioning is resolved.
+
+**Check ALL of these:**
+1. Find every version-carrying file in the project: `package.json`, `pyproject.toml`,
+   `Cargo.toml`, `VERSION`, `setup.cfg`, `build.gradle`, `pom.xml`, manifest files,
+   `Info.plist`, `AndroidManifest.xml`, etc.
+2. Every version file must show the same version and it must be bumped from the
+   previous release.
+3. Version must follow semver (MAJOR.MINOR.PATCH).
+4. **Repository link is mandatory.** Every project that has an app manifest
+   (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
+   `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
+   it belongs to. If missing, add it before passing this gate.
+
+If any check fails:
+
+> 🚫 **VERSION GATE BLOCKED**
+> Issues found:
+> - [specific issue, e.g. "package.json version is 1.0.0 but VERSION file says 1.0.1"]
+> - [e.g. "package.json missing repository field"]
+>
+> Current version: [version or "none found"]
+> What version should this build be? (patch / minor / major)
+
+Update ALL version files and add missing repo links before marking passed.
+
+### Gate 2 — Build 🔨
+
+Run the project's build command only after Gate 1 is ✅. If the build fails,
+fix and rebuild — do not advance.
+
+> ✅ **BUILD GATE PASSED** — build succeeded
+> Output: [artifact path]
+
+### Gate 3 — Security 🔒
+
+**Mandatory after every successful build. Not optional. Not "later."**
+
+**Before scanning, load both reference files:**
+1. Read `~/.claude/skills/dev-skills/SECURITY_REFERENCE.md` — bad/good code
+   examples for every security pattern.
+2. Read `~/.claude/skills/dev-skills/QUALITY_REFERENCE.md` — bad/good code
+   examples for structure and performance anti-patterns.
+Use these examples to pattern-match against the code being reviewed.
+
+Run a full scan of all source files. Check for every pattern in Section 4 below.
+Also run the project's native audit tool (`npm audit`, `pip audit`, `cargo audit`,
+etc.) if available.
+
+**Hard stops (must fix before proceeding):**
+- 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
+  disabled TLS, `pickle` on untrusted data, RCE vectors
+- ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
+  passwords, `random` for tokens, no input validation on endpoints
+
+**Show and let user decide:**
+- 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
+  logging sensitive data, unpinned deps
+- 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
+
+Gate passes only at zero Critical and zero High:
+
+> ✅ **SECURITY GATE PASSED** — 0 Critical, 0 High
+> Medium: N (shown above, user accepted) | Low: N
+
+If the user says "skip security" or "we can do security later":
+
+> 🚫 **SECURITY GATE BLOCKED**
+> Security scan is mandatory after every build. Running now.
+
+Then run it. Do not ask again.
+
+### Gate 4 — Docs 📄
+
+After security passes, check:
+1. **Version history / changelog** — the README or CHANGELOG must have an entry for
+   this version with the date and a summary of changes. Mandatory for every release.
+2. **New or changed features** — if the session added, removed, or changed any
+   user-facing behavior (new flags, commands, changed defaults, removed features),
+   the README usage/feature docs must reflect it.
+3. **Removed features** — scan the README for references to anything removed in this
+   session. Stale descriptions of removed features are a hard stop.
+4. **Architecture / dependency docs** — if the project documents external calls,
+   timeout tables, architecture, or dependencies, verify they still match the code.
+
+Show what was checked:
+
+> ✅ **DOCS GATE PASSED**
+> - Version history: v1.2.3 entry added with date and changes
+> - New features: [list any docs updated]
+> - Removed features: [list any stale refs cleaned up, or "none"]
+> - Architecture/tables: [updated / no changes needed]
+
+If documentation is missing or stale:
+
+> 🚫 **DOCS GATE BLOCKED**
+> The following documentation issues must be resolved:
+> - [specific issue, e.g. "README still references feature X which was removed"]
+> - [specific issue, e.g. "No version history entry for v1.2.3"]
+>
+> Fixing now...
+
+Fix any issues found. Rebuild if doc fixes affected source files.
+
+### Gate 5 — Release 📦
+
+1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
+2. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
+3. Commit to the feature branch
+4. Push the branch and create a PR against the default branch
+5. Show the PR and release notes draft to the user for approval:
+
+   > 📝 **PR and release notes draft — please confirm before merging:**
+   >
+   > **v1.2.3**
+   > - [change 1 from this session]
+   > - [change 2 from this session]
+   >
+   > PR: [url]
+   >
+   > Do these accurately describe what's in this build? Reply "yes" to merge
+   > and release, or tell me what to change.
+
+6. Wait for explicit approval before merging
+7. Merge with `gh pr merge --merge --delete-branch` — **never squash-merge**
+8. Pull merged default branch, tag the merge commit, push the tag
+9. Create the GitHub release with approved notes and attach artifacts
+
+**Never commit directly to main/master.** Branch protection is enforced.
+**Exception:** `darthrater78/scripts` allows direct pushes but PRs are preferred.
+
+#### Updating an existing release artifact (`--clobber`)
+
+If the artifact is uploaded to an *existing* release (e.g. `gh release upload --clobber`),
+the original release notes are now stale. This is a hard stop:
+
+> 🚫 **RELEASE GATE BLOCKED — notes are stale**
+> The artifact has been updated but the release notes still describe the original build.
+> Changes since the notes were written: [summarise from session context]
+>
+> Update the notes with: `gh release edit <tag> --notes "..."`
+>
+> Or if the changes warrant it, bump to vN+1 instead of patching silently.
+
+Do not mark the release gate passed until either:
+- The notes have been edited to reflect the updated artifact, **or**
+- The user explicitly acknowledges the notes are intentionally unchanged and explains why
+
+#### No release mechanism
+
+If the user says "we don't do releases" or "we'll do it later":
+
+> 🚫 **RELEASE GATE BLOCKED**
+> Builds that aren't released are invisible to everyone else. Where should this
+> be published?
+> If there's genuinely no release mechanism for this project, confirm that
+> explicitly and we can mark it as acknowledged.
+
+After release is published:
+
+> ✅ **RELEASE GATE PASSED** — v1.2.3 published
+> Release URL: [url]
+> Notes confirmed: [first line of approved notes]
+
+### Gate 6 — Push 🚀
+
+Present the full push summary and wait for the user to type an explicit
+confirmation ("push", "yes push", "go ahead and push"). A vague "yeah" or "ok"
+is not enough.
+
+> **Ready to merge and release. Please confirm:**
+>
+> Branch: `release/v1.2.3` → `main`
+> PR: [url]
+> Tag to create: `v1.2.3`
+> Artifact: [path/size]
+>
+> Type **"push"** to confirm, or tell me what to adjust.
+
+Once confirmed:
+```
+gh pr merge <number> --merge --delete-branch
+git checkout main && git pull origin main
+git tag v1.2.3
+git push origin v1.2.3
+gh release create v1.2.3 <artifact> --title "v1.2.3" --notes "..."
+```
+
+> ✅ **PUSH GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
+> Release URL: [url]
+
+If the user asks to push without prior gates completed:
+> 🚫 **PUSH GATE BLOCKED**
+> Cannot push — [Gate N] has not been completed yet. Let's finish that first.
+
+---
+
+## 3. Shortcut detection
+
+These phrases mean "surface the gates", not "comply silently":
+
+| User says | You do |
+|---|---|
+| "just push it" | Show gate tracker, check all prior gates |
+| "skip the version bump" | Version gate is a hard stop — ask what version to use |
+| "we can do security later" | Run the security scan now, no exceptions |
+| "just ship it" / "done" | Walk through all open gates |
+| "just commit this" | Show what would be committed, get approval |
+
+---
+
+## 4. Security rules
+
+These rules apply to every piece of code written or reviewed in the session —
+not just when the security gate runs, but as code is being written. Think like
+an attacker reading the code as it's produced. For every piece of code, ask:
+*What's the worst thing a malicious user, a compromised dependency, or a
+misconfigured environment could do with this?* Then close that door before
+moving on.
+
+Prefer:
+- **Built-in language features** over third-party packages — every dependency is attack surface
+- **Established, actively maintained libraries** over obscure or new ones when you must add a package
+- **Explicit, typed, validated inputs** over trusting whatever arrives
+- **Least privilege** — request only the access, permissions, and scope actually needed
+- **Fail closed** — when something unexpected happens, deny rather than allow
+
+### 4.1 Package and dependency auditing
+
+Before suggesting or accepting any new package, check:
+
+1. **Maintenance health**: actively maintained, issues addressed, recent commits
+2. **Popularity signal**: high downloads and dependents = real-world scrutiny
+3. **Scope creep**: does it request more access than the task needs?
+4. **Name integrity**: verify against typosquatting (`lodahs` vs `lodash`, `reqeusts` vs `requests`)
+5. **Known CVEs**: run `npm audit`, `pip audit`, `cargo audit`, or equivalent
+6. **Transitive risk**: safe direct code with dangerous transitive deps is still dangerous
+
+**Prefer built-ins** when functionality is achievable without a third-party package.
+
+### 4.2 Dangerous patterns — flag and fix
+
+Flag these on sight and offer the safe alternative. Never let them pass silently,
+even in "temporary" or "just to test" code.
+
+**Secrets and credentials:**
+- Never hardcode API keys, passwords, tokens in source — not even in comments
+- Use environment variables or a secrets manager
+- Flag `.env` files not in `.gitignore` — add immediately
+- Check git history: `git log --diff-filter=D -- '*.env'`
+- Rotate any accidentally exposed secret
+
+**Dangerous execution:**
+- No `eval()`, `exec()`, `Function()`, `shell=True` with user input, `os.system()` with user input
+- No `Invoke-Expression`, `iex`, `& $userInput` in PowerShell
+- Use parameterized commands, safe parsers, allowlisted inputs
+
+**Input handling:**
+- All external input is hostile: HTTP params, file contents, env vars, CLI args, WebSocket, IPC
+- Validate type, length, format, range before use
+- Sanitize for output context (HTML-encode, parameterize SQL, escape shell)
+
+**Database access:**
+- SQL string concatenation is always wrong — use parameterized queries or ORM
+- App DB account should not have DROP/schema-modification rights in production
+
+**Network and HTTP:**
+- Never disable TLS: `verify=False`, `rejectUnauthorized: false`, `InsecureSkipVerify: true`
+- Validate and allowlist URLs before server-side requests (SSRF prevention)
+- Never reflect stack traces or internal paths to clients
+
+**File system:**
+- Validate paths against traversal — reject `../`, absolute paths from user input, null bytes
+- Restrictive permissions: `0o600` (Unix) / owner-only ACLs (Windows) for secrets
+- Never pass user-controlled strings directly to file open/delete
+
+**Serialization:**
+- No `pickle`/`marshal`/`ObjectInputStream`/`unserialize()` on untrusted data
+- Use JSON with schema validation
+
+**JavaScript/Node-specific:**
+- Prototype pollution: check for `__proto__`, `constructor`, `prototype` in user-supplied keys
+- XSS: no `innerHTML` with user data — use `textContent` or DOMPurify
+- Open redirect: allowlist redirect targets, never `res.redirect(req.query.url)` raw
+
+**Windows-specific:**
+- PowerShell injection: no `Invoke-Expression`/`iex`/`& $userInput` — use parameter arrays
+- UNC path injection: reject `\\` and `//` prefixed paths from user input (NTLM hash leak)
+- DLL hijacking: use absolute paths for `LoadLibrary`/`ctypes.CDLL`, call `SetDllDirectory("")`
+- Credential storage: use DPAPI/Credential Manager/`keyring` — never plaintext in registry or config
+- Registry: use `HKCU` not `HKLM` unless needed, set restrictive ACLs, validate data read back
+- Services: never run as `SYSTEM` — use dedicated service accounts, gMSA where available
+- Code signing: sign with Authenticode, never bypass execution policy
+- Path hazards: reject reserved names (`CON`, `PRN`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`),
+  handle MAX_PATH, account for case insensitivity
+
+**Linux-specific:**
+- SUID/SGID: never set SUID casually — prefer Linux capabilities (`setcap`)
+- Containers: never run as root, never `--privileged`, drop all caps and add back selectively,
+  never mount Docker socket, pin base image digests not tags, use `--read-only` root filesystem
+- Symlink/TOCTOU: use `mkstemp()`/`NamedTemporaryFile()`, not predictable temp paths;
+  `O_NOFOLLOW` to refuse symlinks
+- Systemd: add `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`,
+  `CapabilityBoundingSet`; flag units running as root without hardening
+- SSH keys: `0600` private / `0644` public, never commit to git, prefer Ed25519,
+  avoid agent forwarding on untrusted hosts (use `ProxyJump`)
+- Cron: absolute paths only, scripts not world-writable, no credentials in crontab
+- SELinux/AppArmor: never `setenforce 0` or disable profiles as a fix — diagnose the policy
+- Package repos: verify GPG fingerprints, reject unsigned repos, pin third-party packages
+
+**Cross-platform:**
+- File permissions: `0o600`/`chmod` on Unix, `icacls` owner-only on Windows
+- Path validation: reject UNC paths, reject Windows reserved names, check traversal
+- Credential hierarchy: secrets manager > OS credential store > encrypted file > env var > never hardcode
+
+### 4.3 Python best practices
+
+- **Type hints** on every function signature. Use `from __future__ import annotations` for Python ≤3.9.
+- **Context managers** (`with`) for all resources. Always `encoding="utf-8"` on `open()`.
+- **`pathlib.Path`** over string path concatenation.
+- **`secrets`** module for tokens/nonces/session IDs — never `random`.
+- **No `assert`** for validation — stripped by `python -O`. Use `if` + `raise`.
+- **No bare `except`** — catch specific exceptions, log, and re-raise.
+- **Never log** passwords, tokens, full request bodies, or PII.
+- **Hashing**: SHA-256 minimum for integrity. bcrypt/argon2/scrypt for passwords — never MD5/SHA1.
+- **No mutable default arguments** — use `None` + create inside the function.
+- **Pin exact versions** in requirements. Use `pip-compile` for transitive pinning.
+- **Run `bandit`** before committing. Add to pre-commit hooks or CI.
+
+### 4.4 Code quality — no spaghetti, no waste
+
+These rules apply while writing code, not just during review. Clean structure
+and good performance are not separate concerns from security — tangled code
+hides bugs and makes audits harder.
+
+**Structure:**
+- **Max nesting: 3 levels.** Use early returns/guard clauses to flatten logic.
+- **Single responsibility.** Each function does one thing. If you can't name it
+  without "and", split it.
+- **No god functions.** Functions over ~40 lines are doing too much — split by
+  responsibility (validation, transformation, I/O, presentation).
+- **Clear data flow.** Inputs in, outputs out. Minimize side effects. Never hide
+  state mutations inside getters or utility functions.
+- **One-direction dependencies.** High-level modules import low-level, never the
+  reverse. No circular imports — extract shared logic to a third module.
+- **Don't abstract prematurely.** Three similar lines are better than an
+  AbstractStrategyFactoryProvider. Extract only when the logic is genuinely the
+  same concept repeated, not just similar-looking code.
+- **Don't copy-paste.** When the same validation/transformation appears in 3+
+  places with identical logic, extract it. But only when it's the same *concept*,
+  not just coincidentally similar code.
+
+**Performance:**
+- **No N+1 queries.** Never query inside a loop. Batch with `IN`/`ANY` or use joins.
+- **Right data structure.** Sets for membership checks, dicts for lookups — not lists.
+  O(1) vs O(n) matters when n grows.
+- **No string concatenation in loops.** Use `join()` or builders.
+- **Compute once.** Don't recompute expensive results (regex compilation, config loading,
+  API calls) inside loops when the result doesn't change.
+- **No allocations in hot paths.** Constants at module level, not re-created per call.
+- **Fetch only what you need.** No `SELECT *` when you need two columns. No loading
+  entire files to read one line. Paginate unbounded queries.
+- **Don't block.** No sync I/O on async event loops. No CPU-intensive work on the
+  main thread. Offload to workers.
+- **Bound your caches.** Unbounded `dict` caches grow forever → memory leak. Use
+  `lru_cache(maxsize=N)` or equivalent.
+- **Clean up listeners.** Event listeners and subscriptions that outlive their
+  component are memory leaks.
+- **Index your queries.** Every `WHERE` clause on a column used in production
+  should have an index. Flag missing indexes.
+
+### 4.5 Attack surface checklist
+
+Before finalizing any piece of code:
+
+- [ ] **Authentication**: every sensitive endpoint protected? Tokens validated, not just present?
+- [ ] **Authorization**: caller has permission, not just identity?
+- [ ] **Input validation**: all external input validated?
+- [ ] **Output encoding**: data encoded for output context (HTML, SQL, shell, JSON)?
+- [ ] **Error handling**: errors expose internal state to caller?
+- [ ] **Dependencies**: all packages necessary and from trusted sources?
+- [ ] **Secrets**: credentials in env/secrets manager, not source?
+- [ ] **Permissions**: file, process, DB permissions as restrictive as possible?
+- [ ] **HTTPS/TLS**: all network communication encrypted, verification enabled?
+
+### 4.6 Handling "just make it work" requests
+
+When the user wants to skip security ("just hardcode the key", "disable the cert check",
+"I'll fix it later"):
+
+1. Don't silently comply. One-line warning, no lecture.
+2. Offer the safe version first — it's usually just as fast.
+3. If the user insists, implement with a loud `# SECURITY RISK: <reason>` comment and
+   a `TODO` so it's impossible to forget. Never leave it silent.
+
+### 4.7 Security summary
+
+At natural breakpoints (end of a feature, before suggesting a commit), surface a
+brief security check:
+
+```
+Security check:
+✅ Parameterized queries for all DB access
+✅ Input validation on all route parameters
+⚠️  CORS allows all origins — tighten before production
+🚨 API key on line 42 of config.py — move to env var
+```
+
+One line per item. Don't repeat things already fixed.
+
+---
+
+## 5. Cost discipline
+
+The big cost drivers, in rough order of impact:
+1. **Long sessions** — the whole history is resent every request (~6x cost difference)
+2. **Model choice** — Opus everywhere is ~3x the cost of Sonnet
+3. **Effort level** — xhigh vs medium is ~2.3x per request
+4. **Output length** — doubling output is ~2.2x per request
+5. **Context size** — every MCP server, skill, and rule is injected into every request
+
+### 5.1 Behaviors you control directly
+
+**Bounded output.** Lead with the answer. No preamble, no recaps. Show diffs, not
+whole files. If three sentences suffice, use three sentences.
+
+**Minimal context.** Read only what the task needs. Use offset/limit and targeted
+grep. Don't re-read files already seen.
+
+**No redundant verification.** Don't re-run tests or re-read files when the tool
+result already confirmed success.
+
+### 5.2 Model gating — Sonnet ceiling
+
+Treat Sonnet as the maximum model for the session unless the user has explicitly
+approved something stronger. Concretely:
+
+- At the start of work, check which model is powering the session (stated in the
+  system prompt). If it's above Sonnet — Opus or Fable — tell the user immediately:
+  "This session is running on [model], which exceeds the Sonnet cost ceiling.
+  Run `/model sonnet` to switch down, or tell me you want to stay on [model]
+  for this task."
+- Do not proceed with substantial work on an above-ceiling model until the user
+  either switches down or explicitly approves staying. A simple "yes, stay on Opus"
+  counts — but it applies to the current task only. Re-raise if work moves to a
+  new task.
+- If a task genuinely warrants a stronger model (architecture, nasty root-cause
+  debugging, security analysis), say so and ask for approval rather than silently
+  accepting the expensive model.
+- You cannot switch the model yourself — only the user can, via `/model`. What you
+  *can* do is set `"model": "sonnet"` in `~/.claude/settings.json` so every new
+  session starts on Sonnet. Offer this once if the user keeps landing on expensive
+  models unintentionally.
+
+### 5.3 Effort fit
+
+Recommend `/effort` changes when the task doesn't match the current level:
+- **high/xhigh**: only for architecture decisions, root-cause debugging, security review
+- **medium**: routine edits, mechanical refactors, running tests, writing boilerplate
+- Remind the user to switch back down after a high-effort stretch
+
+### 5.4 MCP server and connector awareness
+
+MCP servers add per-request overhead. Check how their tools are loaded before
+reporting — don't conflate the two states:
+
+- **Active tools** (full definitions in context): expensive — often thousands to
+  tens of thousands of tokens per server, on every request.
+- **Deferred tools** (name-only, schemas loaded on demand): low overhead — a few
+  hundred tokens per turn. Report only the count for deferred servers ("N connectors
+  deferred — low overhead, no action needed"). Do not list their names.
+
+**CRITICAL: Never name a connector you cannot see.** Only list servers whose
+`mcp__<server>__` tool prefixes are literally present in your context. Do not
+infer or guess based on the user's role or company.
+
+**Only flag servers with full active tool definitions for removal** — deferred
+servers are already in the cheapest state. If you notice active servers the current
+work never touches, mention it once and offer both paths:
+
+**How the user can disable them:**
+- CLI-added: `claude mcp list` to see, `claude mcp remove <name>` to remove,
+  `/mcp` inside a session to toggle
+- Project-level in `.mcp.json`: add to `"disabledMcpjsonServers"` in
+  `.claude/settings.json`
+- Desktop app connectors: toggle in app UI (Settings → Connectors/Extensions) —
+  Claude cannot change these
+- CLI clean start: `claude --strict-mcp-config --mcp-config '{"mcpServers":{}}'`
+  launches with zero MCP servers — suggest a shell alias for users who want a
+  cheap default
+
+**After `/mcp` changes:** Re-check what's connected by examining your own context
+(tool prefixes). Do NOT use `claude mcp list` — it returns the full catalog
+including unconnected servers. Give a short before/after:
+
+```
+Connections now: Home Assistant, Slack (was: + Jira, Gmail, Calendar, Drive)
+Estimated overhead: ~12k/turn, down from ~40k/turn
+```
+
+### 5.5 Phase transitions → fresh session
+
+When work shifts phase (exploration → implementation, implementation → testing,
+task complete → new task), offer a handoff summary:
+
+> "Good point to start a fresh session — this one's carrying [N] messages of
+> exploration history. Want a handoff summary to paste into a new session?"
+
+If yes, produce:
+
+```
+## Handoff: [task name]
+**Goal:** one sentence
+**Current state:** what's done, what's verified
+**Key files:** path:line — why it matters
+**Decisions made:** constraints the next session must respect
+**Next step:** the single concrete next action
+```
+
+Keep it under ~30 lines. The point is to replace a long history with a cheap
+restart.
+
+### 5.6 End-of-task token impact estimate
+
+When a task wraps up (or the user asks "how did we do?"), surface a rough
+order-of-magnitude estimate. You can't see billing data, so be clear it's
+approximate. Build it from what you can observe:
+
+- **Per-request overhead**: MCP tool definitions, skills, rules on every request
+- **Conversation growth**: each turn resends the whole history
+- **Context loaded**: files read, their approximate sizes, unused reads
+- **Model multiplier**: if part of the session ran above Sonnet ceiling
+
+Present as 3–5 lines:
+
+```
+Token impact (rough estimate):
+✅ Saved ~40k — read only 2 relevant files instead of exploring the package
+✅ Saved ~25k/turn — session restarted at the implement phase
+⚠️ ~30k/turn overhead — 5 connected MCP servers, none used this session
+Biggest win next time: disable unused connectors
+```
+
+Skip for trivial exchanges. Never let the report become longer than the savings
+it describes.
+
+### 5.7 Tone
+
+Suggestions should be one or two sentences, woven into your normal response —
+never a lecture or a checklist dump. Once per session per topic. If the user
+declines or ignores a suggestion, drop it.
+
+---
+
+## 6. Session start
+
+When this skill loads, always open with the gate tracker:
+
+```
+Dev Skills active.
+
+🔢 VERSION    ⬜
+🔨 BUILD      ⬜
+🔒 SECURITY   ⬜
+📄 DOCS       ⬜
+📦 RELEASE    ⬜
+🚀 PUSH       ⬜
+
+Commits require explicit approval. Security scan runs after every build.
+```
+
+Then: "What are we building?"
+
+---
+
+## 7. Workflow status
+
+When asked "status", "where are we", or at any natural checkpoint, show the
+full gate tracker with current state.
+
+---
+
+## 8. Audit mode
+
+On "audit my project", "scan this codebase", "security review", or "check my code":
+
+**First, load both reference files:**
+1. Read `~/.claude/skills/dev-skills/SECURITY_REFERENCE.md`
+2. Read `~/.claude/skills/dev-skills/QUALITY_REFERENCE.md`
+
+Then:
+1. Discover source files via Glob
+2. Triage — read high-risk files first (auth, login, upload, config, api, routes,
+   crypto, token, secret, password)
+3. Grep for dangerous patterns (`eval(`, `shell=True`, `pickle.loads`, `md5`,
+   `Invoke-Expression`, `innerHTML`, hardcoded strings, `.env` files)
+4. Apply every security rule from Section 4
+5. Output findings using severity levels (🚨 Critical, ⚠️ High, 📝 Medium, 💡 Low)
+   with file:line, description, and fix for each
+6. End with summary: files scanned, total findings by severity, top 3 next steps
