@@ -176,4 +176,13 @@ Won't persist across conversations or auto-trigger — you'll need to paste each
 
 ## Version
 
-`v2.1.0`
+`v2.2.0`
+
+### Version history
+
+**v2.2.0** — 2026-08-28
+- Gate 1 now requires a release notes link alongside the repository link in any app that displays one (About dialogs, settings screens, footers, help menus)
+
+**v2.1.0** — 2026-08-28
+- Gate pre-flight enforcement on every git write operation
+- Source-code version string scanning (XAML, HTML, UI templates, About dialogs)
