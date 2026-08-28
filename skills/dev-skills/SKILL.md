@@ -33,9 +33,11 @@ explicit approval. Violations of this rule break trust.
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
 
 **When the user says "commit" or "save this":**
-1. Run `git status` and `git diff` to show what will be committed
-2. Draft a commit message and show it
-3. Wait for explicit approval before executing
+1. If building an app: confirm a test build has been created and verified working.
+   No commit without a tested build.
+2. Run `git status` and `git diff` to show what will be committed
+3. Draft a commit message and show it
+4. Wait for explicit approval before executing
 
 ---
 
@@ -88,12 +90,25 @@ Update ALL version files and add missing repo links before marking passed.
 Run the project's build command only after Gate 1 is ✅. If the build fails,
 fix and rebuild — do not advance.
 
-> ✅ **BUILD GATE PASSED** — build succeeded
+**A test build is mandatory before any commit.** When building an app, create a
+test/dev version and verify it runs correctly before staging or committing anything.
+This means:
+1. Build the project (dev/test mode where applicable)
+2. Launch or preview the app — confirm it starts, the golden path works, and
+   no regressions are visible
+3. Only after the test build is verified working does this gate pass
+
+If the app cannot be tested locally (e.g. requires external infrastructure),
+say so explicitly rather than skipping — the user decides whether to proceed.
+
+> ✅ **BUILD GATE PASSED** — test build verified working
 > Output: [artifact path]
 
-### Gate 3 — Security 🔒
+### Gate 3 — Security & Quality 🔒
 
 **Mandatory after every successful build. Not optional. Not "later."**
+
+This gate has two steps that must both pass: a security scan and a quality review.
 
 **Before scanning, load both reference files:**
 1. Read `~/.claude/skills/dev-skills/SECURITY_REFERENCE.md` — bad/good code
@@ -102,9 +117,11 @@ fix and rebuild — do not advance.
    examples for structure and performance anti-patterns.
 Use these examples to pattern-match against the code being reviewed.
 
-Run a full scan of all source files. Check for every pattern in Section 4 below.
-Also run the project's native audit tool (`npm audit`, `pip audit`, `cargo audit`,
-etc.) if available.
+#### Step 1 — Security scan
+
+Run a full scan of all source files. Check for every security pattern in
+Sections 4.1–4.3 below. Also run the project's native audit tool (`npm audit`,
+`pip audit`, `cargo audit`, etc.) if available.
 
 **Hard stops (must fix before proceeding):**
 - 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
@@ -117,10 +134,55 @@ etc.) if available.
   logging sensitive data, unpinned deps
 - 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
 
-Gate passes only at zero Critical and zero High:
+Security step passes at zero Critical and zero High:
 
-> ✅ **SECURITY GATE PASSED** — 0 Critical, 0 High
+> ✅ **Security scan passed** — 0 Critical, 0 High
 > Medium: N (shown above, user accepted) | Low: N
+
+#### Step 2 — Quality review
+
+Scan the changed code for every quality pattern in Section 4.4. Check for:
+
+**Structure issues (flag and fix):**
+- Deep nesting (>3 levels) — flatten with early returns
+- God functions (>~40 lines or multiple responsibilities) — split
+- Circular dependencies — restructure
+- Hidden side effects in getters or utility functions — rename or separate
+- Copy-pasted logic that should be shared — extract
+
+**Performance issues (flag and fix):**
+- N+1 queries — batch with IN/ANY or joins
+- Wrong data structures (lists for lookups instead of sets/dicts)
+- String concatenation in loops — use join/builders
+- Recomputation in loops (regex, config, API calls) — compute once
+- Allocations in hot paths — move constants to module level
+- Loading everything when a subset is needed — SELECT specific columns, paginate
+- Blocking I/O on async event loops — use async alternatives
+- Unbounded caches — use lru_cache with maxsize
+- Missing database indexes on queried columns
+- Event listeners never cleaned up — add teardown
+
+Report quality findings separately from security:
+
+> **Quality review — changed code:**
+> ⚠️ `app.py:45` — N+1 query inside loop (fetches orders per user)
+>    Fix: batch with `WHERE user_id = ANY(%s)`
+> ⚠️ `utils.py:120` — function is 80 lines with 5 responsibilities
+>    Fix: split into validate_input, transform_data, save_result
+> ✅ No deep nesting issues
+> ✅ No circular dependencies
+
+Quality issues don't hard-block the gate (they're not security vulnerabilities),
+but they must be surfaced and the user must acknowledge them. Fix what's
+reasonable within the current scope — flag the rest as known technical debt.
+
+#### Gate 3 combined output
+
+Both steps must complete before the gate passes:
+
+> ✅ **SECURITY & QUALITY GATE PASSED**
+> Security: 0 Critical, 0 High | Medium: N | Low: N
+> Quality: N structure issues, N performance issues (shown above, user accepted)
 
 If the user says "skip security" or "we can do security later":
 
