@@ -32,16 +32,38 @@ explicit approval. Violations of this rule break trust.
 - NEVER push to remote without passing through the Push Gate (Gate 6).
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
 
-**When the user says "commit" or "save this":**
-1. If building an app: confirm a test build has been created and verified working.
-   No commit without a tested build.
-2. Run `git status` and `git diff` to show what will be committed
-3. Draft a commit message and show it
-4. Wait for explicit approval before executing
+**Before ANY git write operation (commit, push, PR, merge, tag, release):**
+1. **Check the gate tracker.** If any gate applies to this session's work and
+   has not passed, stop and surface the blocking gate. This is not optional —
+   even if the user says "commit", "merge", or "push", check the gates FIRST.
+   The gates exist precisely for the moments when you're moving fast and want
+   to skip them.
+2. If building an app: confirm a test build has been created and verified working.
+3. Run `git status` and `git diff` to show what will be committed.
+4. Draft a commit message and show it.
+5. Wait for explicit approval before executing.
+
+**When do gates apply?** Any session that has produced code changes, version
+bumps, builds, or is heading toward a release. If the session modified source
+files and will commit them, the gates apply. The only exception is trivial
+non-code changes (typo in a comment, updating a gitignore) where no build or
+release is involved — and even then, commit approval is still required.
 
 ---
 
 ## 2. The six gates
+
+**MANDATORY PRE-FLIGHT:** Before running `git commit`, `git push`, `gh pr create`,
+`gh pr merge`, `git tag`, or `gh release create`, STOP and check:
+1. Do these gates apply to this session? (Did you modify source files, version
+   files, or build artifacts? If yes → gates apply.)
+2. What is the current gate state? Show the tracker.
+3. Are all required gates passed? If not → surface the blocking gate and do NOT
+   proceed with the git operation.
+
+This pre-flight is the enforcement mechanism. It fires on every git write
+operation, every time, with no exceptions. The user saying "commit" or "merge"
+does not bypass it — it triggers it.
 
 Every session that produces a build, release, or push moves through these gates
 in order. A gate cannot be silently skipped. If the user tries to jump ahead,
@@ -64,11 +86,16 @@ No build starts until versioning is resolved.
 **Check ALL of these:**
 1. Find every version-carrying file in the project: `package.json`, `pyproject.toml`,
    `Cargo.toml`, `VERSION`, `setup.cfg`, `build.gradle`, `pom.xml`, manifest files,
-   `Info.plist`, `AndroidManifest.xml`, etc.
-2. Every version file must show the same version and it must be bumped from the
-   previous release.
-3. Version must follow semver (MAJOR.MINOR.PATCH).
-4. **Repository link is mandatory.** Every project that has an app manifest
+   `Info.plist`, `AndroidManifest.xml`, `.csproj`, `AssemblyInfo.cs`, etc.
+2. **Search source code for hardcoded version strings.** Grep the project for the
+   current version number (e.g. `1.0.0`, `v1.0.0`). Check XAML, HTML, UI templates,
+   "About" dialogs, splash screens, window titles, headers, footers, constants, and
+   config files. Every instance must be updated — not just the manifest files.
+   A missed version string in the app's UI is a gate failure.
+3. Every version reference must show the same version and it must be bumped from
+   the previous release.
+4. Version must follow semver (MAJOR.MINOR.PATCH).
+5. **Repository link is mandatory.** Every project that has an app manifest
    (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
    `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
    it belongs to. If missing, add it before passing this gate.
@@ -78,6 +105,7 @@ If any check fails:
 > 🚫 **VERSION GATE BLOCKED**
 > Issues found:
 > - [specific issue, e.g. "package.json version is 1.0.0 but VERSION file says 1.0.1"]
+> - [e.g. "MainWindow.xaml still shows v1.0.0 in the title bar"]
 > - [e.g. "package.json missing repository field"]
 >
 > Current version: [version or "none found"]

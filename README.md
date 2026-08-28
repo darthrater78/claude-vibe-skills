@@ -80,7 +80,7 @@ The terse rules in `SKILL.md` are enough for Claude to write secure, clean code 
 
 ### Gate 1 — Version 🔢
 
-No build starts until every version file (`package.json`, `pyproject.toml`, `VERSION`, etc.) is bumped, consistent, and includes the repository URL.
+No build starts until every version file (`package.json`, `pyproject.toml`, `VERSION`, etc.) is bumped, consistent, and includes the repository URL. Also greps the entire project for hardcoded version strings in source code, UI templates (XAML, HTML), window titles, "About" dialogs, and config files — every match must be updated.
 
 ### Gate 2 — Build 🔨
 
@@ -176,4 +176,4 @@ Won't persist across conversations or auto-trigger — you'll need to paste each
 
 ## Version
 
-`v2.0.0`
+`v2.1.0`
