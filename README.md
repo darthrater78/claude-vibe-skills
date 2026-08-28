@@ -80,7 +80,7 @@ The terse rules in `SKILL.md` are enough for Claude to write secure, clean code 
 
 ### Gate 1 — Version 🔢
 
-No build starts until every version file (`package.json`, `pyproject.toml`, `VERSION`, etc.) is bumped, consistent, and includes the repository URL. Also greps the entire project for hardcoded version strings in source code, UI templates (XAML, HTML), window titles, "About" dialogs, and config files — every match must be updated.
+No build starts until every version file (`package.json`, `pyproject.toml`, `VERSION`, etc.) is bumped, consistent, and includes the repository URL. Also greps the entire project for hardcoded version strings in source code, UI templates (XAML, HTML), window titles, "About" dialogs, and config files — every match must be updated. Any app that displays a repo link must also link to the current version's release notes.
 
 ### Gate 2 — Build 🔨
 
@@ -176,4 +176,13 @@ Won't persist across conversations or auto-trigger — you'll need to paste each
 
 ## Version
 
-`v2.1.0`
+`v2.2.0`
+
+### Version history
+
+**v2.2.0** — 2026-08-28
+- Gate 1 now requires a release notes link alongside the repository link in any app that displays one (About dialogs, settings screens, footers, help menus)
+
+**v2.1.0** — 2026-08-28
+- Gate pre-flight enforcement on every git write operation
+- Source-code version string scanning (XAML, HTML, UI templates, About dialogs)
