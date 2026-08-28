@@ -99,6 +99,12 @@ No build starts until versioning is resolved.
    (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
    `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
    it belongs to. If missing, add it before passing this gate.
+6. **Release notes link is mandatory.** Every app that displays a repository link
+   (in an "About" dialog, settings screen, footer, help menu, etc.) must also
+   include a link to the current version's release notes. Use the pattern
+   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>` — the version in
+   the URL must match the version being built. If the app already shows a repo
+   link but has no release notes link, add one before passing this gate.
 
 If any check fails:
 
@@ -107,11 +113,12 @@ If any check fails:
 > - [specific issue, e.g. "package.json version is 1.0.0 but VERSION file says 1.0.1"]
 > - [e.g. "MainWindow.xaml still shows v1.0.0 in the title bar"]
 > - [e.g. "package.json missing repository field"]
+> - [e.g. "About dialog has repo link but no release notes link"]
 >
 > Current version: [version or "none found"]
 > What version should this build be? (patch / minor / major)
 
-Update ALL version files and add missing repo links before marking passed.
+Update ALL version files, add missing repo links and release notes links before marking passed.
 
 ### Gate 2 — Build 🔨
 
