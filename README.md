@@ -159,9 +159,12 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.3.1`
+`v2.3.2`
 
 ### Version history
+
+**v2.3.2** — 2026-08-30
+- Gate 4 (Docs) now includes internal consistency check — cross-checks README descriptions against SKILL.md source of truth for renamed concepts, restructured workflows, and changed terminology
 
 **v2.3.1** — 2026-08-30
 - Gate 6 (Ship) now enforces distributable artifact rebuild before release creation and verifies release assets are attached
