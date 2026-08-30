@@ -280,6 +280,12 @@ After security passes, check:
    session. Stale descriptions of removed features are a hard stop.
 4. **Architecture / dependency docs** — if the project documents external calls,
    timeout tables, architecture, or dependencies, verify they still match the code.
+5. **Internal consistency** — if the README describes how the project works (gate
+   names, workflows, install steps, feature summaries, diagrams), cross-check every
+   description against the actual source of truth (SKILL.md, code, config). Renamed
+   concepts, restructured workflows, and changed terminology must be reflected
+   everywhere — not just in the changelog. Read the full README and flag any
+   description that no longer matches.
 
 Show what was checked:
 
@@ -288,12 +294,14 @@ Show what was checked:
 > - New features: [list any docs updated]
 > - Removed features: [list any stale refs cleaned up, or "none"]
 > - Architecture/tables: [updated / no changes needed]
+> - Internal consistency: [README descriptions match source of truth, or list fixes]
 
 If documentation is missing or stale:
 
 > 🚫 **DOCS GATE BLOCKED**
 > The following documentation issues must be resolved:
 > - [specific issue, e.g. "README still references feature X which was removed"]
+> - [specific issue, e.g. "README calls Gate 6 'Push' but it was renamed to 'Ship'"]
 > - [specific issue, e.g. "No version history entry for v1.2.3"]
 >
 > Fixing now...
