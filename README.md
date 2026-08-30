@@ -8,12 +8,12 @@ One skill for disciplined vibe coding: commit approval, versioned builds, securi
 
 1. **Commits require approval.** Claude never runs `git commit`, `git push`, or `gh pr create` without your explicit say-so. No more surprise commits after a single change.
 
-2. **Six gates before anything ships.** Every session that produces a build moves through version → build → security → docs → release → push in order. No gate can be silently skipped.
+2. **Six gates before anything ships.** Every session that produces a build moves through version → build → security → docs → release → ship in order. No gate can be silently skipped.
 
 3. **Security and quality scanning.** After every build, a full code scan runs automatically — checking for hardcoded secrets, injection vectors, spaghetti code, N+1 queries, and more. Critical and high findings block the release.
 
 ```
-🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 PUSH
+🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
 ---
@@ -107,11 +107,11 @@ Checks that README/CHANGELOG has a version entry, new features are documented, r
 
 ### Gate 5 — Release 📦
 
-Creates a feature branch, gets commit approval, pushes, opens a PR with release notes, waits for your approval, merges (never squash-merges), tags, and creates a GitHub release.
+Creates a feature branch, gets commit approval, pushes, and opens a PR with release notes. Waits for your approval before proceeding — never merges without it.
 
-### Gate 6 — Push 🚀
+### Gate 6 — Ship 🚀
 
-Shows the full push summary and waits for your explicit typed confirmation. "yeah" is not enough — type "push" or "confirm push".
+Merges the PR, tags the merge commit, creates a GitHub release with artifacts, and runs post-ship verification (tag on remote, release exists, PR merged, release assets attached). Shows the full ship summary and waits for explicit confirmation — "yeah" is not enough, type "ship" or "confirm ship".
 
 ---
 
@@ -149,9 +149,9 @@ Say "audit my project", "scan this codebase", or "security review" to trigger a 
 
 This single skill replaces all four previous skills:
 - `dev-mode.skill` — no longer needed (this skill is always-on)
-- `cost-saver.skill` — merged into Section 5 (Cost discipline)
-- `vibe-coding-workflow.skill` — merged into Section 2 (The six gates)
-- `vibe-secure-vibe-coding.skill` — merged into Section 4 (Security rules)
+- `cost-saver.skill` — merged into Cost discipline
+- `vibe-coding-workflow.skill` — merged into The six gates
+- `vibe-secure-vibe-coding.skill` — merged into Security rules
 
 Uninstall the old skills and install `dev-skills.skill`. Everything that worked before still works — plus commit approval, code quality scanning, Windows/Linux platform security, and lower token costs via two-tier loading.
 
