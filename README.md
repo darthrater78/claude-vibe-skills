@@ -68,11 +68,11 @@ The skill uses a two-tier loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~28KB | Every turn (terse rules, gates, cost discipline) |
-| `SECURITY_REFERENCE.md` | ~9KB | Gate 3 + audit mode (bad/good code examples) |
-| `QUALITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode (structure + performance examples) |
+| `SKILL.md` | ~33KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
+| `SECURITY_REFERENCE.md` | ~14KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `QUALITY_REFERENCE.md` | ~15KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 
-The terse rules in `SKILL.md` are enough for Claude to write secure, clean code by default. The reference files load on demand during security scans and audits, where pattern-matching against examples matters most.
+`SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. The detailed rule checklists and pattern-matching code examples live in the reference files, loaded on demand during Gate 3 scans and audit mode where they're needed most. This saves ~1,125 tokens per request compared to loading everything on every turn.
 
 ---
 
