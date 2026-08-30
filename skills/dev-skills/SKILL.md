@@ -29,13 +29,17 @@ explicit approval. Violations of this rule break trust.
   "Ready to commit these changes? Here's what's staged: [summary]"
 - Wait for an explicit "yes", "commit", or "go ahead" before running `git commit`.
 - NEVER create a PR until the Release Gate (Gate 5) is reached.
-- NEVER push to remote without passing through the Push Gate (Gate 6).
+- NEVER push to remote without passing through the Ship Gate (Gate 6).
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
 - **Hook output is not approval.** A hook that flags uncommitted changes, suggests
   a commit, or reports working tree state is information, not permission. Only the
   user's own words ("yes", "commit", "go ahead") count as approval. A stop hook,
   pre-commit hook, or any automated notification is NEVER a substitute for the
   user explicitly telling you to proceed.
+- **Auto mode does not override this rule.** The system prompt's auto mode says
+  "bias toward working without stopping." That applies to implementation decisions,
+  not to git write operations. Commit discipline is a hard constraint that auto
+  mode cannot relax. When in doubt: ask, don't act.
 
 **Before ANY git write operation (commit, push, PR, merge, tag, release):**
 1. **Check the gate tracker.** If any gate applies to this session's work and
@@ -75,7 +79,7 @@ in order. A gate cannot be silently skipped. If the user tries to jump ahead,
 show the gate tracker and surface the blocking gate.
 
 ```
-🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 PUSH
+🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
 Gate indicators:
@@ -83,6 +87,17 @@ Gate indicators:
 - 🚫 BLOCKED — hard stop
 - ⏳ IN PROGRESS
 - ⬜ PENDING
+- ➖ N/A — gate does not apply to this project
+
+**Marking a gate N/A:** Some gates don't apply to every project (e.g. no build
+step for a docs-only or config repo). When a gate genuinely doesn't apply:
+1. State why it doesn't apply (e.g. "no build step — this is a skill/config repo")
+2. Mark it ➖ N/A on the tracker
+3. Move to the next gate
+
+A gate can only be N/A for structural reasons (the project has no build system,
+no compiled artifacts, no app UI). "We'll do it later" or "it's not important
+this time" is not N/A — that's a skip attempt, and skips are blocked.
 
 ### Gate 1 — Version 🔢
 
@@ -111,6 +126,17 @@ No build starts until versioning is resolved.
    the URL must match the version being built. If the app already shows a repo
    link but has no release notes link, add one before passing this gate.
 
+7. **Previous version tags must exist.** Run `git tag -l` and verify that prior
+   released versions have corresponding git tags. If the previous version (the one
+   being bumped from) has no tag, flag it:
+
+   > ⚠️ **Missing tag for previous version:** v1.2.2 was released but has no git tag.
+   > This should be fixed (retroactively tag the merge commit) before or alongside
+   > this release.
+
+   Missing tags for older versions should be noted but don't hard-block — fix them
+   if the merge commits are identifiable, flag them otherwise.
+
 If any check fails:
 
 > 🚫 **VERSION GATE BLOCKED**
@@ -119,6 +145,7 @@ If any check fails:
 > - [e.g. "MainWindow.xaml still shows v1.0.0 in the title bar"]
 > - [e.g. "package.json missing repository field"]
 > - [e.g. "About dialog has repo link but no release notes link"]
+> - [e.g. "v1.2.2 has no git tag — needs retroactive tagging"]
 >
 > Current version: [version or "none found"]
 > What version should this build be? (patch / minor / major)
@@ -141,6 +168,13 @@ This means:
 If the app cannot be tested locally (e.g. requires external infrastructure),
 say so explicitly rather than skipping — the user decides whether to proceed.
 
+**Projects with no build step** (config repos, skill repos, documentation-only
+repos, pure script collections): mark this gate ➖ N/A with an explanation:
+
+> ➖ **BUILD GATE N/A** — this is a [skill/config/docs] repo with no build system.
+
+Do not silently skip — always show the N/A status on the tracker.
+
 > ✅ **BUILD GATE PASSED** — test build verified working
 > Output: [artifact path]
 
@@ -160,8 +194,9 @@ Use these examples to pattern-match against the code being reviewed.
 
 #### Step 1 — Security scan
 
-Run a full scan of all source files. Check for every security pattern in
-Sections 4.1–4.3 below. Also run the project's native audit tool (`npm audit`,
+Run a full scan of all source files. Check for every pattern category in
+Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` (loaded
+above). Also run the project's native audit tool (`npm audit`,
 `pip audit`, `cargo audit`, etc.) if available.
 
 **Hard stops (must fix before proceeding):**
@@ -182,7 +217,8 @@ Security step passes at zero Critical and zero High:
 
 #### Step 2 — Quality review
 
-Scan the changed code for every quality pattern in Section 4.4. Check for:
+Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md` (loaded
+above) and the checklist below:
 
 **Structure issues (flag and fix):**
 - Deep nesting (>3 levels) — flatten with early returns
@@ -266,13 +302,17 @@ Fix any issues found. Rebuild if doc fixes affected source files.
 
 ### Gate 5 — Release 📦
 
+This gate prepares the release: branch, commit, PR, and release notes draft.
+Execution (merge, tag, publish) happens in Gate 6.
+
+**Steps:**
 1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
 2. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
 3. Commit to the feature branch
 4. Push the branch and create a PR against the default branch
-5. Show the PR and release notes draft to the user for approval:
+5. Draft release notes and show the PR + notes to the user:
 
-   > 📝 **PR and release notes draft — please confirm before merging:**
+   > 📝 **PR created — review before shipping:**
    >
    > **v1.2.3**
    > - [change 1 from this session]
@@ -280,23 +320,78 @@ Fix any issues found. Rebuild if doc fixes affected source files.
    >
    > PR: [url]
    >
-   > Do these accurately describe what's in this build? Reply "yes" to merge
-   > and release, or tell me what to change.
+   > Do these accurately describe what's in this build? Reply "yes" to ship,
+   > or tell me what to change.
 
-6. Wait for explicit approval before merging
-7. Merge with `gh pr merge --merge --delete-branch` — **never squash-merge**
-8. Pull merged default branch, tag the merge commit, push the tag
-9. Create the GitHub release with approved notes and attach artifacts
+6. Wait for explicit approval of the PR content and release notes
 
 **Never commit directly to main/master.** Branch protection is enforced.
 **Exception:** `darthrater78/scripts` allows direct pushes but PRs are preferred.
+
+> ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
+> Pending: merge, tag, and publish (Gate 6)
+
+### Gate 6 — Ship 🚀
+
+This gate executes the release: merge, tag, and publish. It is the single
+execution point for all three — they happen here, not in Gate 5.
+
+**Pre-ship summary:** Present everything that will happen and wait for explicit
+confirmation. A vague "yeah" or "ok" is not enough — the user must say "ship",
+"push", "yes push", or "go ahead."
+
+> **Ready to ship. Please confirm:**
+>
+> Branch: `release/v1.2.3` → `main`
+> PR: [url]
+> Tag to create: `v1.2.3`
+> Release notes: [first line of approved notes]
+> Artifact: [path/size, or "none" for non-app projects]
+>
+> Type **"ship"** to confirm, or tell me what to adjust.
+
+**Execution (all three steps, in order):**
+```
+gh pr merge <number> --merge --delete-branch
+git checkout main && git pull origin main
+git tag v1.2.3
+git push origin v1.2.3
+gh release create v1.2.3 --title "v1.2.3" --notes "..."
+```
+
+**Post-ship verification (mandatory — the gate does not pass without this):**
+After executing, verify that every step actually succeeded:
+
+1. **Tag exists on remote:** run `git ls-remote --tags origin v1.2.3` — must
+   return the tag. If not, the tag push failed — fix and retry.
+2. **GitHub release exists:** check that the release is visible (via
+   `gh release view v1.2.3` or the GitHub API). If not, create it.
+3. **PR is merged:** confirm the PR state is "merged", not just "closed."
+
+Only after all three verifications pass:
+
+> ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
+> Release URL: [url]
+> Verified: tag on remote ✅ | release exists ✅ | PR merged ✅
+
+If any verification fails:
+
+> 🚫 **SHIP GATE BLOCKED — post-ship verification failed**
+> - Tag on remote: [✅ or ❌ — details]
+> - Release exists: [✅ or ❌ — details]
+> - PR merged: [✅ or ❌ — details]
+>
+> Fixing...
+
+Fix the failed step and re-verify. Do not mark the gate passed until all three
+verifications succeed.
 
 #### Updating an existing release artifact (`--clobber`)
 
 If the artifact is uploaded to an *existing* release (e.g. `gh release upload --clobber`),
 the original release notes are now stale. This is a hard stop:
 
-> 🚫 **RELEASE GATE BLOCKED — notes are stale**
+> 🚫 **SHIP GATE BLOCKED — notes are stale**
 > The artifact has been updated but the release notes still describe the original build.
 > Changes since the notes were written: [summarise from session context]
 >
@@ -304,7 +399,7 @@ the original release notes are now stale. This is a hard stop:
 >
 > Or if the changes warrant it, bump to vN+1 instead of patching silently.
 
-Do not mark the release gate passed until either:
+Do not mark the gate passed until either:
 - The notes have been edited to reflect the updated artifact, **or**
 - The user explicitly acknowledges the notes are intentionally unchanged and explains why
 
@@ -312,48 +407,15 @@ Do not mark the release gate passed until either:
 
 If the user says "we don't do releases" or "we'll do it later":
 
-> 🚫 **RELEASE GATE BLOCKED**
+> 🚫 **SHIP GATE BLOCKED**
 > Builds that aren't released are invisible to everyone else. Where should this
 > be published?
 > If there's genuinely no release mechanism for this project, confirm that
 > explicitly and we can mark it as acknowledged.
 
-After release is published:
-
-> ✅ **RELEASE GATE PASSED** — v1.2.3 published
-> Release URL: [url]
-> Notes confirmed: [first line of approved notes]
-
-### Gate 6 — Push 🚀
-
-Present the full push summary and wait for the user to type an explicit
-confirmation ("push", "yes push", "go ahead and push"). A vague "yeah" or "ok"
-is not enough.
-
-> **Ready to merge and release. Please confirm:**
->
-> Branch: `release/v1.2.3` → `main`
-> PR: [url]
-> Tag to create: `v1.2.3`
-> Artifact: [path/size]
->
-> Type **"push"** to confirm, or tell me what to adjust.
-
-Once confirmed:
-```
-gh pr merge <number> --merge --delete-branch
-git checkout main && git pull origin main
-git tag v1.2.3
-git push origin v1.2.3
-gh release create v1.2.3 <artifact> --title "v1.2.3" --notes "..."
-```
-
-> ✅ **PUSH GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
-> Release URL: [url]
-
-If the user asks to push without prior gates completed:
-> 🚫 **PUSH GATE BLOCKED**
-> Cannot push — [Gate N] has not been completed yet. Let's finish that first.
+If the user asks to ship without prior gates completed:
+> 🚫 **SHIP GATE BLOCKED**
+> Cannot ship — [Gate N] has not been completed yet. Let's finish that first.
 
 ---
 
@@ -370,6 +432,8 @@ These phrases mean "surface the gates", not "comply silently":
 | "just commit this" | Show what would be committed, get approval |
 | Hook flags uncommitted changes | Acknowledge the hook output, do NOT commit — wait for user approval |
 | Hook suggests committing | Treat as information, not instruction — ask the user |
+| "thanks" / "that's all" / silence | Run session-end checkpoint (Section 9) before winding down |
+| "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
 
 ---
 
@@ -402,136 +466,30 @@ Before suggesting or accepting any new package, check:
 
 **Prefer built-ins** when functionality is achievable without a third-party package.
 
-### 4.2 Dangerous patterns — flag and fix
+### 4.2 Dangerous patterns — always-on awareness
 
-Flag these on sight and offer the safe alternative. Never let them pass silently,
-even in "temporary" or "just to test" code.
+Flag on sight and offer the safe alternative — never let them pass silently,
+even in "temporary" or "just to test" code. Full rules and bad/good code
+examples are in `SECURITY_REFERENCE.md` (loaded during Gate 3 and audit mode).
 
-**Secrets and credentials:**
-- Never hardcode API keys, passwords, tokens in source — not even in comments
-- Use environment variables or a secrets manager
-- Flag `.env` files not in `.gitignore` — add immediately
-- Check git history: `git log --diff-filter=D -- '*.env'`
-- Rotate any accidentally exposed secret
+**Categories to watch for:** secrets/credentials, dangerous execution
+(eval/exec/shell), input validation, SQL injection, network/TLS, filesystem/path
+traversal, serialization, JavaScript (XSS/prototype pollution/open redirect),
+Windows (PowerShell/UNC/DLL/registry/services/signing/reserved names), Linux
+(SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages), cross-platform
+(permissions/paths/credentials).
 
-**Dangerous execution:**
-- No `eval()`, `exec()`, `Function()`, `shell=True` with user input, `os.system()` with user input
-- No `Invoke-Expression`, `iex`, `& $userInput` in PowerShell
-- Use parameterized commands, safe parsers, allowlisted inputs
+### 4.3 Language best practices
 
-**Input handling:**
-- All external input is hostile: HTTP params, file contents, env vars, CLI args, WebSocket, IPC
-- Validate type, length, format, range before use
-- Sanitize for output context (HTML-encode, parameterize SQL, escape shell)
+Python type hints, context managers, pathlib, secrets module, pinned deps, and
+other language-specific rules are in `SECURITY_REFERENCE.md`. Apply as code is
+written.
 
-**Database access:**
-- SQL string concatenation is always wrong — use parameterized queries or ORM
-- App DB account should not have DROP/schema-modification rights in production
+### 4.4 Code quality — structure and performance
 
-**Network and HTTP:**
-- Never disable TLS: `verify=False`, `rejectUnauthorized: false`, `InsecureSkipVerify: true`
-- Validate and allowlist URLs before server-side requests (SSRF prevention)
-- Never reflect stack traces or internal paths to clients
-
-**File system:**
-- Validate paths against traversal — reject `../`, absolute paths from user input, null bytes
-- Restrictive permissions: `0o600` (Unix) / owner-only ACLs (Windows) for secrets
-- Never pass user-controlled strings directly to file open/delete
-
-**Serialization:**
-- No `pickle`/`marshal`/`ObjectInputStream`/`unserialize()` on untrusted data
-- Use JSON with schema validation
-
-**JavaScript/Node-specific:**
-- Prototype pollution: check for `__proto__`, `constructor`, `prototype` in user-supplied keys
-- XSS: no `innerHTML` with user data — use `textContent` or DOMPurify
-- Open redirect: allowlist redirect targets, never `res.redirect(req.query.url)` raw
-
-**Windows-specific:**
-- PowerShell injection: no `Invoke-Expression`/`iex`/`& $userInput` — use parameter arrays
-- UNC path injection: reject `\\` and `//` prefixed paths from user input (NTLM hash leak)
-- DLL hijacking: use absolute paths for `LoadLibrary`/`ctypes.CDLL`, call `SetDllDirectory("")`
-- Credential storage: use DPAPI/Credential Manager/`keyring` — never plaintext in registry or config
-- Registry: use `HKCU` not `HKLM` unless needed, set restrictive ACLs, validate data read back
-- Services: never run as `SYSTEM` — use dedicated service accounts, gMSA where available
-- Code signing: sign with Authenticode, never bypass execution policy
-- Path hazards: reject reserved names (`CON`, `PRN`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`),
-  handle MAX_PATH, account for case insensitivity
-
-**Linux-specific:**
-- SUID/SGID: never set SUID casually — prefer Linux capabilities (`setcap`)
-- Containers: never run as root, never `--privileged`, drop all caps and add back selectively,
-  never mount Docker socket, pin base image digests not tags, use `--read-only` root filesystem
-- Symlink/TOCTOU: use `mkstemp()`/`NamedTemporaryFile()`, not predictable temp paths;
-  `O_NOFOLLOW` to refuse symlinks
-- Systemd: add `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`,
-  `CapabilityBoundingSet`; flag units running as root without hardening
-- SSH keys: `0600` private / `0644` public, never commit to git, prefer Ed25519,
-  avoid agent forwarding on untrusted hosts (use `ProxyJump`)
-- Cron: absolute paths only, scripts not world-writable, no credentials in crontab
-- SELinux/AppArmor: never `setenforce 0` or disable profiles as a fix — diagnose the policy
-- Package repos: verify GPG fingerprints, reject unsigned repos, pin third-party packages
-
-**Cross-platform:**
-- File permissions: `0o600`/`chmod` on Unix, `icacls` owner-only on Windows
-- Path validation: reject UNC paths, reject Windows reserved names, check traversal
-- Credential hierarchy: secrets manager > OS credential store > encrypted file > env var > never hardcode
-
-### 4.3 Python best practices
-
-- **Type hints** on every function signature. Use `from __future__ import annotations` for Python ≤3.9.
-- **Context managers** (`with`) for all resources. Always `encoding="utf-8"` on `open()`.
-- **`pathlib.Path`** over string path concatenation.
-- **`secrets`** module for tokens/nonces/session IDs — never `random`.
-- **No `assert`** for validation — stripped by `python -O`. Use `if` + `raise`.
-- **No bare `except`** — catch specific exceptions, log, and re-raise.
-- **Never log** passwords, tokens, full request bodies, or PII.
-- **Hashing**: SHA-256 minimum for integrity. bcrypt/argon2/scrypt for passwords — never MD5/SHA1.
-- **No mutable default arguments** — use `None` + create inside the function.
-- **Pin exact versions** in requirements. Use `pip-compile` for transitive pinning.
-- **Run `bandit`** before committing. Add to pre-commit hooks or CI.
-
-### 4.4 Code quality — no spaghetti, no waste
-
-These rules apply while writing code, not just during review. Clean structure
-and good performance are not separate concerns from security — tangled code
-hides bugs and makes audits harder.
-
-**Structure:**
-- **Max nesting: 3 levels.** Use early returns/guard clauses to flatten logic.
-- **Single responsibility.** Each function does one thing. If you can't name it
-  without "and", split it.
-- **No god functions.** Functions over ~40 lines are doing too much — split by
-  responsibility (validation, transformation, I/O, presentation).
-- **Clear data flow.** Inputs in, outputs out. Minimize side effects. Never hide
-  state mutations inside getters or utility functions.
-- **One-direction dependencies.** High-level modules import low-level, never the
-  reverse. No circular imports — extract shared logic to a third module.
-- **Don't abstract prematurely.** Three similar lines are better than an
-  AbstractStrategyFactoryProvider. Extract only when the logic is genuinely the
-  same concept repeated, not just similar-looking code.
-- **Don't copy-paste.** When the same validation/transformation appears in 3+
-  places with identical logic, extract it. But only when it's the same *concept*,
-  not just coincidentally similar code.
-
-**Performance:**
-- **No N+1 queries.** Never query inside a loop. Batch with `IN`/`ANY` or use joins.
-- **Right data structure.** Sets for membership checks, dicts for lookups — not lists.
-  O(1) vs O(n) matters when n grows.
-- **No string concatenation in loops.** Use `join()` or builders.
-- **Compute once.** Don't recompute expensive results (regex compilation, config loading,
-  API calls) inside loops when the result doesn't change.
-- **No allocations in hot paths.** Constants at module level, not re-created per call.
-- **Fetch only what you need.** No `SELECT *` when you need two columns. No loading
-  entire files to read one line. Paginate unbounded queries.
-- **Don't block.** No sync I/O on async event loops. No CPU-intensive work on the
-  main thread. Offload to workers.
-- **Bound your caches.** Unbounded `dict` caches grow forever → memory leak. Use
-  `lru_cache(maxsize=N)` or equivalent.
-- **Clean up listeners.** Event listeners and subscriptions that outlive their
-  component are memory leaks.
-- **Index your queries.** Every `WHERE` clause on a column used in production
-  should have an index. Flag missing indexes.
+Quality rules (nesting limits, single responsibility, N+1 queries, data
+structures, caching, blocking I/O, etc.) with bad/good code examples are in
+`QUALITY_REFERENCE.md`. Apply as code is written, not just during Gate 3.
 
 ### 4.5 Attack surface checklist
 
@@ -737,7 +695,7 @@ Dev Skills active.
 🔒 SECURITY   ⬜
 📄 DOCS       ⬜
 📦 RELEASE    ⬜
-🚀 PUSH       ⬜
+🚀 SHIP       ⬜
 
 Commits require explicit approval. Security scan runs after every build.
 ```
@@ -753,7 +711,43 @@ full gate tracker with current state.
 
 ---
 
-## 8. Audit mode
+## 8. Session-end checkpoint
+
+**This fires when the session is winding down** — the user says "thanks",
+"that's all", "looks good", goes silent, or otherwise signals the work is done.
+
+Before wrapping up, check:
+
+1. **Were source files modified in this session?** (`git status` and `git diff`
+   against the session's starting commit)
+2. **If yes — are all applicable gates complete?** Show the gate tracker. Any
+   gate that is not ✅ or ➖ N/A is unfinished work.
+3. **Specifically check for the most common miss:** code was committed and merged
+   but never tagged or released. Run `git tag -l` and compare against the version
+   in the project's version file(s). If the current version has no tag, flag it:
+
+   > ⚠️ **Session-end check: version v1.2.3 has no git tag or GitHub release.**
+   > The code is merged but not tagged/released. Should we finish Gates 5-6 now?
+
+4. **If no source files were modified**, skip the gate check — the session was
+   exploratory or advisory.
+
+Do NOT silently wind down a session that has uncommitted changes, untagged
+versions, or incomplete gates. Surface the gap and let the user decide.
+
+> **Session-end gate status:**
+> 🔢 VERSION    ✅ v1.2.3
+> 🔨 BUILD      ➖ N/A (config repo)
+> 🔒 SECURITY   ✅
+> 📄 DOCS       ✅
+> 📦 RELEASE    ✅ PR #42
+> 🚀 SHIP       🚫 NOT DONE — tag and release missing
+>
+> Should we finish shipping before wrapping up?
+
+---
+
+## 9. Audit mode
 
 On "audit my project", "scan this codebase", "security review", or "check my code":
 

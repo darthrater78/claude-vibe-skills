@@ -1,7 +1,52 @@
 # Code Quality Pattern Reference
 
 This file is loaded on demand by the dev-skills skill during Gate 3 and quality
-review. It contains bad/good code examples for structure and performance patterns.
+review. It contains rules and bad/good code examples for structure and
+performance patterns.
+
+---
+
+## Rules — apply as code is written
+
+These rules apply while writing code, not just during Gate 3 quality review.
+Clean structure and good performance are not separate concerns from security —
+tangled code hides bugs and makes audits harder.
+
+**Structure:**
+- **Max nesting: 3 levels.** Use early returns/guard clauses to flatten logic.
+- **Single responsibility.** Each function does one thing. If you can't name it
+  without "and", split it.
+- **No god functions.** Functions over ~40 lines are doing too much — split by
+  responsibility (validation, transformation, I/O, presentation).
+- **Clear data flow.** Inputs in, outputs out. Minimize side effects. Never hide
+  state mutations inside getters or utility functions.
+- **One-direction dependencies.** High-level modules import low-level, never the
+  reverse. No circular imports — extract shared logic to a third module.
+- **Don't abstract prematurely.** Three similar lines are better than an
+  AbstractStrategyFactoryProvider. Extract only when the logic is genuinely the
+  same concept repeated, not just similar-looking code.
+- **Don't copy-paste.** When the same validation/transformation appears in 3+
+  places with identical logic, extract it. But only when it's the same *concept*,
+  not just coincidentally similar code.
+
+**Performance:**
+- **No N+1 queries.** Never query inside a loop. Batch with `IN`/`ANY` or use joins.
+- **Right data structure.** Sets for membership checks, dicts for lookups — not lists.
+  O(1) vs O(n) matters when n grows.
+- **No string concatenation in loops.** Use `join()` or builders.
+- **Compute once.** Don't recompute expensive results (regex compilation, config loading,
+  API calls) inside loops when the result doesn't change.
+- **No allocations in hot paths.** Constants at module level, not re-created per call.
+- **Fetch only what you need.** No `SELECT *` when you need two columns. No loading
+  entire files to read one line. Paginate unbounded queries.
+- **Don't block.** No sync I/O on async event loops. No CPU-intensive work on the
+  main thread. Offload to workers.
+- **Bound your caches.** Unbounded `dict` caches grow forever → memory leak. Use
+  `lru_cache(maxsize=N)` or equivalent.
+- **Clean up listeners.** Event listeners and subscriptions that outlive their
+  component are memory leaks.
+- **Index your queries.** Every `WHERE` clause on a column used in production
+  should have an index. Flag missing indexes.
 
 ---
 
