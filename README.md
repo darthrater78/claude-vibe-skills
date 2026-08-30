@@ -176,12 +176,23 @@ Won't persist across conversations or auto-trigger — you'll need to paste each
 
 ## Version
 
-`v2.2.0`
+`v2.3.0`
 
 ### Version history
 
+**v2.3.0** — 2026-08-30
+- Gate 5/6 restructured: Release (PR prep) and Ship (merge+tag+publish with mandatory post-verification)
+- Hook output is never commit approval — explicit guard added
+- Auto mode cannot override commit discipline
+- N/A gate mechanism (➖) for structurally inapplicable gates
+- Session-end checkpoint catches uncommitted changes and untagged versions before winding down
+- Self-check at session start verifies reference files exist
+- Performance trim: moved ~104 lines of detailed security/quality rules from SKILL.md to on-demand reference files (~1,125 tokens/request savings)
+- Reference files now include full rule checklists alongside code examples
+
 **v2.2.0** — 2026-08-28
 - Gate 1 now requires a release notes link alongside the repository link in any app that displays one (About dialogs, settings screens, footers, help menus)
+- Fix: prevent hook output from being treated as commit approval
 
 **v2.1.0** — 2026-08-28
 - Gate pre-flight enforcement on every git write operation

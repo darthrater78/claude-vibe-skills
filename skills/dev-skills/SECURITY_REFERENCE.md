@@ -1,8 +1,97 @@
 # Security Pattern Reference
 
 This file is loaded on demand by the dev-skills skill during Gate 3 (security
-scan) and audit mode. It contains bad/good code examples for every security
-pattern. Use these to pattern-match against code being reviewed.
+scan) and audit mode. It contains rules and bad/good code examples for every
+security pattern. Use these to pattern-match against code being reviewed.
+
+---
+
+## Rules — flag on sight during any coding session
+
+These rules apply as code is written, not just during Gate 3 scans.
+
+**Secrets and credentials:**
+- Never hardcode API keys, passwords, tokens in source — not even in comments
+- Use environment variables or a secrets manager
+- Flag `.env` files not in `.gitignore` — add immediately
+- Check git history: `git log --diff-filter=D -- '*.env'`
+- Rotate any accidentally exposed secret
+
+**Dangerous execution:**
+- No `eval()`, `exec()`, `Function()`, `shell=True` with user input, `os.system()` with user input
+- No `Invoke-Expression`, `iex`, `& $userInput` in PowerShell
+- Use parameterized commands, safe parsers, allowlisted inputs
+
+**Input handling:**
+- All external input is hostile: HTTP params, file contents, env vars, CLI args, WebSocket, IPC
+- Validate type, length, format, range before use
+- Sanitize for output context (HTML-encode, parameterize SQL, escape shell)
+
+**Database access:**
+- SQL string concatenation is always wrong — use parameterized queries or ORM
+- App DB account should not have DROP/schema-modification rights in production
+
+**Network and HTTP:**
+- Never disable TLS: `verify=False`, `rejectUnauthorized: false`, `InsecureSkipVerify: true`
+- Validate and allowlist URLs before server-side requests (SSRF prevention)
+- Never reflect stack traces or internal paths to clients
+
+**File system:**
+- Validate paths against traversal — reject `../`, absolute paths from user input, null bytes
+- Restrictive permissions: `0o600` (Unix) / owner-only ACLs (Windows) for secrets
+- Never pass user-controlled strings directly to file open/delete
+
+**Serialization:**
+- No `pickle`/`marshal`/`ObjectInputStream`/`unserialize()` on untrusted data
+- Use JSON with schema validation
+
+**JavaScript/Node-specific:**
+- Prototype pollution: check for `__proto__`, `constructor`, `prototype` in user-supplied keys
+- XSS: no `innerHTML` with user data — use `textContent` or DOMPurify
+- Open redirect: allowlist redirect targets, never `res.redirect(req.query.url)` raw
+
+**Windows-specific:**
+- PowerShell injection: no `Invoke-Expression`/`iex`/`& $userInput` — use parameter arrays
+- UNC path injection: reject `\\` and `//` prefixed paths from user input (NTLM hash leak)
+- DLL hijacking: use absolute paths for `LoadLibrary`/`ctypes.CDLL`, call `SetDllDirectory("")`
+- Credential storage: use DPAPI/Credential Manager/`keyring` — never plaintext in registry or config
+- Registry: use `HKCU` not `HKLM` unless needed, set restrictive ACLs, validate data read back
+- Services: never run as `SYSTEM` — use dedicated service accounts, gMSA where available
+- Code signing: sign with Authenticode, never bypass execution policy
+- Path hazards: reject reserved names (`CON`, `PRN`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`),
+  handle MAX_PATH, account for case insensitivity
+
+**Linux-specific:**
+- SUID/SGID: never set SUID casually — prefer Linux capabilities (`setcap`)
+- Containers: never run as root, never `--privileged`, drop all caps and add back selectively,
+  never mount Docker socket, pin base image digests not tags, use `--read-only` root filesystem
+- Symlink/TOCTOU: use `mkstemp()`/`NamedTemporaryFile()`, not predictable temp paths;
+  `O_NOFOLLOW` to refuse symlinks
+- Systemd: add `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`,
+  `CapabilityBoundingSet`; flag units running as root without hardening
+- SSH keys: `0600` private / `0644` public, never commit to git, prefer Ed25519,
+  avoid agent forwarding on untrusted hosts (use `ProxyJump`)
+- Cron: absolute paths only, scripts not world-writable, no credentials in crontab
+- SELinux/AppArmor: never `setenforce 0` or disable profiles as a fix — diagnose the policy
+- Package repos: verify GPG fingerprints, reject unsigned repos, pin third-party packages
+
+**Cross-platform:**
+- File permissions: `0o600`/`chmod` on Unix, `icacls` owner-only on Windows
+- Path validation: reject UNC paths, reject Windows reserved names, check traversal
+- Credential hierarchy: secrets manager > OS credential store > encrypted file > env var > never hardcode
+
+**Python best practices:**
+- Type hints on every function signature. Use `from __future__ import annotations` for Python ≤3.9.
+- Context managers (`with`) for all resources. Always `encoding="utf-8"` on `open()`.
+- `pathlib.Path` over string path concatenation.
+- `secrets` module for tokens/nonces/session IDs — never `random`.
+- No `assert` for validation — stripped by `python -O`. Use `if` + `raise`.
+- No bare `except` — catch specific exceptions, log, and re-raise.
+- Never log passwords, tokens, full request bodies, or PII.
+- Hashing: SHA-256 minimum for integrity. bcrypt/argon2/scrypt for passwords — never MD5/SHA1.
+- No mutable default arguments — use `None` + create inside the function.
+- Pin exact versions in requirements. Use `pip-compile` for transitive pinning.
+- Run `bandit` before committing. Add to pre-commit hooks or CI.
 
 ---
 
