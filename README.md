@@ -30,35 +30,33 @@ Download `dev-skills.skill` from the [latest release](../../releases/latest).
 
 ## Install
 
+### Claude.ai (browser — recommended)
+
+1. Download `dev-skills.skill` from the [latest release](../../releases/latest)
+2. Go to [claude.ai](https://claude.ai) → **Customize** → **Skills** → upload the `.skill` file
+3. The skill syncs to Claude Desktop and Claude Code on the web automatically
+
 ### Claude Desktop (Windows / macOS)
 
 1. Download `dev-skills.skill` from the [latest release](../../releases/latest)
-2. Open Claude Desktop → **Customize** → **Import skill**
-3. Select `dev-skills.skill`
-4. **Fully close and restart Claude Desktop** (quit from system tray, not just close the window)
+2. Open Claude Desktop → **Customize** → **Skills** → upload the `.skill` file
 
 The skill activates automatically based on trigger phrases — just talk to Claude normally.
 
 ### Claude Code (CLI)
 
-Skills installed in Claude Desktop are automatically available in Claude Code on the same machine.
-
-Alternatively, extract the `.skill` file (it's a zip) to `~/.claude/skills/dev-skills/`:
+Skills uploaded via claude.ai sync automatically. To install manually instead,
+extract the `.skill` file (it's a zip) to `~/.claude/skills/dev-skills/`:
 
 ```bash
 mkdir -p ~/.claude/skills/dev-skills
 unzip dev-skills.skill -d ~/.claude/skills/dev-skills/
 ```
 
-### Ad hoc use (no install)
+### Claude Code on the web (claude.ai/code)
 
-Drop the `.skill` file into a Claude Desktop chat, or reference it in Claude Code:
-
-```bash
-claude "@path/to/dev-skills.skill let's build this"
-```
-
-Session-only — nothing is installed.
+Skills uploaded via claude.ai sync automatically. Project-level skills
+committed to `.claude/skills/` in a repo also load when the repo is cloned.
 
 ---
 
@@ -156,21 +154,6 @@ This single skill replaces all four previous skills:
 - `vibe-secure-vibe-coding.skill` — merged into Section 4 (Security rules)
 
 Uninstall the old skills and install `dev-skills.skill`. Everything that worked before still works — plus commit approval, code quality scanning, Windows/Linux platform security, and lower token costs via two-tier loading.
-
----
-
-## Using without Claude Desktop (browser claude.ai)
-
-Skills are not natively supported in the browser. As a workaround:
-
-1. Download the `.skill` file
-2. Open it as a ZIP (rename to `.zip` or use any zip tool)
-3. Copy the contents of `SKILL.md`
-4. Paste at the start of your Claude conversation:
-
-   > "Please follow these instructions for this session: [paste SKILL.md content]"
-
-Won't persist across conversations or auto-trigger — you'll need to paste each time.
 
 ---
 
