@@ -176,9 +176,12 @@ Won't persist across conversations or auto-trigger — you'll need to paste each
 
 ## Version
 
-`v2.3.0`
+`v2.3.1`
 
 ### Version history
+
+**v2.3.1** — 2026-08-30
+- Gate 6 (Ship) now enforces distributable artifact rebuild before release creation and verifies release assets are attached
 
 **v2.3.0** — 2026-08-30
 - Gate 5/6 restructured: Release (PR prep) and Ship (merge+tag+publish with mandatory post-verification)
