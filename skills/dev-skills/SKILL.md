@@ -350,13 +350,25 @@ confirmation. A vague "yeah" or "ok" is not enough — the user must say "ship",
 >
 > Type **"ship"** to confirm, or tell me what to adjust.
 
-**Execution (all three steps, in order):**
+**Distributable artifacts:** Before creating the release, check if the project
+has distributable artifacts — `.skill` files, `.zip` bundles, binaries, or
+anything referenced by download links in the README. If so:
+1. Rebuild them from the current committed source files
+2. Verify the contents match the version being released (check dates, file sizes,
+   spot-check content)
+3. Include them in the `gh release create` command or upload with `gh release upload`
+
+If the README has download links (e.g. `../../releases/latest/download/file.ext`),
+every linked file must be present as a release asset. A release with broken
+download links is a ship failure.
+
+**Execution (all steps, in order):**
 ```
 gh pr merge <number> --merge --delete-branch
 git checkout main && git pull origin main
 git tag v1.2.3
 git push origin v1.2.3
-gh release create v1.2.3 --title "v1.2.3" --notes "..."
+gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 ```
 
 **Post-ship verification (mandatory — the gate does not pass without this):**
@@ -367,12 +379,15 @@ After executing, verify that every step actually succeeded:
 2. **GitHub release exists:** check that the release is visible (via
    `gh release view v1.2.3` or the GitHub API). If not, create it.
 3. **PR is merged:** confirm the PR state is "merged", not just "closed."
+4. **Release assets:** if the project has distributable artifacts, verify they
+   are attached to the release and that README download links resolve. A release
+   missing its promised artifacts is incomplete.
 
-Only after all three verifications pass:
+Only after all verifications pass:
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
 > Release URL: [url]
-> Verified: tag on remote ✅ | release exists ✅ | PR merged ✅
+> Verified: tag on remote ✅ | release exists ✅ | PR merged ✅ | assets ✅
 
 If any verification fails:
 
@@ -380,10 +395,11 @@ If any verification fails:
 > - Tag on remote: [✅ or ❌ — details]
 > - Release exists: [✅ or ❌ — details]
 > - PR merged: [✅ or ❌ — details]
+> - Release assets: [✅ or ❌ — details]
 >
 > Fixing...
 
-Fix the failed step and re-verify. Do not mark the gate passed until all three
+Fix the failed step and re-verify. Do not mark the gate passed until all
 verifications succeed.
 
 #### Updating an existing release artifact (`--clobber`)
