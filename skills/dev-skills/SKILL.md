@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.6.0
+version: 2.6.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -728,7 +728,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.6.0 active.
+Dev Skills v2.6.1 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -746,13 +746,17 @@ surface this to the user.
 
 **Version check — run at session start, every time.** Compare the loaded version
 (from the `version` field in this file's frontmatter) against the latest release
-on GitHub:
+on GitHub. Use WebFetch to hit the GitHub API (no authentication needed for
+public repos):
 
-```bash
-gh release view --repo darthrater78/claude-vibe-skills --json tagName -q .tagName
+```
+WebFetch https://api.github.com/repos/darthrater78/claude-vibe-skills/releases/latest
 ```
 
-- If the command fails (no `gh`, not authenticated, no network), skip silently —
+Parse the `tag_name` field from the JSON response (e.g. `"v2.6.1"` → `2.6.1`)
+and compare against the loaded version.
+
+- If the fetch fails (no network, rate-limited, tool unavailable), skip silently —
   don't block the session for an update check.
 - If the remote version is newer than the loaded version:
 
