@@ -41,7 +41,7 @@ Download `dev-skills.skill` from the [latest release](../../releases/latest).
 1. Download `dev-skills.skill` from the [latest release](../../releases/latest)
 2. Open Claude Desktop → **Customize** → **Skills** → upload the `.skill` file
 
-The skill activates automatically based on trigger phrases — just talk to Claude normally.
+The skill activates automatically every session — just talk to Claude normally.
 
 ### Claude Code (CLI)
 
@@ -159,9 +159,12 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.3.2`
+`v2.3.3`
 
 ### Version history
+
+**v2.3.3** — 2026-08-31
+- Fix: add `alwaysApply: true` to SKILL.md frontmatter so the skill activates automatically every session instead of requiring manual invocation
 
 **v2.3.2** — 2026-08-30
 - Gate 4 (Docs) now includes internal consistency check — cross-checks README descriptions against SKILL.md source of truth for renamed concepts, restructured workflows, and changed terminology
