@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.6.1
+version: 2.7.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -728,7 +728,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.6.1 active.
+Dev Skills v2.7.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -744,30 +744,8 @@ Commits require explicit approval. Security scan runs after every build.
 frontmatter. If they differ, the skill was not repackaged after a version bump —
 surface this to the user.
 
-**Version check — run at session start, every time.** Compare the loaded version
-(from the `version` field in this file's frontmatter) against the latest release
-on GitHub. Use WebFetch to hit the GitHub API (no authentication needed for
-public repos):
-
-```
-WebFetch https://api.github.com/repos/darthrater78/claude-vibe-skills/releases/latest
-```
-
-Parse the `tag_name` field from the JSON response (e.g. `"v2.6.1"` → `2.6.1`)
-and compare against the loaded version.
-
-- If the fetch fails (no network, rate-limited, tool unavailable), skip silently —
-  don't block the session for an update check.
-- If the remote version is newer than the loaded version:
-
-  > ⚠️ **Update available:** v[remote] is available (you're running v[local])
-  > Download: https://github.com/darthrater78/claude-vibe-skills/releases/latest
-  >
-  > Update now, or continue with the current version?
-
-- If the user says yes, download the `.skill` file and tell them where to
-  install it (see the Install section in the README).
-- If the versions match, say nothing — no "you're up to date" noise.
+**Updates:** Check for new versions at
+https://github.com/darthrater78/claude-vibe-skills/releases
 
 **MCP check — run at session start, every time.** Scan your context for active
 MCP tool prefixes (`mcp__<server>__`). Report what's connected:
