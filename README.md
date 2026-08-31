@@ -159,15 +159,12 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.6.1`
+`v2.7.0`
 
 ### Version history
 
-**v2.6.1** — 2026-08-31
-- Fix: version update check now uses WebFetch (GitHub API) instead of `gh` CLI, which isn't available in all environments
-
-**v2.6.0** — 2026-08-31
-- Session start now checks for newer versions on GitHub and prompts the user to update
+**v2.7.0** — 2026-08-31
+- Replaced automated version update check with a static releases link — automated check was unreliable across environments
 - Expanded cost discipline (Section 5.1) with five new rules: tool call batching, grep-before-read, git diff over full reads, minimize agent spawns, text over screenshots
 
 **v2.5.0** — 2026-08-31
