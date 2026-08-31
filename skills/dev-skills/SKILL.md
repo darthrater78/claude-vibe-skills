@@ -1,12 +1,13 @@
 ---
 name: dev-skills
+alwaysApply: true
 description: >
   Always-on development discipline: commit approval, versioned builds, security
   scanning, cost control, and a strict gate workflow that never advances silently.
-  Trigger on ANY coding session — this is not optional. Also trigger explicitly on:
-  "dev mode", "dev skills", "start coding", "build", "ship it", "push", "release",
-  "commit", "done", "just push it", "skip the version", "audit", "security review",
-  "scan this", "check my code", or any attempt to bypass a gate.
+  Also trigger explicitly on: "dev mode", "dev skills", "start coding", "build",
+  "ship it", "push", "release", "commit", "done", "just push it", "skip the
+  version", "audit", "security review", "scan this", "check my code", or any
+  attempt to bypass a gate.
 ---
 
 # Dev Skills
