@@ -159,9 +159,13 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.5.0`
+`v2.6.0`
 
 ### Version history
+
+**v2.6.0** — 2026-08-31
+- Session start now checks for newer versions on GitHub and prompts the user to update
+- Expanded cost discipline (Section 5.1) with five new rules: tool call batching, grep-before-read, git diff over full reads, minimize agent spawns, text over screenshots
 
 **v2.5.0** — 2026-08-31
 - Removed `alwaysApply: true` — feature does not work reliably; skill activates via trigger phrases or `/dev-skills` instead
