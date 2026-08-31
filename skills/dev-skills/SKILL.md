@@ -1,5 +1,6 @@
 ---
 name: dev-skills
+version: 2.4.0
 alwaysApply: true
 description: >
   Always-on development discipline: commit approval, versioned builds, security
@@ -713,7 +714,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills active.
+Dev Skills v2.4.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -724,6 +725,30 @@ Dev Skills active.
 
 Commits require explicit approval. Security scan runs after every build.
 ```
+
+**Important:** The version shown must match the `version` field in this file's
+frontmatter. If they differ, the skill was not repackaged after a version bump —
+surface this to the user.
+
+**MCP check — run at session start, every time.** Scan your context for active
+MCP tool prefixes (`mcp__<server>__`). Report what's connected:
+
+```
+MCP servers active: [list names derived from tool prefixes]
+To disable for this session: /mcp → toggle off any you don't need
+```
+
+Rules for the MCP check:
+- **Only name servers whose `mcp__<server>__` tool prefixes are literally in your
+  context.** Never infer or guess.
+- Distinguish **active** (full tool definitions loaded — expensive, thousands of
+  tokens per request) from **deferred** (name-only, schemas loaded on demand —
+  cheap). Report deferred as a count only: "N deferred (low overhead)".
+- If active servers look irrelevant to the work ahead, say so: "Consider
+  disabling [name] — not needed for this task. Run `/mcp` to toggle."
+- `/mcp` is the in-session command. It toggles servers on/off without leaving
+  the session. This is the primary recommendation for disabling during a session.
+- For permanent removal, see Section 5.4.
 
 Then: "What are we building?"
 
