@@ -1,14 +1,13 @@
 ---
 name: dev-skills
-version: 2.4.0
-alwaysApply: true
+version: 2.5.0
 description: >
-  Always-on development discipline: commit approval, versioned builds, security
-  scanning, cost control, and a strict gate workflow that never advances silently.
-  Also trigger explicitly on: "dev mode", "dev skills", "start coding", "build",
-  "ship it", "push", "release", "commit", "done", "just push it", "skip the
-  version", "audit", "security review", "scan this", "check my code", or any
-  attempt to bypass a gate.
+  Development discipline: commit approval, versioned builds, security scanning,
+  cost control, and a strict gate workflow that never advances silently. Trigger
+  on: "dev mode", "dev skills", "start coding", "build", "ship it", "push",
+  "release", "commit", "done", "just push it", "skip the version", "audit",
+  "security review", "scan this", "check my code", or any attempt to bypass a
+  gate.
 ---
 
 # Dev Skills
@@ -714,7 +713,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.4.0 active.
+Dev Skills v2.5.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜

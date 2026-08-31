@@ -1,10 +1,10 @@
 # claude-vibe-skills
 
-One skill for disciplined vibe coding: commit approval, versioned builds, security scanning, code quality checks, cost control, and a strict 6-gate release workflow — all enforced automatically, every session.
+One skill for disciplined vibe coding: commit approval, versioned builds, security scanning, code quality checks, cost control, and a strict 6-gate release workflow.
 
 ## What it does
 
-`dev-skills` is an always-on skill that enforces three things:
+`dev-skills` enforces three things:
 
 1. **Commits require approval.** Claude never runs `git commit`, `git push`, or `gh pr create` without your explicit say-so. No more surprise commits after a single change.
 
@@ -41,7 +41,7 @@ Download `dev-skills.skill` from the [latest release](../../releases/latest).
 1. Download `dev-skills.skill` from the [latest release](../../releases/latest)
 2. Open Claude Desktop → **Customize** → **Skills** → upload the `.skill` file
 
-The skill activates automatically based on trigger phrases — just talk to Claude normally.
+The skill activates on trigger phrases (see the trigger list in the skill description) or when invoked with `/dev-skills`.
 
 ### Claude Code (CLI)
 
@@ -107,7 +107,7 @@ Checks that README/CHANGELOG has a version entry, new features are documented, r
 
 ### Gate 5 — Release 📦
 
-Creates a feature branch, gets commit approval, pushes, and opens a PR with release notes. Waits for your approval before proceeding — never merges without it.
+Checks prerequisites first (GitHub remote exists, default branch is pushed, `gh` CLI is authenticated), then creates a feature branch, gets commit approval, pushes, and opens a PR with release notes. Never falls back to direct commits on main — if infrastructure isn't set up, it blocks and helps you fix it.
 
 ### Gate 6 — Ship 🚀
 
@@ -148,7 +148,7 @@ Say "audit my project", "scan this codebase", or "security review" to trigger a 
 ## Migrating from the old skills
 
 This single skill replaces all four previous skills:
-- `dev-mode.skill` — no longer needed (this skill is always-on)
+- `dev-mode.skill` — no longer needed (this skill covers the same triggers)
 - `cost-saver.skill` — merged into Cost discipline
 - `vibe-coding-workflow.skill` — merged into The six gates
 - `vibe-secure-vibe-coding.skill` — merged into Security rules
@@ -159,14 +159,18 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.4.0`
+`v2.5.0`
 
 ### Version history
+
+**v2.5.0** — 2026-08-31
+- Removed `alwaysApply: true` — feature does not work reliably; skill activates via trigger phrases or `/dev-skills` instead
+- Gate 5 (Release) now checks prerequisites before PR workflow: GitHub remote must exist, default branch must be pushed, `gh` CLI must be authenticated — prevents silent fallback to direct commits on new repos
+- Session-start MCP check now shows specific disable commands per active server (not just a generic `/mcp` suggestion)
 
 **v2.4.0** — 2026-08-31
 - Version field in SKILL.md frontmatter — session start banner now shows which version is loaded
 - MCP server check at session start — reports active/deferred servers with `/mcp` toggle instructions
-- `alwaysApply: true` now working — description was not appearing in skill listing; fixed
 
 **v2.3.2** — 2026-08-30
 - Gate 4 (Docs) now includes internal consistency check — cross-checks README descriptions against SKILL.md source of truth for renamed concepts, restructured workflows, and changed terminology
