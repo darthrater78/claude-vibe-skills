@@ -159,9 +159,14 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.3.2`
+`v2.4.0`
 
 ### Version history
+
+**v2.4.0** — 2026-08-31
+- Version field in SKILL.md frontmatter — session start banner now shows which version is loaded
+- MCP server check at session start — reports active/deferred servers with `/mcp` toggle instructions
+- `alwaysApply: true` now working — description was not appearing in skill listing; fixed
 
 **v2.3.2** — 2026-08-30
 - Gate 4 (Docs) now includes internal consistency check — cross-checks README descriptions against SKILL.md source of truth for renamed concepts, restructured workflows, and changed terminology
