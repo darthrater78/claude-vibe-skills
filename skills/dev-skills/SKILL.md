@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.5.0
+version: 2.6.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -577,6 +577,21 @@ grep. Don't re-read files already seen.
 **No redundant verification.** Don't re-run tests or re-read files when the tool
 result already confirmed success.
 
+**Batch tool calls.** Independent calls go in parallel — each sequential round trip
+resends the full conversation history. Five parallel calls cost the same as one.
+
+**Grep before reading.** Find the right lines first, then read with offset/limit.
+Never read a 2000-line file to check one function.
+
+**Git diff over full reads.** When reviewing changes, `git diff` is far cheaper
+than reading every modified file end to end.
+
+**Minimize agent spawns.** Each subagent starts cold with full context re-injection.
+Only spawn when the work justifies it — not for a single grep or file read.
+
+**Text over screenshots.** `read_page` / `get_page_text` costs a fraction of a
+screenshot when you only need to verify text content or structure.
+
 ### 5.2 Model gating — Sonnet ceiling
 
 Treat Sonnet as the maximum model for the session unless the user has explicitly
@@ -713,7 +728,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.5.0 active.
+Dev Skills v2.6.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -728,6 +743,27 @@ Commits require explicit approval. Security scan runs after every build.
 **Important:** The version shown must match the `version` field in this file's
 frontmatter. If they differ, the skill was not repackaged after a version bump —
 surface this to the user.
+
+**Version check — run at session start, every time.** Compare the loaded version
+(from the `version` field in this file's frontmatter) against the latest release
+on GitHub:
+
+```bash
+gh release view --repo darthrater78/claude-vibe-skills --json tagName -q .tagName
+```
+
+- If the command fails (no `gh`, not authenticated, no network), skip silently —
+  don't block the session for an update check.
+- If the remote version is newer than the loaded version:
+
+  > ⚠️ **Update available:** v[remote] is available (you're running v[local])
+  > Download: https://github.com/darthrater78/claude-vibe-skills/releases/latest
+  >
+  > Update now, or continue with the current version?
+
+- If the user says yes, download the `.skill` file and tell them where to
+  install it (see the Install section in the README).
+- If the versions match, say nothing — no "you're up to date" noise.
 
 **MCP check — run at session start, every time.** Scan your context for active
 MCP tool prefixes (`mcp__<server>__`). Report what's connected:
