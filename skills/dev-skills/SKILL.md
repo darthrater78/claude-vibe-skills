@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.7.0
+version: 2.7.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -359,13 +359,27 @@ confirmation. A vague "yeah" or "ok" is not enough — the user must say "ship",
 >
 > Type **"ship"** to confirm, or tell me what to adjust.
 
-**Distributable artifacts:** Before creating the release, check if the project
-has distributable artifacts — `.skill` files, `.zip` bundles, binaries, or
-anything referenced by download links in the README. If so:
-1. Rebuild them from the current committed source files
+**Distributable artifacts — active detection required.** Do not assume a project
+has no artifacts. Actively scan for evidence:
+
+1. **Check build tooling:** look for PyInstaller specs (`.spec`, `pyinstaller` in
+   requirements/scripts), Makefile/build targets, `setup.py` with `entry_points`,
+   `cargo build --release`, `go build`, `dotnet publish`, webpack/vite configs,
+   `.skill` source directories, or any build script in `scripts/`, `build/`, `Makefile`.
+2. **Check README:** look for download links, install instructions referencing
+   binaries/executables/packages, or "Download" sections.
+3. **Check prior releases:** run `gh release view <previous-tag>` — if prior
+   releases had assets attached, this one should too.
+
+If ANY of these indicators exist, artifacts are expected. Build them:
+1. Rebuild from the current committed source files
 2. Verify the contents match the version being released (check dates, file sizes,
    spot-check content)
 3. Include them in the `gh release create` command or upload with `gh release upload`
+
+**A release that should have artifacts but doesn't is a ship failure** — even if
+the README has no download links. If prior releases had an EXE/binary/package
+and this one doesn't, that's a regression.
 
 If the README has download links (e.g. `../../releases/latest/download/file.ext`),
 every linked file must be present as a release asset. A release with broken
@@ -388,9 +402,10 @@ After executing, verify that every step actually succeeded:
 2. **GitHub release exists:** check that the release is visible (via
    `gh release view v1.2.3` or the GitHub API). If not, create it.
 3. **PR is merged:** confirm the PR state is "merged", not just "closed."
-4. **Release assets:** if the project has distributable artifacts, verify they
-   are attached to the release and that README download links resolve. A release
-   missing its promised artifacts is incomplete.
+4. **Release assets:** verify against the artifact detection above. If build
+   tooling, README downloads, or prior releases indicated artifacts are expected,
+   confirm they are attached. A release missing expected artifacts is incomplete
+   — do not pass with "assets: none" when the project builds distributable files.
 
 Only after all verifications pass:
 
@@ -728,7 +743,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.7.0 active.
+Dev Skills v2.7.1 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
