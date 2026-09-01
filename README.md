@@ -159,9 +159,12 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.7.0`
+`v2.7.1`
 
 ### Version history
+
+**v2.7.1** — 2026-09-01
+- Gate 6 (Ship) now actively scans for artifact evidence — checks build tooling (PyInstaller, Makefile, cargo, etc.), README download references, and prior release assets instead of passively assuming "no artifacts"
 
 **v2.7.0** — 2026-08-31
 - Replaced automated version update check with a static releases link — automated check was unreliable across environments
