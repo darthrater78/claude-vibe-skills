@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.7.1
+version: 2.7.2
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -239,6 +239,11 @@ above) and the checklist below:
 - Unbounded caches — use lru_cache with maxsize
 - Missing database indexes on queried columns
 - Event listeners never cleaned up — add teardown
+
+**Container / build issues (flag and fix):**
+- Dockerfile hardcodes package names instead of installing from dependency file — switch to `pip install -r requirements.txt` / `npm ci`
+- New import added but package missing from dependency file — add it
+- Dockerfile and dependency file list different packages — reconcile to one source of truth
 
 Report quality findings separately from security:
 
@@ -743,7 +748,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.7.1 active.
+Dev Skills v2.7.2 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜

@@ -98,6 +98,7 @@ Mandatory after every build. Loads both reference files and scans all source cod
 - Deep nesting, god functions, circular dependencies, hidden side effects
 - N+1 queries, wrong data structures, string concat in loops, blocking I/O
 - Unbounded caches, missing indexes, unnecessary allocations, premature abstraction
+- Container dependency drift: Dockerfiles hardcoding packages instead of installing from dependency files, imports missing from declared dependencies
 
 Critical and High findings must be fixed. Medium and Low are surfaced for your decision. Gate passes at zero Critical and zero High.
 
@@ -159,9 +160,12 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.7.1`
+`v2.7.2`
 
 ### Version history
+
+**v2.7.2** — 2026-09-03
+- Gate 3 quality review now catches container dependency drift — Dockerfiles that hardcode package lists instead of installing from dependency files, and new imports missing from dependency declarations
 
 **v2.7.1** — 2026-09-01
 - Gate 6 (Ship) now actively scans for artifact evidence — checks build tooling (PyInstaller, Makefile, cargo, etc.), README download references, and prior release assets instead of passively assuming "no artifacts"
