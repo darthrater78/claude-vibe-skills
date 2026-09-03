@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.7.2
+version: 2.7.3
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -521,8 +521,9 @@ examples are in `SECURITY_REFERENCE.md` (loaded during Gate 3 and audit mode).
 (eval/exec/shell), input validation, SQL injection, network/TLS, filesystem/path
 traversal, serialization, JavaScript (XSS/prototype pollution/open redirect),
 Windows (PowerShell/UNC/DLL/registry/services/signing/reserved names), Linux
-(SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages), cross-platform
-(permissions/paths/credentials).
+(SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages), Android
+(exported components/manifest hardening/WebView/Intents/storage/network security
+config/permissions/logging/ProGuard), cross-platform (permissions/paths/credentials).
 
 ### 4.3 Language best practices
 
@@ -748,7 +749,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.7.2 active.
+Dev Skills v2.7.3 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜

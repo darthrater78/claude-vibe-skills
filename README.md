@@ -91,7 +91,7 @@ Mandatory after every build. Loads both reference files and scans all source cod
 **Security:**
 - Hardcoded secrets, SQL injection, command injection, disabled TLS
 - Path traversal, missing auth, weak crypto, unsafe deserialization
-- Platform-specific: PowerShell injection, UNC path attacks, DLL hijacking (Windows); SUID misuse, container security, symlink races, systemd hardening (Linux)
+- Platform-specific: PowerShell injection, UNC path attacks, DLL hijacking (Windows); SUID misuse, container security, symlink races, systemd hardening (Linux); exported components, WebView RCE, Intent spoofing, insecure storage (Android)
 - Dependency auditing: typosquatting, unpinned versions, known CVEs
 
 **Code quality:**
@@ -160,9 +160,13 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.7.2`
+`v2.7.3`
 
 ### Version history
+
+**v2.7.3** — 2026-09-03
+- Added Android platform security checks: exported components, manifest hardening, WebView RCE, Intent validation, secure storage (EncryptedSharedPreferences/Keystore), network security config, certificate pinning, logging hygiene, ProGuard/R8
+- Added Android quality patterns: main thread blocking (ANR prevention), Activity/Fragment lifecycle leaks, RecyclerView best practices, overdraw reduction
 
 **v2.7.2** — 2026-09-03
 - Gate 3 quality review now catches container dependency drift — Dockerfiles that hardcode package lists instead of installing from dependency files, and new imports missing from dependency declarations
