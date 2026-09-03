@@ -48,6 +48,21 @@ tangled code hides bugs and makes audits harder.
 - **Index your queries.** Every `WHERE` clause on a column used in production
   should have an index. Flag missing indexes.
 
+**Container / build dependency hygiene:**
+- **Single source of truth for dependencies.** Never hardcode package lists in a
+  Dockerfile (`pip install pkg1 pkg2`, `npm install pkg1 pkg2`). Use a dependency
+  file (`requirements.txt`, `package.json`, `Pipfile`, `pyproject.toml`) and
+  install from it (`pip install -r requirements.txt`, `npm ci`).
+- **Imports must match declared dependencies.** When code adds a new import, the
+  corresponding package must appear in the dependency file AND the build must
+  install it. A missing dependency compiles locally (installed in the dev venv)
+  but crashes in a fresh container. After any feature that adds an import, verify
+  the package is in the dependency file.
+- **Dockerfile installs from the dependency file, not around it.** If a Dockerfile
+  has its own `pip install` or `npm install` line with package names, those packages
+  drift from the real dependency file. Flag any Dockerfile that installs packages
+  by name instead of from the project's dependency file.
+
 ---
 
 ## Deep nesting — flatten with early returns
@@ -514,3 +529,66 @@ def validate_email(raw: str) -> str:
         raise ValidationError("Invalid email")
     return email
 ```
+
+---
+
+## Container dependency drift — single source of truth
+
+```dockerfile
+# bad — hardcoded pip install list in Dockerfile drifts from requirements.txt
+FROM python:3.12-slim
+WORKDIR /app
+COPY . .
+RUN pip install flask requests
+CMD ["python", "app.py"]
+# developer adds "import pyotp" → works locally (installed in venv)
+# → container crashes: ModuleNotFoundError: No module named 'pyotp'
+
+# good — install from the dependency file
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "app.py"]
+```
+
+```dockerfile
+# bad — npm packages listed inline instead of from package.json
+FROM node:20-slim
+WORKDIR /app
+COPY . .
+RUN npm install express cors
+CMD ["node", "server.js"]
+# developer adds "const jwt = require('jsonwebtoken')" → works locally
+# → container crashes: Cannot find module 'jsonwebtoken'
+
+# good — install from package.json lockfile
+FROM node:20-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY . .
+CMD ["node", "server.js"]
+```
+
+```python
+# bad — requirements.txt exists but Dockerfile ignores it
+# Dockerfile has: RUN pip install flask requests pyotp
+# requirements.txt has: flask, requests, pyotp, qrcode
+# → qrcode missing from container, crash on the code path that uses it
+
+# good — one source of truth, Dockerfile always reads it
+# requirements.txt is the authority, Dockerfile installs from it:
+#   COPY requirements.txt .
+#   RUN pip install --no-cache-dir -r requirements.txt
+# Adding a dependency = one edit to requirements.txt, no Dockerfile change
+```
+
+### How to catch this during review
+
+When reviewing code that adds a new import or require:
+1. Check whether the package is in the project's dependency file
+2. Check whether the Dockerfile installs from that file or hardcodes its own list
+3. If the Dockerfile hardcodes packages, flag both the missing package AND the
+   antipattern — the fix is to switch to installing from the dependency file
