@@ -125,6 +125,8 @@ The skill also keeps sessions cheap:
 - **MCP awareness** — identifies unused MCP servers adding token overhead and shows how to disable them
 - **Phase transitions** — offers handoff summaries at natural breakpoints so you can start a fresh, cheap session
 - **Token impact estimates** — rough end-of-task report showing what was saved and what was wasted
+- **Git command presentation** — asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell, always starting with the proper `cd` command
+- **Usage limit handoff** — proactively offers a handoff summary when the account is nearing its usage cap so you can resume in a fresh session without losing progress
 
 ---
 
@@ -160,9 +162,13 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.7.3`
+`v2.8.0`
 
 ### Version history
+
+**v2.8.0** — 2026-09-04
+- Git command presentation (5.8): asks the user's shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell — always starts with a `cd` to the project directory, never assumes the user is already there
+- Usage limit handoff (5.9): proactively offers a handoff summary when the account is nearing its usage cap, including gate tracker state and shell environment so the next session can resume without re-asking
 
 **v2.7.3** — 2026-09-03
 - Added Android platform security checks: exported components, manifest hardening, WebView RCE, Intent validation, secure storage (EncryptedSharedPreferences/Keystore), network security config, certificate pinning, logging hygiene, ProGuard/R8

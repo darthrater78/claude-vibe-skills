@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.7.3
+version: 2.8.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -733,6 +733,132 @@ Suggestions should be one or two sentences, woven into your normal response —
 never a lecture or a checklist dump. Once per session per topic. If the user
 declines or ignores a suggestion, drop it.
 
+### 5.8 Git command presentation
+
+**This section fires whenever you present git, `gh`, or GitHub CLI commands for
+the user to run manually** — during any gate (commit, push, PR, merge, tag,
+release), handoff summaries, or troubleshooting. It does NOT apply to commands
+Claude executes directly via tool calls.
+
+**Shell environment detection.** The first time you need to present a git command
+in a session, ask the user what shell they are working in:
+
+> **Which shell will you be running these commands in?**
+> 1. Windows PowerShell
+> 2. Linux PowerShell (pwsh)
+> 3. Git Bash (Windows)
+> 4. Termux (Android)
+> 5. macOS Terminal (zsh/bash)
+> 6. Linux Terminal (bash/zsh)
+> 7. WSL (Windows Subsystem for Linux)
+
+Store the answer for the rest of the session — don't ask again.
+
+**Always start with `cd`.** Never assume the user's terminal is already in the
+project directory. Every command block you present must begin with the
+appropriate `cd` command for their shell:
+
+| Shell | `cd` format |
+|---|---|
+| Windows PowerShell | `cd "C:\Users\steve\Desktop\git\project-name"` |
+| Linux PowerShell (pwsh) | `cd "/home/user/projects/project-name"` |
+| Git Bash (Windows) | `cd "/c/Users/steve/Desktop/git/project-name"` |
+| Termux (Android) | `cd ~/storage/shared/projects/project-name` |
+| macOS Terminal | `cd ~/projects/project-name` |
+| Linux Terminal | `cd ~/projects/project-name` |
+| WSL | `cd /mnt/c/Users/steve/Desktop/git/project-name` |
+
+Use the actual project path from the current working directory. For Git Bash,
+convert Windows paths (`C:\foo\bar`) to Unix-style (`/c/foo/bar`). For WSL,
+convert to `/mnt/c/...` form.
+
+**Shell-specific syntax.** Adapt commands to the user's shell:
+
+- **Multi-line strings:** PowerShell uses here-strings (`@'...'@`), Bash/Termux/
+  macOS/Linux use heredocs or `$'...'`, Git Bash follows Bash rules
+- **Variable expansion:** PowerShell uses `$var`, Bash uses `$var` or `${var}` —
+  but quoting rules differ
+- **Command chaining:** PowerShell uses `;` (no `&&`), Bash/Git Bash/Termux use
+  `&&`
+- **Line continuation:** PowerShell uses backtick (`` ` ``), Bash uses backslash
+  (`\`)
+- **Path separators:** PowerShell and Windows use `\`, everything else uses `/`
+- **Termux quirks:** limited PATH, may need `pkg install` for tools like `gh`,
+  smaller screen so keep commands concise
+
+**Example output (Windows PowerShell):**
+```powershell
+cd "C:\Users\steve\Desktop\git\claude-vibe-skills"
+git checkout -b release/v2.8.0
+git add -A
+git commit -m @'
+v2.8.0 — add git command presentation to cost discipline
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+'@
+git push -u origin release/v2.8.0
+```
+
+**Example output (Git Bash):**
+```bash
+cd "/c/Users/steve/Desktop/git/claude-vibe-skills"
+git checkout -b release/v2.8.0
+git add -A
+git commit -m "v2.8.0 — add git command presentation to cost discipline
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push -u origin release/v2.8.0
+```
+
+**Example output (Termux):**
+```bash
+cd ~/storage/shared/projects/claude-vibe-skills
+git checkout -b release/v2.8.0
+git add -A
+git commit -m "v2.8.0 — add git command presentation to cost discipline
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push -u origin release/v2.8.0
+```
+
+### 5.9 Usage limit handoff
+
+**When the system prompt shows the account is nearing its usage cap** (e.g.
+`<total_tokens>` is low, the system mentions overage or rate limits, or the
+user says they're running low on usage), proactively offer a handoff summary
+before the session is forced to end:
+
+> ⚠️ **Heads up — this account looks close to its usage limit.** If the session
+> cuts off mid-task, you'll lose the working context. Want me to produce a
+> handoff summary now so you can pick up in a fresh session (or on a different
+> plan tier) without losing progress?
+
+If yes, produce the same handoff format as Section 5.5:
+
+```
+## Handoff: [task name]
+**Goal:** one sentence
+**Current state:** what's done, what's verified
+**Gate status:** show the tracker with current state
+**Key files:** path:line — why it matters
+**Decisions made:** constraints the next session must respect
+**Shell environment:** [user's shell from 5.8, if detected]
+**Next step:** the single concrete next action
+```
+
+Include the gate tracker state so the next session knows where to resume the
+workflow. Include the shell environment so the next session doesn't have to
+re-ask.
+
+If the user hasn't explicitly said they're low, but you observe signs (the
+system prompt's token budget is below ~2M, the session has been long, or the
+conversation was compressed), mention it once lightly:
+
+> "We've been going a while — want a handoff summary in case you want to
+> continue in a fresh session?"
+
+Don't nag. Once offered, drop it unless the user asks.
+
 ---
 
 ## 6. Session start
@@ -749,7 +875,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.7.3 active.
+Dev Skills v2.8.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
