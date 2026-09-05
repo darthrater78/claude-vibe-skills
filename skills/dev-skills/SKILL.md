@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.10.0
+version: 2.10.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -111,6 +111,20 @@ step for a docs-only or config repo). When a gate genuinely doesn't apply:
 A gate can only be N/A for structural reasons (the project has no build system,
 no compiled artifacts, no app UI). "We'll do it later" or "it's not important
 this time" is not N/A — that's a skip attempt, and skips are blocked.
+
+**User-driven operations.** The gates track the state of the work, not who
+performed the git operation. If the user commits, pushes, creates a PR, or
+merges outside of Claude (in their terminal, via GitHub UI, or another tool),
+that satisfies the corresponding step — Claude does not need to re-do it.
+
+When resuming work or checking gate status, detect what's already done:
+1. Run `git log`, `git branch -r`, `gh pr list`, `gh pr view`, `git tag -l`
+2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
+3. Continue from the next incomplete gate
+
+A user-driven commit or PR does not exempt the remaining gates. If the user
+merged to main without completing security (Gate 3) or docs (Gate 4), those
+gates are still owed — run them on the merged code and surface any issues.
 
 ### Gate 1 — Version 🔢
 
@@ -369,7 +383,6 @@ Execution (merge, tag, publish) happens in Gate 6.
 **Never commit directly to main/master.** All work happens on feature/fix/release
 branches and merges via PR. If the session is on the default branch when Gate 5
 is reached, create a branch first.
-**Exception:** `darthrater78/scripts` allows direct pushes but PRs are preferred.
 
 > ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
 > Pending: merge, tag, and publish (Gate 6)
@@ -945,7 +958,7 @@ If yes:
 Then show the gate tracker:
 
 ```
-Dev Skills v2.10.0 active.
+Dev Skills v2.10.1 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Shell: <detected shell> | Last sync: <just now / not synced>

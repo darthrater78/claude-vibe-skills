@@ -164,9 +164,17 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.10.0`
+`v2.10.1`
 
 ### Version history
+
+**v2.10.1** — 2026-09-05
+- User-driven operations: if the user commits, pushes, creates a PR, or merges outside of Claude, the gates detect what's already done and continue from the next incomplete step — gates track the state of the work, not who performed the git operation
+- Added MIT LICENSE file
+- Expanded .gitignore to cover OS artifacts and editor/IDE files
+- Removed hardcoded `darthrater78/scripts` direct-push exception from Gate 5 — branch-based workflow now applies uniformly to all repos
+- Self-governance rule: skill's own rules apply when editing the skill itself (added in v2.10.0 merge, now documented)
+- Session-start improvements: shell environment detection, remote URL verification, and sync-before-work offer (added in v2.10.0 merge, now documented)
 
 **v2.10.0** — 2026-09-05
 - Git repo detection at session start: detects git repos, offers to sync with origin before starting work, and warns if on the default branch — ensures the session always works with up-to-date files on a proper working branch
