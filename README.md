@@ -64,15 +64,16 @@ committed to `.claude/skills/` in a repo also load when the repo is cloned.
 
 ## What's inside
 
-The skill uses a two-tier loading strategy to keep token costs down:
+The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~33KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
+| `SKILL.md` | ~28KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
 | `SECURITY_REFERENCE.md` | ~14KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `QUALITY_REFERENCE.md` | ~15KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `SHELL_REFERENCE.md` | ~3KB | Section 5.7 — when git commands need shell-specific formatting |
 
-`SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. The detailed rule checklists and pattern-matching code examples live in the reference files, loaded on demand during Gate 3 scans and audit mode where they're needed most. This saves ~1,125 tokens per request compared to loading everything on every turn.
+`SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. Shell-specific command formatting, detailed security/quality rule checklists, and pattern-matching code examples live in reference files, loaded on demand where they're needed most.
 
 ---
 
@@ -164,67 +165,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.10.0`
+`v2.10.1`
 
-### Version history
-
-**v2.10.0** — 2026-09-05
-- Git repo detection at session start: detects git repos, offers to sync with origin before starting work, and warns if on the default branch — ensures the session always works with up-to-date files on a proper working branch
-- Branch-based workflow enforcement: all work must happen on feature/fix/release branches; committing directly to main/master is blocked; session-end checkpoint flags unmerged branches
-- Prose tightened: Gate 6 reduced ~20%, Section 5.7 (Tone) folded into Section 5 intro, redundant phrasing trimmed throughout — net 30 lines removed while adding new features
-- Cost discipline subsections renumbered: Git command presentation is now 5.7 (was 5.8), Usage limit handoff is now 5.8 (was 5.9)
-
-**v2.9.0** — 2026-09-05
-- Git command presentation (5.7) now defaults to presenting commands for manual execution to save tool-call token overhead — Claude never assumes direct execution without the user choosing it; gates 1, 5, and 6 reference this pattern
-- Android APK artifact requirement in Gate 6: Android projects must include a properly named APK (`<app-name>-v<VERSION>.apk`) as a release asset — "debug" in the filename is a ship failure
-
-**v2.8.0** — 2026-09-04
-- Git command presentation (now 5.7): asks the user's shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell — always starts with a `cd` to the project directory, never assumes the user is already there
-- Usage limit handoff (now 5.8): proactively offers a handoff summary when the account is nearing its usage cap, including gate tracker state and shell environment so the next session can resume without re-asking
-
-**v2.7.3** — 2026-09-03
-- Added Android platform security checks: exported components, manifest hardening, WebView RCE, Intent validation, secure storage (EncryptedSharedPreferences/Keystore), network security config, certificate pinning, logging hygiene, ProGuard/R8
-- Added Android quality patterns: main thread blocking (ANR prevention), Activity/Fragment lifecycle leaks, RecyclerView best practices, overdraw reduction
-
-**v2.7.2** — 2026-09-03
-- Gate 3 quality review now catches container dependency drift — Dockerfiles that hardcode package lists instead of installing from dependency files, and new imports missing from dependency declarations
-
-**v2.7.1** — 2026-09-01
-- Gate 6 (Ship) now actively scans for artifact evidence — checks build tooling (PyInstaller, Makefile, cargo, etc.), README download references, and prior release assets instead of passively assuming "no artifacts"
-
-**v2.7.0** — 2026-08-31
-- Replaced automated version update check with a static releases link — automated check was unreliable across environments
-- Expanded cost discipline (Section 5.1) with five new rules: tool call batching, grep-before-read, git diff over full reads, minimize agent spawns, text over screenshots
-
-**v2.5.0** — 2026-08-31
-- Removed `alwaysApply: true` — feature does not work reliably; skill activates via trigger phrases or `/dev-skills` instead
-- Gate 5 (Release) now checks prerequisites before PR workflow: GitHub remote must exist, default branch must be pushed, `gh` CLI must be authenticated — prevents silent fallback to direct commits on new repos
-- Session-start MCP check now shows specific disable commands per active server (not just a generic `/mcp` suggestion)
-
-**v2.4.0** — 2026-08-31
-- Version field in SKILL.md frontmatter — session start banner now shows which version is loaded
-- MCP server check at session start — reports active/deferred servers with `/mcp` toggle instructions
-
-**v2.3.2** — 2026-08-30
-- Gate 4 (Docs) now includes internal consistency check — cross-checks README descriptions against SKILL.md source of truth for renamed concepts, restructured workflows, and changed terminology
-
-**v2.3.1** — 2026-08-30
-- Gate 6 (Ship) now enforces distributable artifact rebuild before release creation and verifies release assets are attached
-
-**v2.3.0** — 2026-08-30
-- Gate 5/6 restructured: Release (PR prep) and Ship (merge+tag+publish with mandatory post-verification)
-- Hook output is never commit approval — explicit guard added
-- Auto mode cannot override commit discipline
-- N/A gate mechanism (➖) for structurally inapplicable gates
-- Session-end checkpoint catches uncommitted changes and untagged versions before winding down
-- Self-check at session start verifies reference files exist
-- Performance trim: moved ~104 lines of detailed security/quality rules from SKILL.md to on-demand reference files (~1,125 tokens/request savings)
-- Reference files now include full rule checklists alongside code examples
-
-**v2.2.0** — 2026-08-28
-- Gate 1 now requires a release notes link alongside the repository link in any app that displays one (About dialogs, settings screens, footers, help menus)
-- Fix: prevent hook output from being treated as commit approval
-
-**v2.1.0** — 2026-08-28
-- Gate pre-flight enforcement on every git write operation
-- Source-code version string scanning (XAML, HTML, UI templates, About dialogs)
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
