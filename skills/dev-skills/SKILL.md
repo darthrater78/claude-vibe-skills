@@ -16,6 +16,13 @@ This skill is the contract for every coding session. Gates cannot be skipped,
 commits require approval, all work happens on branches, and security scans
 run after every build.
 
+**Self-governance:** This skill's rules apply to editing the skill itself. Changes
+to SKILL.md, SECURITY_REFERENCE.md, QUALITY_REFERENCE.md, or any file in the
+skill's directory follow the same gates, approval requirements, and controls as
+any other code. There are no exceptions and no self-exemption. The skill is
+invoked at session start precisely so these rules are in effect before any work
+begins — including work on the skill.
+
 ---
 
 ## 1. Commit discipline — NEVER commit without approval
@@ -325,11 +332,25 @@ Execution (merge, tag, publish) happens in Gate 6.
 
 **Steps:**
 1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
-2. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
-3. **Present commands per Section 5.7** — format the commit, push, and PR creation
+2. **Sync with origin before committing.** Run `git fetch origin` and compare
+   the local branch with its remote counterpart. If the remote is ahead, pull
+   before staging. Present the sync commands formatted for the user's shell
+   (Section 5.7). This prevents committing on top of stale history, which causes
+   merge conflicts and can clobber others' work.
+
+   > 📡 **Pre-commit sync:** Fetching latest from origin...
+   > [status: up to date / N commits behind / diverged]
+
+   If diverged, resolve before proceeding. Do not skip this step.
+3. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
+4. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
+   include `git remote add origin <url>` (using the URL stored at session start)
+   in the command block before any push commands. This prevents the "default repo
+   has not been set" error.
+5. **Present commands per Section 5.7** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
    Claude to execute directly.
-4. After the branch is pushed and PR created, draft release notes and show the
+6. After the branch is pushed and PR created, draft release notes and show the
    PR + notes to the user:
 
    > 📝 **PR created — review before shipping:**
@@ -343,7 +364,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    > Do these accurately describe what's in this build? Reply "yes" to ship,
    > or tell me what to change.
 
-5. Wait for explicit approval of the PR content and release notes
+7. Wait for explicit approval of the PR content and release notes
 
 **Never commit directly to main/master.** All work happens on feature/fix/release
 branches and merges via PR. If the session is on the default branch when Gate 5
@@ -709,19 +730,20 @@ Always present the commands first, formatted for the user's shell environment
 execute directly. If the user asks Claude to execute, proceed via tool calls —
 but the default is manual presentation to minimize cost.
 
-**Shell environment detection.** The first time you need to present a git command
-in a session, ask the user what shell they are working in:
+**Shell environment detection** is done at session start (Section 6, step 2).
+By the time git commands are needed, the shell is already known. If a session
+somehow reaches this point without a detected shell (e.g. skill loaded mid-session),
+ask immediately before presenting any commands.
 
-> **Which shell will you be running these commands in?**
-> 1. Windows PowerShell
-> 2. Linux PowerShell (pwsh)
-> 3. Git Bash (Windows)
-> 4. Termux (Android)
-> 5. macOS Terminal (zsh/bash)
-> 6. Linux Terminal (bash/zsh)
-> 7. WSL (Windows Subsystem for Linux)
+**Remote verification.** Before presenting any push commands, verify the remote
+is configured (`git remote -v`). If origin is not set, include
+`git remote add origin <url>` (using the URL stored at session start, Section 6
+step 1) as the first command in the block. This prevents the "default repo has
+not been set" error.
 
-Store the answer for the rest of the session — don't ask again.
+**Never use bare `git push`.** Every push command must specify the remote and
+branch explicitly: `git push -u origin <branch-name>`. The `-u` flag sets
+upstream tracking, preventing the error on subsequent pushes.
 
 **Always start with `cd`.** Never assume the user's terminal is already in the
 project directory. Every command block you present must begin with the
@@ -755,6 +777,14 @@ convert to `/mnt/c/...` form.
 - **Termux quirks:** limited PATH, may need `pkg install` for tools like `gh`,
   smaller screen so keep commands concise
 
+**Termux clone flow.** On Termux (Android), the repo may not exist locally.
+When the user's shell is Termux, every command block must account for this:
+- **First time (repo not yet cloned):** start with `git clone <url>` then `cd`
+  into the cloned directory. Use the repo URL stored at session start (Section 6,
+  step 1).
+- **Subsequent commands (repo already cloned):** start with `cd` then
+  `git fetch origin && git pull origin <branch>` to sync before any work.
+
 **Example output (Windows PowerShell):**
 ```powershell
 cd "C:\Users\steve\Desktop\git\claude-vibe-skills"
@@ -779,9 +809,24 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 git push -u origin release/v2.10.0
 ```
 
-**Example output (Termux):**
+**Example output (Termux — first time, repo not yet cloned):**
 ```bash
-cd ~/storage/shared/projects/claude-vibe-skills
+cd ~/storage/shared/projects
+git clone https://github.com/owner/repo.git
+cd repo
+git fetch origin && git pull origin main
+git checkout -b release/v2.10.0
+git add -A
+git commit -m "v2.10.0 — git repo detection and branch enforcement
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push -u origin release/v2.10.0
+```
+
+**Example output (Termux — repo already cloned):**
+```bash
+cd ~/storage/shared/projects/repo
+git fetch origin && git pull origin main
 git checkout -b release/v2.10.0
 git add -A
 git commit -m "v2.10.0 — git repo detection and branch enforcement
@@ -811,7 +856,7 @@ If yes, produce the same handoff format as Section 5.5:
 **Gate status:** show the tracker with current state
 **Key files:** path:line — why it matters
 **Decisions made:** constraints the next session must respect
-**Shell environment:** [user's shell from 5.8, if detected]
+**Shell environment:** [user's shell from Section 6, step 2]
 **Next step:** the single concrete next action
 ```
 
@@ -845,8 +890,36 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
 If yes:
 
-1. **Offer to sync with origin.** The user may be working with outdated files.
-   Present the option before any work begins:
+1. **Detect and store the repo URL.** Run `git remote -v` to capture the origin
+   URL. Store it for the session — this URL is used in clone commands (Termux),
+   `git remote add` recovery, release URLs, and PR links. Never assume or
+   hardcode a repo URL — always derive from `git remote -v`.
+
+   If no remote is configured:
+
+   > ⚠️ **No remote configured.** This repo has no `origin` remote set.
+   > What is the GitHub URL for this project? (e.g. `https://github.com/owner/repo`)
+
+   Store the answer, and include `git remote add origin <url>` in the first
+   command block presented to the user.
+
+2. **Shell environment detection.** Ask the user which shell they work in —
+   this determines how all git commands are formatted for the rest of the session:
+
+   > **Which shell will you be running these commands in?**
+   > 1. Windows PowerShell
+   > 2. Linux PowerShell (pwsh)
+   > 3. Git Bash (Windows)
+   > 4. Termux (Android)
+   > 5. macOS Terminal (zsh/bash)
+   > 6. Linux Terminal (bash/zsh)
+   > 7. WSL (Windows Subsystem for Linux)
+
+   Store the answer for the rest of the session — don't ask again.
+
+3. **Offer to sync with origin.** The user may be working with outdated files.
+   Present the option before any work begins, formatted for the user's detected
+   shell (Section 5.7):
 
    > 📡 **Git repo detected:** `<repo-name>` on branch `<current-branch>`
    > Want to sync with origin before we start? This ensures we're working
@@ -855,11 +928,10 @@ If yes:
    > 1. **Yes — sync now** (fetch + pull from origin)
    > 2. **No — work with what's here**
 
-   If the user chooses to sync, run `git fetch origin` and `git pull origin
-   <current-branch>` (or present the commands per Section 5.7 if the shell
-   environment is already known). Report any conflicts or divergence.
+   If the user chooses to sync, present the fetch/pull commands formatted for
+   their shell. Report any conflicts or divergence.
 
-2. **Check the branch.** If the user is on `main` or `master`, flag it:
+4. **Check the branch.** If the user is on `main` or `master`, flag it:
 
    > ⚠️ **You're on `<branch>`.** This skill enforces branch-based development
    > — all work happens on feature/fix branches, then merges to the default
@@ -868,14 +940,15 @@ If yes:
    If yes, ask for a branch name or suggest one based on the task. Never
    proceed with implementation work directly on the default branch.
 
-3. **Report the repo state** in the session start banner (see below).
+5. **Report the repo state** in the session start banner (see below).
 
 Then show the gate tracker:
 
 ```
 Dev Skills v2.10.0 active.
 
-Repo: <repo-name> | Branch: <current-branch> | Last sync: <just now / not synced>
+Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
+Shell: <detected shell> | Last sync: <just now / not synced>
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
