@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.8.0
+version: 2.9.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -824,36 +824,36 @@ convert to `/mnt/c/...` form.
 **Example output (Windows PowerShell):**
 ```powershell
 cd "C:\Users\steve\Desktop\git\claude-vibe-skills"
-git checkout -b release/v2.8.0
+git checkout -b release/v2.9.0
 git add -A
 git commit -m @'
-v2.8.0 — add git command presentation to cost discipline
+v2.9.0 — add git command presentation to cost discipline
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 '@
-git push -u origin release/v2.8.0
+git push -u origin release/v2.9.0
 ```
 
 **Example output (Git Bash):**
 ```bash
 cd "/c/Users/steve/Desktop/git/claude-vibe-skills"
-git checkout -b release/v2.8.0
+git checkout -b release/v2.9.0
 git add -A
-git commit -m "v2.8.0 — add git command presentation to cost discipline
+git commit -m "v2.9.0 — add git command presentation to cost discipline
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.8.0
+git push -u origin release/v2.9.0
 ```
 
 **Example output (Termux):**
 ```bash
 cd ~/storage/shared/projects/claude-vibe-skills
-git checkout -b release/v2.8.0
+git checkout -b release/v2.9.0
 git add -A
-git commit -m "v2.8.0 — add git command presentation to cost discipline
+git commit -m "v2.9.0 — add git command presentation to cost discipline
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.8.0
+git push -u origin release/v2.9.0
 ```
 
 ### 5.9 Usage limit handoff
@@ -910,7 +910,7 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.8.0 active.
+Dev Skills v2.9.0 active.
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜

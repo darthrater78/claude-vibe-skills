@@ -112,7 +112,7 @@ Checks prerequisites first (GitHub remote exists, default branch is pushed, `gh`
 
 ### Gate 6 — Ship 🚀
 
-Merges the PR, tags the merge commit, creates a GitHub release with artifacts, and runs post-ship verification (tag on remote, release exists, PR merged, release assets attached). Shows the full ship summary and waits for explicit confirmation — "yeah" is not enough, type "ship" or "confirm ship".
+Merges the PR, tags the merge commit, creates a GitHub release with artifacts, and runs post-ship verification (tag on remote, release exists, PR merged, release assets attached). Android projects must include a properly named APK (`<app-name>-v<VERSION>.apk`) — "debug" in the filename is a ship failure. Shows the full ship summary and waits for explicit confirmation — "yeah" is not enough, type "ship" or "confirm ship".
 
 ---
 
@@ -125,7 +125,7 @@ The skill also keeps sessions cheap:
 - **MCP awareness** — identifies unused MCP servers adding token overhead and shows how to disable them
 - **Phase transitions** — offers handoff summaries at natural breakpoints so you can start a fresh, cheap session
 - **Token impact estimates** — rough end-of-task report showing what was saved and what was wasted
-- **Git command presentation** — asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell, always starting with the proper `cd` command
+- **Git command presentation** — defaults to presenting git commands for manual execution to minimize tool-call token overhead; asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and formats all commands for that shell, always starting with the proper `cd` command
 - **Usage limit handoff** — proactively offers a handoff summary when the account is nearing its usage cap so you can resume in a fresh session without losing progress
 
 ---
@@ -162,9 +162,13 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.8.0`
+`v2.9.0`
 
 ### Version history
+
+**v2.9.0** — 2026-09-05
+- Git command presentation (5.8) now defaults to presenting commands for manual execution to save tool-call token overhead — Claude never assumes direct execution without the user choosing it; gates 1, 5, and 6 reference this pattern
+- Android APK artifact requirement in Gate 6: Android projects must include a properly named APK (`<app-name>-v<VERSION>.apk`) as a release asset — "debug" in the filename is a ship failure
 
 **v2.8.0** — 2026-09-04
 - Git command presentation (5.8): asks the user's shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell — always starts with a `cd` to the project directory, never assumes the user is already there
