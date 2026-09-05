@@ -415,10 +415,29 @@ to missing assets are also a ship failure.
 **Android APK requirement.** When the project is an Android app (`build.gradle`,
 `AndroidManifest.xml`, or Gradle with Android plugins):
 1. Build release APK: `./gradlew assembleRelease` — never a debug build
-2. Name it `<app-name>-v<VERSION>.apk` — rename Gradle's generic output if needed.
+2. **Verify APK signing — debug signature is a ship failure.** Run:
+   ```
+   apksigner verify --print-certs <apk-file>
+   ```
+   or if `apksigner` is unavailable:
+   ```
+   keytool -printcert -jarfile <apk-file>
+   ```
+   Check the output:
+   - 🚨 **Ship failure** if the signer CN contains `Android Debug`, `debug`, or
+     the SHA-256 matches the well-known debug keystore fingerprint
+   - 🚨 **Ship failure** if the APK is unsigned (no signature block at all)
+   - ✅ Pass only if signed with a release keystore whose CN matches the project's
+     expected identity (e.g. the organization or developer name)
+
+   The default debug keystore (`~/.android/debug.keystore`, password `android`,
+   alias `androiddebugkey`) is generated automatically by Android tooling. Any APK
+   signed with it can be re-signed by anyone — it provides zero authenticity.
+   **Never ship a debug-signed APK.**
+3. Name it `<app-name>-v<VERSION>.apk` — rename Gradle's generic output if needed.
    **"debug" in the filename = wrong variant = ship failure.**
-3. Attach as release asset — an Android release without an APK is a ship failure
-4. Verify the APK appears in release assets with correct name and reasonable size
+4. Attach as release asset — an Android release without an APK is a ship failure
+5. Verify the APK appears in release assets with correct name and reasonable size
 
 **Execution — present commands per Section 5.7:**
 
@@ -527,7 +546,7 @@ traversal, serialization, JavaScript (XSS/prototype pollution/open redirect),
 Windows (PowerShell/UNC/DLL/registry/services/signing/reserved names), Linux
 (SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages), Android
 (exported components/manifest hardening/WebView/Intents/storage/network security
-config/permissions/logging/ProGuard), cross-platform (permissions/paths/credentials).
+config/permissions/logging/ProGuard/APK signing), cross-platform (permissions/paths/credentials).
 
 ### 4.3 Language best practices
 
