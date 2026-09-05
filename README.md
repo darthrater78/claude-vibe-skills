@@ -1,16 +1,18 @@
 # claude-vibe-skills
 
-One skill for disciplined vibe coding: commit approval, versioned builds, security scanning, code quality checks, cost control, and a strict 6-gate release workflow.
+One skill for disciplined vibe coding: commit approval, branch-based development, versioned builds, security scanning, code quality checks, cost control, and a strict 6-gate release workflow.
 
 ## What it does
 
-`dev-skills` enforces three things:
+`dev-skills` enforces four things:
 
 1. **Commits require approval.** Claude never runs `git commit`, `git push`, or `gh pr create` without your explicit say-so. No more surprise commits after a single change.
 
-2. **Six gates before anything ships.** Every session that produces a build moves through version → build → security → docs → release → ship in order. No gate can be silently skipped.
+2. **Branch-based development.** All work happens on feature/fix branches — never directly on main/master. At session start, the skill detects the git repo, offers to sync with origin, and flags if you're on the default branch.
 
-3. **Security and quality scanning.** After every build, a full code scan runs automatically — checking for hardcoded secrets, injection vectors, spaghetti code, N+1 queries, and more. Critical and high findings block the release.
+3. **Six gates before anything ships.** Every session that produces a build moves through version → build → security → docs → release → ship in order. No gate can be silently skipped.
+
+4. **Security and quality scanning.** After every build, a full code scan runs automatically — checking for hardcoded secrets, injection vectors, spaghetti code, N+1 queries, and more. Critical and high findings block the release.
 
 ```
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
@@ -162,17 +164,23 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.9.0`
+`v2.10.0`
 
 ### Version history
 
+**v2.10.0** — 2026-09-05
+- Git repo detection at session start: detects git repos, offers to sync with origin before starting work, and warns if on the default branch — ensures the session always works with up-to-date files on a proper working branch
+- Branch-based workflow enforcement: all work must happen on feature/fix/release branches; committing directly to main/master is blocked; session-end checkpoint flags unmerged branches
+- Prose tightened: Gate 6 reduced ~20%, Section 5.7 (Tone) folded into Section 5 intro, redundant phrasing trimmed throughout — net 30 lines removed while adding new features
+- Cost discipline subsections renumbered: Git command presentation is now 5.7 (was 5.8), Usage limit handoff is now 5.8 (was 5.9)
+
 **v2.9.0** — 2026-09-05
-- Git command presentation (5.8) now defaults to presenting commands for manual execution to save tool-call token overhead — Claude never assumes direct execution without the user choosing it; gates 1, 5, and 6 reference this pattern
+- Git command presentation (5.7) now defaults to presenting commands for manual execution to save tool-call token overhead — Claude never assumes direct execution without the user choosing it; gates 1, 5, and 6 reference this pattern
 - Android APK artifact requirement in Gate 6: Android projects must include a properly named APK (`<app-name>-v<VERSION>.apk`) as a release asset — "debug" in the filename is a ship failure
 
 **v2.8.0** — 2026-09-04
-- Git command presentation (5.8): asks the user's shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell — always starts with a `cd` to the project directory, never assumes the user is already there
-- Usage limit handoff (5.9): proactively offers a handoff summary when the account is nearing its usage cap, including gate tracker state and shell environment so the next session can resume without re-asking
+- Git command presentation (now 5.7): asks the user's shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and adapts all presented git/gh commands to that shell — always starts with a `cd` to the project directory, never assumes the user is already there
+- Usage limit handoff (now 5.8): proactively offers a handoff summary when the account is nearing its usage cap, including gate tracker state and shell environment so the next session can resume without re-asking
 
 **v2.7.3** — 2026-09-03
 - Added Android platform security checks: exported components, manifest hardening, WebView RCE, Intent validation, secure storage (EncryptedSharedPreferences/Keystore), network security config, certificate pinning, logging hygiene, ProGuard/R8

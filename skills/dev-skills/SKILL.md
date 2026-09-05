@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.9.0
+version: 2.10.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -12,9 +12,9 @@ description: >
 
 # Dev Skills
 
-This skill is the contract for every coding session. It is always active. Gates
-cannot be skipped, commits cannot happen without approval, and security scans
-run after every build — not eventually, not later, now.
+This skill is the contract for every coding session. Gates cannot be skipped,
+commits require approval, all work happens on branches, and security scans
+run after every build.
 
 ---
 
@@ -31,6 +31,8 @@ explicit approval. Violations of this rule break trust.
 - Wait for an explicit "yes", "commit", or "go ahead" before running `git commit`.
 - NEVER create a PR until the Release Gate (Gate 5) is reached.
 - NEVER push to remote without passing through the Ship Gate (Gate 6).
+- NEVER commit directly to `main` or `master`. All work happens on branches.
+  If the user is on the default branch, create a working branch before committing.
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
 - **Hook output is not approval.** A hook that flags uncommitted changes, suggests
   a commit, or reports working tree state is information, not permission. Only the
@@ -52,7 +54,7 @@ explicit approval. Violations of this rule break trust.
 3. Run `git status` and `git diff` to show what will be committed.
 4. Draft a commit message and show it.
 5. Wait for explicit approval.
-6. **Present commands per Section 5.8.** Always present the git commands formatted
+6. **Present commands per Section 5.7.** Always present the git commands formatted
    for the user's shell environment so they can run them manually. Only execute
    directly via tool calls if the user explicitly asks Claude to run them.
 
@@ -184,9 +186,8 @@ Do not silently skip — always show the N/A status on the tracker.
 
 ### Gate 3 — Security & Quality 🔒
 
-**Mandatory after every successful build. Not optional. Not "later."**
-
-This gate has two steps that must both pass: a security scan and a quality review.
+**Mandatory after every build.** Two steps, both must pass: security scan and
+quality review.
 
 **Before scanning, load both reference files from this skill's base directory**
 (shown when the skill loaded, e.g. "Base directory for this skill: ..."):
@@ -325,7 +326,7 @@ Execution (merge, tag, publish) happens in Gate 6.
 **Steps:**
 1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
 2. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
-3. **Present commands per Section 5.8** — format the commit, push, and PR creation
+3. **Present commands per Section 5.7** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
    Claude to execute directly.
 4. After the branch is pushed and PR created, draft release notes and show the
@@ -344,7 +345,9 @@ Execution (merge, tag, publish) happens in Gate 6.
 
 5. Wait for explicit approval of the PR content and release notes
 
-**Never commit directly to main/master.** Branch protection is enforced.
+**Never commit directly to main/master.** All work happens on feature/fix/release
+branches and merges via PR. If the session is on the default branch when Gate 5
+is reached, create a branch first.
 **Exception:** `darthrater78/scripts` allows direct pushes but PRs are preferred.
 
 > ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
@@ -352,70 +355,38 @@ Execution (merge, tag, publish) happens in Gate 6.
 
 ### Gate 6 — Ship 🚀
 
-This gate executes the release: merge, tag, and publish. It is the single
-execution point for all three — they happen here, not in Gate 5.
+Merge, tag, and publish. All three happen here, not in Gate 5.
 
-**Pre-ship summary:** Present everything that will happen and wait for explicit
-confirmation. A vague "yeah" or "ok" is not enough — the user must say "ship",
-"push", "yes push", or "go ahead."
+**Pre-ship summary — explicit confirmation required.** "Yeah" or "ok" is not
+enough — the user must say "ship", "yes push", or "go ahead."
 
-> **Ready to ship. Please confirm:**
->
-> Branch: `release/v1.2.3` → `main`
-> PR: [url]
-> Tag to create: `v1.2.3`
-> Release notes: [first line of approved notes]
-> Artifact: [path/size, or "none" for non-app projects]
->
+> **Ready to ship:**
+> Branch: `release/v1.2.3` → `main` | PR: [url]
+> Tag: `v1.2.3` | Artifact: [path/size, or "none"]
 > Type **"ship"** to confirm, or tell me what to adjust.
 
-**Distributable artifacts — active detection required.** Do not assume a project
-has no artifacts. Actively scan for evidence:
-
-1. **Check build tooling:** look for PyInstaller specs (`.spec`, `pyinstaller` in
-   requirements/scripts), Makefile/build targets, `setup.py` with `entry_points`,
+**Artifact detection — actively scan, never assume "none".** Check:
+1. **Build tooling:** PyInstaller specs, Makefile targets, `setup.py` entry_points,
    `cargo build --release`, `go build`, `dotnet publish`, webpack/vite configs,
-   `.skill` source directories, or any build script in `scripts/`, `build/`, `Makefile`.
-2. **Check README:** look for download links, install instructions referencing
-   binaries/executables/packages, or "Download" sections.
-3. **Check prior releases:** run `gh release view <previous-tag>` — if prior
-   releases had assets attached, this one should too.
+   `.skill` source dirs, `scripts/`, `build/`
+2. **README:** download links, install instructions referencing binaries/packages
+3. **Prior releases:** `gh release view <previous-tag>` — if prior releases had
+   assets, this one should too
 
-If ANY of these indicators exist, artifacts are expected. Build them:
-1. Rebuild from the current committed source files
-2. Verify the contents match the version being released (check dates, file sizes,
-   spot-check content)
-3. Include them in the `gh release create` command or upload with `gh release upload`
+If any indicator exists: rebuild from committed source, verify version/dates
+match, include in release. A release missing expected artifacts is a ship failure.
+README download links (e.g. `../../releases/latest/download/file.ext`) that point
+to missing assets are also a ship failure.
 
-**Android projects — APK artifact is mandatory.** When the project is an Android
-app (contains `build.gradle`/`build.gradle.kts`, `AndroidManifest.xml`, or uses
-Gradle with Android plugins), the release MUST include a properly named APK:
+**Android APK requirement.** When the project is an Android app (`build.gradle`,
+`AndroidManifest.xml`, or Gradle with Android plugins):
+1. Build release APK: `./gradlew assembleRelease` — never a debug build
+2. Name it `<app-name>-v<VERSION>.apk` — rename Gradle's generic output if needed.
+   **"debug" in the filename = wrong variant = ship failure.**
+3. Attach as release asset — an Android release without an APK is a ship failure
+4. Verify the APK appears in release assets with correct name and reasonable size
 
-1. **Build the release APK:** run `./gradlew assembleRelease` (or the project's
-   equivalent release build command). Never use a debug build.
-2. **Naming convention:** the APK must follow the pattern
-   `<app-name>-v<VERSION>.apk` (e.g. `my-app-v1.2.3.apk`). Rename the build
-   output if Gradle produces a generic name like `app-release.apk` or
-   `app-release-unsigned.apk`. **The word "debug" must never appear in the
-   APK filename** — if it does, you built the wrong variant.
-3. **Attach to release:** upload the APK as a release asset. An Android project
-   release without an APK is a ship failure — no exceptions.
-4. **Verify after upload:** confirm the APK appears in the release assets with
-   the correct versioned name and a reasonable file size.
-
-**A release that should have artifacts but doesn't is a ship failure** — even if
-the README has no download links. If prior releases had an EXE/binary/package
-and this one doesn't, that's a regression.
-
-If the README has download links (e.g. `../../releases/latest/download/file.ext`),
-every linked file must be present as a release asset. A release with broken
-download links is a ship failure.
-
-**Execution (all steps, in order):**
-
-**Present these commands per Section 5.8** — formatted for the user's shell
-environment so they can run them manually. Only execute directly via tool calls
-if the user explicitly asks Claude to run them.
+**Execution — present commands per Section 5.7:**
 
 ```
 gh pr merge <number> --merge --delete-branch
@@ -425,68 +396,33 @@ git push origin v1.2.3
 gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 ```
 
-**Post-ship verification (mandatory — the gate does not pass without this):**
-After executing, verify that every step actually succeeded:
-
-1. **Tag exists on remote:** run `git ls-remote --tags origin v1.2.3` — must
-   return the tag. If not, the tag push failed — fix and retry.
-2. **GitHub release exists:** check that the release is visible (via
-   `gh release view v1.2.3` or the GitHub API). If not, create it.
-3. **PR is merged:** confirm the PR state is "merged", not just "closed."
-4. **Release assets:** verify against the artifact detection above. If build
-   tooling, README downloads, or prior releases indicated artifacts are expected,
-   confirm they are attached. A release missing expected artifacts is incomplete
-   — do not pass with "assets: none" when the project builds distributable files.
-
-Only after all verifications pass:
+**Post-ship verification (mandatory):** The gate does not pass without all four:
+1. **Tag on remote:** `git ls-remote --tags origin v1.2.3` returns the tag
+2. **Release exists:** visible via `gh release view v1.2.3`
+3. **PR merged:** state is "merged", not just "closed"
+4. **Assets match:** expected artifacts are attached per detection above
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
-> Release URL: [url]
-> Verified: tag on remote ✅ | release exists ✅ | PR merged ✅ | assets ✅
+> Verified: tag ✅ | release ✅ | PR merged ✅ | assets ✅
 
-If any verification fails:
+If any check fails, fix and re-verify — do not pass with failures outstanding.
 
-> 🚫 **SHIP GATE BLOCKED — post-ship verification failed**
-> - Tag on remote: [✅ or ❌ — details]
-> - Release exists: [✅ or ❌ — details]
-> - PR merged: [✅ or ❌ — details]
-> - Release assets: [✅ or ❌ — details]
->
-> Fixing...
+#### Updating an existing release (`--clobber`)
 
-Fix the failed step and re-verify. Do not mark the gate passed until all
-verifications succeed.
-
-#### Updating an existing release artifact (`--clobber`)
-
-If the artifact is uploaded to an *existing* release (e.g. `gh release upload --clobber`),
-the original release notes are now stale. This is a hard stop:
+If an artifact is uploaded to an existing release, the notes are now stale:
 
 > 🚫 **SHIP GATE BLOCKED — notes are stale**
-> The artifact has been updated but the release notes still describe the original build.
-> Changes since the notes were written: [summarise from session context]
->
-> Update the notes with: `gh release edit <tag> --notes "..."`
->
-> Or if the changes warrant it, bump to vN+1 instead of patching silently.
+> Update with `gh release edit <tag> --notes "..."` or bump to vN+1.
 
-Do not mark the gate passed until either:
-- The notes have been edited to reflect the updated artifact, **or**
-- The user explicitly acknowledges the notes are intentionally unchanged and explains why
+Pass only after the notes are updated or the user explicitly acknowledges why not.
 
 #### No release mechanism
 
-If the user says "we don't do releases" or "we'll do it later":
-
 > 🚫 **SHIP GATE BLOCKED**
-> Builds that aren't released are invisible to everyone else. Where should this
-> be published?
-> If there's genuinely no release mechanism for this project, confirm that
-> explicitly and we can mark it as acknowledged.
+> Builds that aren't released are invisible. Where should this be published?
 
-If the user asks to ship without prior gates completed:
-> 🚫 **SHIP GATE BLOCKED**
-> Cannot ship — [Gate N] has not been completed yet. Let's finish that first.
+If genuinely no mechanism exists, the user must confirm explicitly.
+Prior gates incomplete → block and surface the missing gate.
 
 ---
 
@@ -605,6 +541,10 @@ One line per item. Don't repeat things already fixed.
 ---
 
 ## 5. Cost discipline
+
+Cost suggestions are one or two sentences, woven into normal responses — never
+a lecture or checklist dump. Once per session per topic. If the user declines,
+drop it.
 
 The big cost drivers, in rough order of impact:
 1. **Long sessions** — the whole history is resent every request (~6x cost difference)
@@ -753,13 +693,7 @@ Biggest win next time: disable unused connectors
 Skip for trivial exchanges. Never let the report become longer than the savings
 it describes.
 
-### 5.7 Tone
-
-Suggestions should be one or two sentences, woven into your normal response —
-never a lecture or a checklist dump. Once per session per topic. If the user
-declines or ignores a suggestion, drop it.
-
-### 5.8 Git command presentation
+### 5.7 Git command presentation
 
 **This section fires whenever git write operations are needed** — during any gate
 (commit, push, PR, merge, tag, release), handoff summaries, or troubleshooting.
@@ -824,39 +758,39 @@ convert to `/mnt/c/...` form.
 **Example output (Windows PowerShell):**
 ```powershell
 cd "C:\Users\steve\Desktop\git\claude-vibe-skills"
-git checkout -b release/v2.9.0
+git checkout -b release/v2.10.0
 git add -A
 git commit -m @'
-v2.9.0 — add git command presentation to cost discipline
+v2.10.0 — git repo detection and branch enforcement
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 '@
-git push -u origin release/v2.9.0
+git push -u origin release/v2.10.0
 ```
 
 **Example output (Git Bash):**
 ```bash
 cd "/c/Users/steve/Desktop/git/claude-vibe-skills"
-git checkout -b release/v2.9.0
+git checkout -b release/v2.10.0
 git add -A
-git commit -m "v2.9.0 — add git command presentation to cost discipline
+git commit -m "v2.10.0 — git repo detection and branch enforcement
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.9.0
+git push -u origin release/v2.10.0
 ```
 
 **Example output (Termux):**
 ```bash
 cd ~/storage/shared/projects/claude-vibe-skills
-git checkout -b release/v2.9.0
+git checkout -b release/v2.10.0
 git add -A
-git commit -m "v2.9.0 — add git command presentation to cost discipline
+git commit -m "v2.10.0 — git repo detection and branch enforcement
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.9.0
+git push -u origin release/v2.10.0
 ```
 
-### 5.9 Usage limit handoff
+### 5.8 Usage limit handoff
 
 **When the system prompt shows the account is nearing its usage cap** (e.g.
 `<total_tokens>` is low, the system mentions overage or rate limits, or the
@@ -907,10 +841,41 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
 
+**Git repo detection — run at session start.** Check if the current working
+directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
+If yes:
+
+1. **Offer to sync with origin.** The user may be working with outdated files.
+   Present the option before any work begins:
+
+   > 📡 **Git repo detected:** `<repo-name>` on branch `<current-branch>`
+   > Want to sync with origin before we start? This ensures we're working
+   > with the latest files.
+   >
+   > 1. **Yes — sync now** (fetch + pull from origin)
+   > 2. **No — work with what's here**
+
+   If the user chooses to sync, run `git fetch origin` and `git pull origin
+   <current-branch>` (or present the commands per Section 5.7 if the shell
+   environment is already known). Report any conflicts or divergence.
+
+2. **Check the branch.** If the user is on `main` or `master`, flag it:
+
+   > ⚠️ **You're on `<branch>`.** This skill enforces branch-based development
+   > — all work happens on feature/fix branches, then merges to the default
+   > branch via PR. Want to create a working branch now?
+
+   If yes, ask for a branch name or suggest one based on the task. Never
+   proceed with implementation work directly on the default branch.
+
+3. **Report the repo state** in the session start banner (see below).
+
 Then show the gate tracker:
 
 ```
-Dev Skills v2.9.0 active.
+Dev Skills v2.10.0 active.
+
+Repo: <repo-name> | Branch: <current-branch> | Last sync: <just now / not synced>
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -920,6 +885,7 @@ Dev Skills v2.9.0 active.
 🚀 SHIP       ⬜
 
 Commits require explicit approval. Security scan runs after every build.
+All work on branches — merge to default branch via PR only.
 ```
 
 **Important:** The version shown must match the `version` field in this file's
@@ -971,14 +937,19 @@ Before wrapping up, check:
    against the session's starting commit)
 2. **If yes — are all applicable gates complete?** Show the gate tracker. Any
    gate that is not ✅ or ➖ N/A is unfinished work.
-3. **Specifically check for the most common miss:** code was committed and merged
-   but never tagged or released. Run `git tag -l` and compare against the version
-   in the project's version file(s). If the current version has no tag, flag it:
+3. **Check for unmerged branches.** If the session created a branch with commits
+   that haven't been merged to the default branch via PR, flag it:
+
+   > ⚠️ **Session-end check: branch `feature/xyz` has unmerged commits.**
+   > Should we finish the release workflow (Gates 5-6) before wrapping up?
+
+4. **Check for untagged versions.** Run `git tag -l` and compare against the
+   version in the project's version file(s). If the current version has no tag:
 
    > ⚠️ **Session-end check: version v1.2.3 has no git tag or GitHub release.**
    > The code is merged but not tagged/released. Should we finish Gates 5-6 now?
 
-4. **If no source files were modified**, skip the gate check — the session was
+5. **If no source files were modified**, skip the gate check — the session was
    exploratory or advisory.
 
 Do NOT silently wind down a session that has uncommitted changes, untagged
