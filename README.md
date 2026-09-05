@@ -165,6 +165,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.10.1`
+`v2.10.2`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
