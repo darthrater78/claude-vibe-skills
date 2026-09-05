@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.10.2
+version: 2.11.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -194,6 +194,15 @@ This means:
 
 If the app cannot be tested locally (e.g. requires external infrastructure),
 say so explicitly rather than skipping — the user decides whether to proceed.
+
+**Projects with CI release workflows.** If the project has a GitHub Actions
+workflow that builds release artifacts on tag push (check
+`.github/workflows/` for `on: push: tags:`), the local build gate covers
+only the **debug/test build**. The release artifact is built by CI during
+Gate 6 — do not build it locally. Gate 2 passes when the debug build
+compiles and the app is verified working.
+
+> ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred to CI)
 
 **Projects with no build step** (config repos, skill repos, documentation-only
 repos, pure script collections): mark this gate ➖ N/A with an explanation:
@@ -398,6 +407,72 @@ enough — the user must say "ship", "yes push", or "go ahead."
 > Branch: `release/v1.2.3` → `main` | PR: [url]
 > Tag: `v1.2.3` | Artifact: [path/size, or "none"]
 > Type **"ship"** to confirm, or tell me what to adjust.
+
+**CI release detection — check before manual steps.** Look for a release
+workflow in `.github/workflows/` that triggers on tag push (`on: push: tags:`)
+and creates a GitHub release. If found, follow the **CI-driven path** below.
+If not, follow the **manual path**.
+
+#### CI-driven path
+
+When a CI release workflow exists:
+
+1. **Verify secrets are configured.** The workflow needs signing secrets
+   (e.g. `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD` for Android).
+   Check with: `gh secret list`. If secrets are missing:
+
+   > 🚫 **SHIP GATE BLOCKED — CI signing secrets not configured.**
+   > The release workflow needs these repository secrets: [list missing].
+   > Add them at: `https://github.com/<owner>/<repo>/settings/secrets/actions`
+
+2. **Merge the PR** (per Section 5.7 command formatting):
+   ```
+   gh pr merge <number> --merge --delete-branch
+   git checkout main && git pull origin main
+   ```
+
+3. **Tag and push — CI does the rest:**
+   ```
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+4. **Wait for CI to complete.** Monitor with:
+   ```
+   gh run list --limit 3
+   gh run watch <run-id>
+   ```
+
+5. **Add release notes.** CI creates the release with the artifact attached
+   but no notes. Add them:
+   ```
+   gh release edit v1.2.3 --notes "..."
+   ```
+   Or if the user prefers, edit via the GitHub UI.
+
+6. **Post-ship verification (mandatory).** Same as manual path — all four
+   checks must pass:
+   - **Tag on remote:** `git ls-remote --tags origin v1.2.3`
+   - **Release exists:** `gh release view v1.2.3`
+   - **PR merged:** state is "merged"
+   - **Assets match:** CI-built artifact attached with correct name and
+     reasonable size. **For Android:** verify the APK name contains the
+     version and does NOT contain "debug".
+
+   If CI failed:
+   > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
+   > Check logs: `gh run view <run-id> --log-failed`
+   > Fix the issue, delete the tag, and re-tag after fixing:
+   > ```
+   > git tag -d v1.2.3
+   > git push origin :refs/tags/v1.2.3
+   > ```
+   > Then re-tag and push once the fix is on the default branch.
+
+> ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
+> Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
+
+#### Manual path (no CI release workflow)
 
 **Artifact detection — actively scan, never assume "none".** Check:
 1. **Build tooling:** PyInstaller specs, Makefile targets, `setup.py` entry_points,
@@ -901,13 +976,46 @@ If yes:
 
 5. **Report the repo state** in the session start banner (see below).
 
+6. **CI workflow detection.** Check `.github/workflows/` for:
+   - A **release workflow** — triggers on tag push (`on: push: tags:`) and
+     creates a GitHub release with artifacts
+   - A **build check workflow** — triggers on pull requests and compiles
+     the project
+
+   Report what's found in the session banner (see template below).
+
+   **If the project is buildable (Gate 2 is not N/A) but has no release
+   workflow**, suggest creating one:
+
+   > 💡 **No CI release workflow detected.** This project has a build step
+   > but no automated release pipeline. A release workflow would let CI
+   > build signed artifacts and publish GitHub releases automatically when
+   > you push a version tag — no local release build needed.
+   >
+   > Want me to create `.github/workflows/release.yml`?
+
+   If the user says yes, ask what the project needs:
+   - What secrets does signing require? (keystore, certificates, tokens)
+   - What's the build command for a release artifact?
+   - What should the artifact be named?
+
+   Then generate the workflow. Do not assume a template — build it from the
+   project's actual build tooling.
+
+   **If a release workflow exists but no build check workflow**, mention it:
+
+   > 💡 **No CI build check detected.** PRs are not compiled before merge.
+   > A build check workflow catches compile errors before they land on the
+   > default branch. Want me to create one?
+
 Then show the gate tracker:
 
 ```
-Dev Skills v2.10.2 active.
+Dev Skills v2.11.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Shell: <detected shell> | Last sync: <just now / not synced>
+CI release: <✅ workflow name / ❌ not detected>
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
