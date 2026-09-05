@@ -14,3 +14,11 @@ ehthumbs.db
 *.swp
 *.swo
 *~
+
+# Android keystores and signing
+*.keystore
+*.jks
+*.pk8
+*.pem
+key.properties
+signing.properties

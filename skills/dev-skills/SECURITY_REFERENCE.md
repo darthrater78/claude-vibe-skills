@@ -96,6 +96,10 @@ These rules apply as code is written, not just during Gate 3 scans.
 - Logging: never log PII, tokens, or passwords — `Log.d`/`Log.v` are readable
   by any app on rooted devices and by ADB
 - ProGuard/R8: enable for release builds — prevents trivial reverse engineering
+- APK signing: never ship with the default debug keystore — verify release signature
+  with `apksigner verify --print-certs`; CN containing "Android Debug" = ship failure
+- Keystore in `.gitignore`: verify `.gitignore` contains `*.keystore`, `*.jks`,
+  `*.pk8`, `key.properties` — a committed keystore is a 🚨 Critical finding
 
 **Cross-platform:**
 - File permissions: `0o600`/`chmod` on Unix, `icacls` owner-only on Windows
@@ -483,6 +487,114 @@ webView.webViewClient = object : WebViewClient() {
 webView.webViewClient = object : WebViewClient() {
     override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
         handler.cancel()
+    }
+}
+```
+
+---
+
+## Android — APK signing
+
+```groovy
+// bad — no signing config, Gradle uses debug keystore by default
+android {
+    buildTypes {
+        release {
+            minifyEnabled true
+            // no signingConfig — APK is signed with ~/.android/debug.keystore
+        }
+    }
+}
+
+// good — release build uses a dedicated release keystore
+android {
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("RELEASE_KEYSTORE_PATH") ?: "release.keystore")
+            storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            signingConfig signingConfigs.release
+        }
+    }
+}
+```
+
+```bash
+# Verify signing — run before every release
+
+# bad — no verification, ship whatever Gradle produced
+cp app/build/outputs/apk/release/app-release.apk ./release.apk
+
+# good — verify the signer is NOT the debug key
+apksigner verify --print-certs app-release.apk
+# Check output: CN must NOT contain "Android Debug"
+# SHA-256 must NOT match the debug keystore fingerprint
+
+# alternative when apksigner is unavailable
+keytool -printcert -jarfile app-release.apk
+# Look for: Owner: CN=<your org or name> — NOT CN=Android Debug
+
+# If you see any of these, the APK is debug-signed — DO NOT SHIP:
+#   Owner: CN=Android Debug, O=Android, C=US
+#   Signer #1 certificate DN: CN=Android Debug, O=Android, C=US
+```
+
+```bash
+# Generating a release keystore (one-time setup)
+keytool -genkeypair -v \
+    -keystore release.keystore \
+    -alias release \
+    -keyalg RSA -keysize 2048 \
+    -validity 10000 \
+    -storepass <strong-password> \
+    -keypass <strong-password> \
+    -dname "CN=<Your Name>, O=<Your Org>, L=<City>, ST=<State>, C=<Country>"
+
+# NEVER commit the keystore or its passwords to version control
+# Store keystore in a secure location, passwords in a secrets manager
+```
+
+```gitignore
+# bad — .gitignore missing keystore entries (or no .gitignore at all)
+# Keystores, key.properties, and .pk8 files can be committed accidentally
+
+# good — .gitignore includes all signing-related files
+*.keystore
+*.jks
+*.pk8
+*.pem
+key.properties
+signing.properties
+```
+
+```groovy
+// bad — passwords hardcoded in build.gradle (committed to repo)
+signingConfigs {
+    release {
+        storeFile file("release.keystore")
+        storePassword "mysecretpassword"
+        keyAlias "mykey"
+        keyPassword "anothersecret"
+    }
+}
+
+// good — passwords loaded from key.properties (which is in .gitignore)
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+signingConfigs {
+    release {
+        storeFile file(keystoreProperties['storeFile'])
+        storePassword keystoreProperties['storePassword']
+        keyAlias keystoreProperties['keyAlias']
+        keyPassword keystoreProperties['keyPassword']
     }
 }
 ```

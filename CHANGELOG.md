@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.10.2] — 2026-09-05
+
+### Added
+- Android APK signing verification in Gate 6 — debug-signed APKs are now a hard ship failure
+- APK signing added to Section 4.2 dangerous patterns category list
+- SECURITY_REFERENCE.md: APK signing rules, `.gitignore` enforcement for keystores, bad/good code examples (Gradle signing configs, `apksigner` verification, `key.properties` pattern)
+- `.gitignore`: Android keystore and signing file patterns (`*.keystore`, `*.jks`, `*.pk8`, `*.pem`, `key.properties`, `signing.properties`)
+
 ## [2.10.1] — 2026-09-05
 
 ### Added
