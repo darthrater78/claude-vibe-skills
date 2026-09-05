@@ -51,7 +51,10 @@ explicit approval. Violations of this rule break trust.
 2. If building an app: confirm a test build has been created and verified working.
 3. Run `git status` and `git diff` to show what will be committed.
 4. Draft a commit message and show it.
-5. Wait for explicit approval before executing.
+5. Wait for explicit approval.
+6. **Present commands per Section 5.8.** Always present the git commands formatted
+   for the user's shell environment so they can run them manually. Only execute
+   directly via tool calls if the user explicitly asks Claude to run them.
 
 **When do gates apply?** Any session that has produced code changes, version
 bumps, builds, or is heading toward a release. If the session modified source
@@ -322,9 +325,11 @@ Execution (merge, tag, publish) happens in Gate 6.
 **Steps:**
 1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
 2. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
-3. Commit to the feature branch
-4. Push the branch and create a PR against the default branch
-5. Draft release notes and show the PR + notes to the user:
+3. **Present commands per Section 5.8** — format the commit, push, and PR creation
+   commands for the user's shell environment. The user runs them manually or asks
+   Claude to execute directly.
+4. After the branch is pushed and PR created, draft release notes and show the
+   PR + notes to the user:
 
    > 📝 **PR created — review before shipping:**
    >
@@ -337,7 +342,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    > Do these accurately describe what's in this build? Reply "yes" to ship,
    > or tell me what to change.
 
-6. Wait for explicit approval of the PR content and release notes
+5. Wait for explicit approval of the PR content and release notes
 
 **Never commit directly to main/master.** Branch protection is enforced.
 **Exception:** `darthrater78/scripts` allows direct pushes but PRs are preferred.
@@ -382,6 +387,22 @@ If ANY of these indicators exist, artifacts are expected. Build them:
    spot-check content)
 3. Include them in the `gh release create` command or upload with `gh release upload`
 
+**Android projects — APK artifact is mandatory.** When the project is an Android
+app (contains `build.gradle`/`build.gradle.kts`, `AndroidManifest.xml`, or uses
+Gradle with Android plugins), the release MUST include a properly named APK:
+
+1. **Build the release APK:** run `./gradlew assembleRelease` (or the project's
+   equivalent release build command). Never use a debug build.
+2. **Naming convention:** the APK must follow the pattern
+   `<app-name>-v<VERSION>.apk` (e.g. `my-app-v1.2.3.apk`). Rename the build
+   output if Gradle produces a generic name like `app-release.apk` or
+   `app-release-unsigned.apk`. **The word "debug" must never appear in the
+   APK filename** — if it does, you built the wrong variant.
+3. **Attach to release:** upload the APK as a release asset. An Android project
+   release without an APK is a ship failure — no exceptions.
+4. **Verify after upload:** confirm the APK appears in the release assets with
+   the correct versioned name and a reasonable file size.
+
 **A release that should have artifacts but doesn't is a ship failure** — even if
 the README has no download links. If prior releases had an EXE/binary/package
 and this one doesn't, that's a regression.
@@ -391,6 +412,11 @@ every linked file must be present as a release asset. A release with broken
 download links is a ship failure.
 
 **Execution (all steps, in order):**
+
+**Present these commands per Section 5.8** — formatted for the user's shell
+environment so they can run them manually. Only execute directly via tool calls
+if the user explicitly asks Claude to run them.
+
 ```
 gh pr merge <number> --merge --delete-branch
 git checkout main && git pull origin main
@@ -735,10 +761,19 @@ declines or ignores a suggestion, drop it.
 
 ### 5.8 Git command presentation
 
-**This section fires whenever you present git, `gh`, or GitHub CLI commands for
-the user to run manually** — during any gate (commit, push, PR, merge, tag,
-release), handoff summaries, or troubleshooting. It does NOT apply to commands
-Claude executes directly via tool calls.
+**This section fires whenever git write operations are needed** — during any gate
+(commit, push, PR, merge, tag, release), handoff summaries, or troubleshooting.
+
+**Default to presenting commands for the user to run manually.** Each git command
+Claude executes via tool calls is a round trip that resends the full conversation
+history — a chain of git commands (commit, push, tag, release) can cost thousands
+of tokens in overhead. Presenting the commands as a formatted block for the user
+to copy-paste into their own terminal costs zero tool-call tokens.
+
+Always present the commands first, formatted for the user's shell environment
+(detected below). The user can then either run them manually or ask Claude to
+execute directly. If the user asks Claude to execute, proceed via tool calls —
+but the default is manual presentation to minimize cost.
 
 **Shell environment detection.** The first time you need to present a git command
 in a session, ask the user what shell they are working in:
