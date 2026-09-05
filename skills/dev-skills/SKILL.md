@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.10.2
+version: 2.11.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -1011,7 +1011,7 @@ If yes:
 Then show the gate tracker:
 
 ```
-Dev Skills v2.10.2 active.
+Dev Skills v2.11.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Shell: <detected shell> | Last sync: <just now / not synced>
