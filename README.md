@@ -68,10 +68,12 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~30KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
+| `SKILL.md` | ~31KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
 | `SECURITY_REFERENCE.md` | ~14KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `QUALITY_REFERENCE.md` | ~15KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
+
+The repo also ships `hooks/gate-preflight.sh`, an optional enforcement hook — it is not part of the skill bundle and is installed separately (see below).
 
 `SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. Shell-specific command formatting, detailed security/quality rule checklists, and pattern-matching code examples live in reference files, loaded on demand where they're needed most.
 
@@ -91,6 +93,22 @@ Gate state is not something Claude remembers — it is a file, `.claude/dev-skil
 | **Release sequence** | version bump, artifact, merge to default branch, tag, or publish | all six, in order |
 
 Gates apply by default to any session that modified a tracked file. There is no "too small to bother" exemption — a gate leaves the workflow only by being marked ➖ N/A for a structural reason (no build system, for example), stated on the tracker.
+
+---
+
+## Enforcement hook (optional)
+
+`hooks/gate-preflight.sh` is a `PreToolUse` hook that **blocks** git write operations whose required gates have not passed, reading `.claude/dev-skills-gates.md` for state. Where it is installed, the pre-flight stops being advisory for anything Claude runs itself.
+
+| Operation | Gates required before it runs |
+|---|---|
+| `git commit`, `git push` to a branch | Security |
+| `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
+| `git tag`, `git push --tags`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
+
+Read-only git is never blocked. Install instructions, the settings snippet, and failure modes are in [`hooks/README.md`](hooks/README.md).
+
+It covers what Claude executes — not commands presented for you to paste, and not git you run yourself. So it is strongest on remote container sessions, where Claude executes git directly, and weakest on local sessions, where presenting commands is the default. The prose rule that presenting a command counts as performing it covers the rest.
 
 ---
 
@@ -159,7 +177,7 @@ The skill also keeps sessions cheap:
 - **MCP awareness** — identifies unused MCP servers adding token overhead and shows how to disable them
 - **Phase transitions** — offers handoff summaries at natural breakpoints so you can start a fresh, cheap session
 - **Token impact estimates** — rough end-of-task report showing what was saved and what was wasted
-- **Git command presentation** — on local sessions, presents git commands for manual execution to minimize tool-call token overhead; asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and formats all commands for that shell, always starting with the proper `cd` command. Remote container sessions execute directly instead, since a presented block would operate on the wrong clone
+- **Git command presentation** — on local sessions, presents git commands for manual execution, as a single copy-once block per operation rather than split across several to minimize tool-call token overhead; asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and formats all commands for that shell, always starting with the proper `cd` command. Remote container sessions execute directly instead, since a presented block would operate on the wrong clone
 - **Usage limit handoff** — proactively offers a handoff summary when the account is nearing its usage cap so you can resume in a fresh session without losing progress
 
 ---
@@ -198,6 +216,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.12.0`
+`v2.13.0`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.

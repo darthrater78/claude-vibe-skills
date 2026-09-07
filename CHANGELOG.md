@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.13.0] — 2026-09-07
+
+### Added
+- `hooks/gate-preflight.sh` — a `PreToolUse` hook that blocks git write operations whose required gates are not ✅ or ➖ N/A, reading `.claude/dev-skills-gates.md` for state. Covers Bash git/gh commands and GitHub MCP write tools; required gates scale with the operation (commit/push → Security; PR creation → Version/Build/Security/Docs; tag, merge, release → those plus Release). Read-only git is never blocked
+- `hooks/settings.example.json` and `hooks/README.md` — install instructions, coverage table, and failure modes. Project-scoped by default; requires `jq` or `python3` and fails closed without one, per the skill's own fail-closed principle
+- Gate pre-flight hook section in SKILL.md Section 2: a hook denial means a gate has not run, and the response is to run it. Explicitly forbids marking a gate ✅ that did not run, clearing a block with a false ➖ N/A, disabling the hook, or routing the operation through an unwatched path to evade a denial
+
+### Changed
+- **Presented commands go in one block** (Section 5.7). The whole sequence — `cd` through push — is a single fenced block the user copies once, with no prose interleaved between commands. Five separate blocks is five chances to miss one or run them out of order. Split only when the user must stop and inspect something first (a conflict, a build, a PR number), and say what to check
+- `SHELL_REFERENCE.md` leads with the one-block rule
+
+### Notes
+- The hook covers what Claude executes, not commands presented for the user to paste or git the user runs directly. It is strongest on remote container sessions and weakest on local ones, where presenting is the default — the Section 1 rule that presenting a command counts as performing it covers the remainder
+
 ## [2.12.0] — 2026-09-07
 
 ### Added

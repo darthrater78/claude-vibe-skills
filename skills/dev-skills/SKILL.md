@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.12.0
+version: 2.13.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -117,6 +117,31 @@ Gate indicators:
 - ⏳ IN PROGRESS
 - ⬜ PENDING
 - ➖ N/A — gate does not apply to this project
+
+### The gate pre-flight hook
+
+The repo ships an optional `PreToolUse` hook (`hooks/gate-preflight.sh`) that
+blocks git write operations whose required gates are not ✅ or ➖ N/A, reading
+`.claude/dev-skills-gates.md` for state. Where it is installed, the pre-flight
+above stops being advisory for anything Claude executes itself.
+
+**If the hook denies a call, it is telling you a gate has not run.** The correct
+response is to run the blocking gate and update the state file, then retry.
+Never:
+- edit `.claude/dev-skills-gates.md` to mark a gate ✅ that did not run
+- mark a gate ➖ N/A to clear the block, unless the structural reason is real
+  and stated on the tracker
+- set `DEV_SKILLS_GATE_HOOK=off`, or route the same operation through a path the
+  hook does not watch, to get around a denial
+
+Working around a gate denial is a worse failure than the skipped gate, because
+it also destroys the signal. If you believe the hook is wrong, say so to the
+user and let them decide.
+
+**The hook does not cover presented commands** — nothing intercepts the user's
+own terminal. On local sessions, where presenting is the default (Section 5.7),
+the prose pre-flight is the only enforcement there is. That is exactly why
+presenting a command counts as performing it (Section 1).
 
 ### Two tracks
 
@@ -969,6 +994,21 @@ not been set" error.
 branch explicitly: `git push -u origin <branch-name>`. The `-u` flag sets
 upstream tracking, preventing the error on subsequent pushes.
 
+**One block, not several.** When commands are presented for the user to run,
+put the whole sequence in a **single fenced block they can copy once** — `cd`,
+branch, add, commit, push, tag, release, all of it. Do not split an operation
+across multiple blocks, and do not interleave prose between the commands.
+Copy-pasting five separate blocks is five chances to miss one, run them out of
+order, or land in the wrong directory.
+
+Split into a second block only when the user genuinely has to stop and look at
+something before continuing — a merge conflict to resolve, a build to verify, a
+PR number needed by the next command. When you do split, say what to check
+before moving on.
+
+Explanation goes above or below the block, never inside it as interleaved prose.
+Brief `#` comments within the block are fine.
+
 **Always start with `cd`** in a presented block. Never assume the user's terminal
 is already in the project directory. Every block presented for the user to run
 must begin with the appropriate `cd` for their shell. (This does not apply to
@@ -1183,7 +1223,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.12.0 active.
+Dev Skills v2.13.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>

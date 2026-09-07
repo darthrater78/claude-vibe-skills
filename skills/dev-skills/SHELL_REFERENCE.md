@@ -33,6 +33,18 @@ commands *instead of* pushing is not.
 
 ---
 
+## One block per operation
+
+Present the entire sequence in a single fenced block the user can copy once —
+`cd` through push. Do not split an operation across several blocks or interleave
+prose between commands (SKILL.md Section 5.7). The examples at the bottom of this
+file show the intended shape: one block, one paste.
+
+Split only when the user must stop and inspect something first (a conflict, a
+build, a PR number). Say what to check before the next block.
+
+---
+
 ## `cd` format by shell
 
 | Shell | `cd` format |
