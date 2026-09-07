@@ -80,6 +80,8 @@ The split follows one rule: **triggers load every turn, recipes load on demand.*
 
 Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for on every request, so an understated figure hides a real per-turn cost.
 
+Releases are published by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which rebuilds `dev-skills.skill` from the tagged source, publishes the release with notes taken from `CHANGELOG.md`, and fails if the artifact does not end up attached.
+
 ---
 
 ## How gates are enforced

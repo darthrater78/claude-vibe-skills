@@ -91,6 +91,15 @@ if [ -f skills/dev-skills.skill ]; then
         errors=$((errors + 1))
       fi
     done
+    # The bundle must match the source, not merely contain the right filenames —
+    # a stale archive ships old rules under a current version number.
+    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md; do
+      if ! unzip -p skills/dev-skills.skill "$f" 2>/dev/null | diff -q - "skills/dev-skills/$f" > /dev/null 2>&1; then
+        echo "  FAIL: bundled $f differs from skills/dev-skills/$f (rebuild the bundle)"
+        errors=$((errors + 1))
+      fi
+    done
+
     bundled_version=$(unzip -p skills/dev-skills.skill SKILL.md 2>/dev/null | grep -m1 '^version:' | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
     if [ "$bundled_version" != "$version_file" ]; then
       echo "  FAIL: bundled SKILL.md is v${bundled_version:-none}, VERSION is $version_file (rebuild the bundle)"

@@ -1,0 +1,80 @@
+name: Publish release
+
+# Tag push publishes the release. Build the artifact here rather than trusting
+# the committed one, so what ships is always built from the tagged source.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version consistency
+        run: bash scripts/validate.sh
+
+      - name: Verify tag matches VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "$file" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION ($file)."
+            echo "Delete the tag, fix the mismatch, and re-tag."
+            exit 1
+          fi
+          echo "OK: tag $GITHUB_REF_NAME matches VERSION $file"
+
+      - name: Build artifact
+        run: |
+          cd skills/dev-skills
+          zip -X -q "$GITHUB_WORKSPACE/dev-skills.skill" \
+            SKILL.md \
+            GATE_REFERENCE.md \
+            SECURITY_REFERENCE.md \
+            QUALITY_REFERENCE.md \
+            SHELL_REFERENCE.md
+          cd "$GITHUB_WORKSPACE"
+          unzip -l dev-skills.skill
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { flag = 1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG.md entry found for $version."
+            exit 1
+          fi
+          cat release-notes.md
+
+      # gh is preinstalled on GitHub runners — no third-party action, so the
+      # release path adds no supply-chain surface.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dev-skills.skill \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md
+
+      - name: Verify the release has its asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
+          echo "Assets: $assets"
+          echo "$assets" | grep -qx 'dev-skills.skill' || {
+            echo "Release published without dev-skills.skill attached."
+            echo "README download links point at this asset — that is a ship failure."
+            exit 1
+          }
