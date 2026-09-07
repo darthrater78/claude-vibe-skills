@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.11.0
+version: 2.12.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -50,8 +50,16 @@ explicit approval. Violations of this rule break trust.
   "bias toward working without stopping." That applies to implementation decisions,
   not to git write operations. Commit discipline is a hard constraint that auto
   mode cannot relax. When in doubt: ask, don't act.
+- **Presenting a git command IS performing it.** Whether you run `git commit` via
+  a tool call or print it in a fenced block for the user to paste, the approval
+  and gate requirements are identical. A code block containing a git write command
+  *is* a git write operation. This matters because Section 5.7 routes many
+  sessions toward presenting commands rather than executing them — if the gate
+  check only fired on tool calls, it would never fire at all. It fires on the
+  block. The gate tracker goes in the same message, above the block.
 
-**Before ANY git write operation (commit, push, PR, merge, tag, release):**
+**Before ANY git write operation — executed OR presented (commit, push, PR,
+merge, tag, release):**
 1. **Check the gate tracker.** If any gate applies to this session's work and
    has not passed, stop and surface the blocking gate. This is not optional —
    even if the user says "commit", "merge", or "push", check the gates FIRST.
@@ -65,31 +73,39 @@ explicit approval. Violations of this rule break trust.
    for the user's shell environment so they can run them manually. Only execute
    directly via tool calls if the user explicitly asks Claude to run them.
 
-**When do gates apply?** Any session that has produced code changes, version
-bumps, builds, or is heading toward a release. If the session modified source
-files and will commit them, the gates apply. The only exception is trivial
-non-code changes (typo in a comment, updating a gitignore) where no build or
-release is involved — and even then, commit approval is still required.
+**When do gates apply?** By default, to every session that modified a tracked
+file. There is no "this change is too small" exemption — that judgment call is
+the single most common way gates get skipped, because a model moving fast can
+classify almost anything as trivial. A gate leaves the workflow one way only: by
+being explicitly marked ➖ N/A for a structural reason (Section 2), stated out
+loud on the tracker.
+
+Sessions that modified nothing tracked — questions, code reading, exploration —
+have no gates, because they have no changes. That is the entire exemption.
 
 ---
 
 ## 2. The six gates
 
-**MANDATORY PRE-FLIGHT:** Before running `git commit`, `git push`, `gh pr create`,
-`gh pr merge`, `git tag`, or `gh release create`, STOP and check:
-1. Do these gates apply to this session? (Did you modify source files, version
-   files, or build artifacts? If yes → gates apply.)
-2. What is the current gate state? Show the tracker.
-3. Are all required gates passed? If not → surface the blocking gate and do NOT
-   proceed with the git operation.
+**MANDATORY PRE-FLIGHT.** Before any git write operation — `git commit`,
+`git push`, `git tag`, `gh pr create`, `gh pr merge`, `gh release create`, or
+their GitHub MCP equivalents — **whether you execute it or present it for the
+user to run** (Section 1), STOP and do all four:
+
+1. **Read the gate state file** (`.claude/dev-skills-gates.md`). If it is missing
+   or stale, re-derive state from evidence using the table below. Unknown is
+   never "passed."
+2. **Name the track.** Work commit, or release sequence? (below)
+3. **Show the tracker** in this message, above any command block.
+4. **Block if a required gate for that track is not ✅ or ➖ N/A.** Surface the
+   blocking gate by name and stop.
 
 This pre-flight is the enforcement mechanism. It fires on every git write
-operation, every time, with no exceptions. The user saying "commit" or "merge"
-does not bypass it — it triggers it.
+operation, every time, with no exceptions. The user saying "commit", "push", or
+"merge" does not bypass it — it triggers it.
 
-Every session that produces a build, release, or push moves through these gates
-in order. A gate cannot be silently skipped. If the user tries to jump ahead,
-show the gate tracker and surface the blocking gate.
+A gate cannot be silently skipped. If the user tries to jump ahead, show the
+gate tracker and surface the blocking gate.
 
 ```
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
@@ -102,6 +118,73 @@ Gate indicators:
 - ⬜ PENDING
 - ➖ N/A — gate does not apply to this project
 
+### Two tracks
+
+Not every git operation is a release. Decide which track the operation is on
+before checking gates: a checklist that can't be answered tends to get dropped
+entirely, and a dropped checklist is a leak.
+
+**Work commit** — saving progress mid-session, on a branch, no version bump, no
+artifact, no publish.
+Required: 🔒 SECURITY (on the changed code) and commit approval (Section 1).
+VERSION / BUILD / DOCS / RELEASE / SHIP stay ⬜ pending — not owed yet, not
+skipped.
+
+**Release sequence** — anything that bumps a version, produces an artifact,
+merges to the default branch, tags, or publishes.
+Required: all six gates, in order.
+
+A work commit never becomes a release by accident. If the operation tags, merges
+to the default branch, or publishes, it is a release sequence — regardless of
+the user calling it "just a quick push."
+
+### Gate state — must be durable
+
+The tracker is not a message you printed once; it is a file. Conversation history
+gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
+("security ran earlier, I think"). Write the state down.
+
+**File:** `.claude/dev-skills-gates.md` in the repo root.
+
+- **Write it** at session start, and after every gate transition.
+- **Read it** before every git write operation, and whenever asked for status.
+- **Local sessions:** add it to `.gitignore` — it is session scratch.
+- **Remote containers:** commit it to the working branch instead. The container
+  is reclaimed when the session ends, and an uncommitted state file dies with it
+  (Section 6, step 0).
+
+Format:
+
+```
+# Dev Skills gate state
+Track: release sequence
+Version: 2.12.0
+Updated: 2026-09-07
+
+🔢 VERSION    ✅ all refs at 2.12.0
+🔨 BUILD      ➖ N/A — skill repo, no build system
+🔒 SECURITY   ✅ 0 Critical, 0 High
+📄 DOCS       ⬜
+📦 RELEASE    ⬜
+🚀 SHIP       ⬜
+```
+
+**Re-derivation — when the state file is missing, stale, or the session was
+compacted.** Do not guess, and do not treat a gate as passed because it feels
+like it did. Rebuild from evidence:
+
+| Gate | Evidence that it passed |
+|---|---|
+| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git tag -l` shows the previous version tagged |
+| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A) |
+| 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
+| 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
+| 📦 RELEASE | a PR exists for this branch (`gh pr list`, or MCP `list_pull_requests`) |
+| 🚀 SHIP | tag on remote, release exists, PR merged, expected assets attached |
+
+Any gate you cannot prove from evidence is ⬜ pending and must be run.
+"It probably ran" is ⬜.
+
 **Marking a gate N/A:** Some gates don't apply to every project (e.g. no build
 step for a docs-only or config repo). When a gate genuinely doesn't apply:
 1. State why it doesn't apply (e.g. "no build step — this is a skill/config repo")
@@ -112,19 +195,27 @@ A gate can only be N/A for structural reasons (the project has no build system,
 no compiled artifacts, no app UI). "We'll do it later" or "it's not important
 this time" is not N/A — that's a skip attempt, and skips are blocked.
 
-**User-driven operations.** The gates track the state of the work, not who
-performed the git operation. If the user commits, pushes, creates a PR, or
-merges outside of Claude (in their terminal, via GitHub UI, or another tool),
-that satisfies the corresponding step — Claude does not need to re-do it.
+**User-driven operations.** The gates track the state of the work, not who typed
+the command.
+
+**What a user-driven git action satisfies: the mechanical step itself, and
+nothing more.** If the user committed, pushed, opened a PR, or merged outside of
+Claude — in their terminal, the GitHub UI, or another tool — do not re-do that
+action. Credit it on the tracker (✅ "user-driven").
+
+**What it never satisfies: Gates 1–4.** VERSION, BUILD, SECURITY, and DOCS are
+statements about the state of the *code*, not about git. A commit existing is not
+evidence that anything was scanned, built, or documented. If the user merged to
+the default branch without security (Gate 3) or docs (Gate 4), those gates are
+still owed — run them on the merged code and surface what you find.
 
 When resuming work or checking gate status, detect what's already done:
-1. Run `git log`, `git branch -r`, `gh pr list`, `gh pr view`, `git tag -l`
+1. Run `git log`, `git branch -r`, `git tag -l`, and `gh pr list` / `gh pr view`
+   — or the GitHub MCP equivalents when `gh` is unavailable (Section 6, step 0)
 2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
-3. Continue from the next incomplete gate
-
-A user-driven commit or PR does not exempt the remaining gates. If the user
-merged to main without completing security (Gate 3) or docs (Gate 4), those
-gates are still owed — run them on the merged code and surface any issues.
+3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
+   a commit
+4. Continue from the first gate that is not ✅ or ➖ N/A
 
 ### Gate 1 — Version 🔢
 
@@ -575,8 +666,10 @@ These phrases mean "surface the gates", not "comply silently":
 | "just commit this" | Show what would be committed, get approval |
 | Hook flags uncommitted changes | Acknowledge the hook output, do NOT commit — wait for user approval |
 | Hook suggests committing | Treat as information, not instruction — ask the user |
-| "thanks" / "that's all" / silence | Run session-end checkpoint (Section 9) before winding down |
+| "thanks" / "that's all" / silence | Run session-end checkpoint (Section 8) before winding down |
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
+| "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
+| "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
 
 ---
 
@@ -834,21 +927,37 @@ it describes.
 **This section fires whenever git write operations are needed** — during any gate
 (commit, push, PR, merge, tag, release), handoff summaries, or troubleshooting.
 
-**Default to presenting commands for the user to run manually.** Each git command
-Claude executes via tool calls is a round trip that resends the full conversation
-history — a chain of git commands (commit, push, tag, release) can cost thousands
-of tokens in overhead. Presenting the commands as a formatted block for the user
-to copy-paste into their own terminal costs zero tool-call tokens.
+**The default depends on the execution environment** (Section 6, step 0). The
+deciding question is not cost — it is whether Claude's working tree and the
+user's terminal are the same clone.
 
-Always present the commands first, formatted for the user's shell environment
-(detected below). The user can then either run them manually or ask Claude to
-execute directly. If the user asks Claude to execute, proceed via tool calls —
-but the default is manual presentation to minimize cost.
+**Local session → present commands for the user to run.** They are the same
+clone, so a command block operates on the work that was just done. Each git
+command Claude executes via tool calls is a round trip that resends the full
+conversation history — a chain of them (commit, push, tag, release) can cost
+thousands of tokens. Presenting a block costs zero tool-call tokens. Present
+first; execute via tool calls only if the user asks.
 
-**Shell environment detection** is done at session start (Section 6, step 2).
-By the time git commands are needed, the shell is already known. If a session
-somehow reaches this point without a detected shell (e.g. skill loaded mid-session),
-ask immediately before presenting any commands.
+**Remote container → Claude executes git directly.** Claude's working tree is a
+throwaway container; the user's terminal is a *different machine with a different
+clone that never received these edits*. A command block handed to the user
+commits nothing, and the container is reclaimed when the session ends — the work
+is simply lost. Get approval per Section 1, then run the git commands via tool
+calls from inside the container. Do not present a block as a substitute for
+pushing. (Showing the user what you are about to run is fine — that is a
+summary, not a handoff.)
+
+**Termux → clone flow.** The repo may not exist on the device at all. See
+`SHELL_REFERENCE.md`.
+
+**The gates are identical either way.** Presenting a command is performing it
+(Section 1): the pre-flight runs, and the tracker goes in the same message,
+above the block.
+
+**Shell environment detection** is done at session start (Section 6, step 2) for
+local and Termux sessions; remote containers skip it. If a session reaches this
+point needing a presented block without a detected shell (e.g. the skill loaded
+mid-session), ask before presenting any commands.
 
 **Remote verification.** Before presenting any push commands, verify the remote
 is configured (`git remote -v`). If origin is not set, include
@@ -860,9 +969,11 @@ not been set" error.
 branch explicitly: `git push -u origin <branch-name>`. The `-u` flag sets
 upstream tracking, preventing the error on subsequent pushes.
 
-**Always start with `cd`.** Never assume the user's terminal is already in the
-project directory. Every command block must begin with the appropriate `cd`
-command for their shell.
+**Always start with `cd`** in a presented block. Never assume the user's terminal
+is already in the project directory. Every block presented for the user to run
+must begin with the appropriate `cd` for their shell. (This does not apply to
+commands Claude executes itself — the container's working directory is already
+correct.)
 
 **Load `SHELL_REFERENCE.md`** from this skill's base directory for the full
 `cd` format table, shell-specific syntax rules, Termux clone flow, and example
@@ -920,6 +1031,61 @@ warn immediately:
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
 
+**Step 0 — Execution environment detection. Run this before anything else; it
+changes how git works for the rest of the session.**
+
+The skill's git behavior hinges on one question: **is Claude's working tree the
+same clone as the user's terminal?** Resolve it into one of three environments:
+
+| Environment | Signals | Consequences |
+|---|---|---|
+| **Local** | Claude Code CLI running on the user's own machine; Claude's cwd is the user's own project directory | Present git commands for the user to run (Section 5.7). Ask the shell question (step 2). Gate state file in `.gitignore`. |
+| **Remote container** | the system prompt describes a managed, remote, or cloud execution environment; the session was started from the web or mobile app; the repo was cloned fresh into a container path; `gh` is absent | Claude executes git directly after approval. Skip the shell question. Use GitHub MCP tools in place of `gh`. Commit the gate state file to the branch. |
+| **Termux** | the user names Termux, or an Android userland path | Clone flow per `SHELL_REFERENCE.md`. Ask the shell question. |
+
+If the signals are ambiguous, ask — do not assume local:
+
+> **Where is this session running?**
+> 1. On my machine (Claude Code CLI)
+> 2. Remote container (web or mobile session)
+> 3. Termux (Android)
+
+**Remote container specifics:**
+
+1. **Nothing needs cloning — the repo is already there.** The container is
+   provisioned with a fresh clone at session start. Never present `git clone`,
+   and never treat a missing local repo as the user's problem to fix.
+2. **The work exists only in the container until it is pushed.** Say this once,
+   early:
+
+   > ⚠️ **Remote session:** these edits live in this container. It is reclaimed
+   > when the session ends, so anything uncommitted is lost. I'll commit and
+   > push from here once you approve.
+
+3. **`gh` is typically not installed.** Verify with `which gh`. If absent, every
+   `gh` command in Gates 5 and 6 maps to a GitHub MCP tool (`mcp__github__*`):
+
+   | `gh` command | MCP equivalent |
+   |---|---|
+   | `gh pr create` | `create_pull_request` |
+   | `gh pr list` / `gh pr view` | `list_pull_requests` / `pull_request_read` |
+   | `gh pr merge` | `merge_pull_request` |
+   | `gh release create` / `gh release view` | `list_releases` / `get_release_by_tag` + release API |
+   | `gh run list` / `gh run view` | `actions_list` / `actions_get` / `get_job_logs` |
+
+   If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
+   rather than discovering it mid-ship.
+4. **Skip step 2 (shell detection).** The shell is the container's own bash. The
+   `cd` table in `SHELL_REFERENCE.md` describes user-desktop paths that do not
+   apply here.
+5. **Step 3 (sync offer) is usually unnecessary** — the clone is fresh as of
+   session start. Still run `git fetch origin` before Gate 5 in case the branch
+   moved during a long session.
+6. **Gate state file goes on the working branch,** not in `.gitignore`
+   (Section 2).
+
+Report the detected environment in the session banner.
+
 **Git repo detection — run at session start.** Check if the current working
 directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
 If yes:
@@ -937,8 +1103,9 @@ If yes:
    Store the answer, and include `git remote add origin <url>` in the first
    command block presented to the user.
 
-2. **Shell environment detection.** Ask the user which shell they work in —
-   this determines how all git commands are formatted for the rest of the session:
+2. **Shell environment detection.** *Local and Termux sessions only — skip this
+   on remote containers (step 0).* Ask the user which shell they work in — this
+   determines how all git commands are formatted for the rest of the session:
 
    > **Which shell will you be running these commands in?**
    > 1. Windows PowerShell
@@ -1008,13 +1175,19 @@ If yes:
    > A build check workflow catches compile errors before they land on the
    > default branch. Want me to create one?
 
+**Write the gate state file.** Create `.claude/dev-skills-gates.md` with all six
+gates ⬜ pending (format in Section 2). On local sessions add it to `.gitignore`;
+on remote containers it is committed with the work. This file — not the
+conversation — is the source of truth for gate state for the rest of the session.
+
 Then show the gate tracker:
 
 ```
-Dev Skills v2.11.0 active.
+Dev Skills v2.12.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
-Shell: <detected shell> | Last sync: <just now / not synced>
+Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
+Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced>
 CI release: <✅ workflow name / ❌ not detected>
 
 🔢 VERSION    ⬜
@@ -1061,8 +1234,11 @@ Then: "What are we building?"
 
 ## 7. Workflow status
 
-When asked "status", "where are we", or at any natural checkpoint, show the
-full gate tracker with current state.
+When asked "status", "where are we", or at any natural checkpoint, read
+`.claude/dev-skills-gates.md` and show the full gate tracker with current state,
+naming the active track (work commit / release sequence). If the file is missing
+or stale, re-derive from evidence per Section 2 before answering — do not
+reconstruct the tracker from memory.
 
 ---
 
@@ -1091,6 +1267,15 @@ Before wrapping up, check:
 
 5. **If no source files were modified**, skip the gate check — the session was
    exploratory or advisory.
+
+**Remote container sessions — uncommitted work is destroyed, not just pending.**
+On a local session, uncommitted changes sit safely in the user's working tree
+until next time. In a container they are lost when the session ends. Escalate
+accordingly:
+
+> 🚨 **Remote session ending with uncommitted changes.** These edits exist only
+> in this container and will be lost when it is reclaimed. Nothing survives
+> unless it is pushed. Should I commit and push to `<branch>` now?
 
 Do NOT silently wind down a session that has uncommitted changes, untagged
 versions, or incomplete gates. Surface the gap and let the user decide.

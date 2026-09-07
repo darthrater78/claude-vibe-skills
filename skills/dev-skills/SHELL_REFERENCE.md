@@ -5,6 +5,32 @@ be formatted for the user's shell environment (Section 5.7). It contains the
 `cd` format table, shell-specific syntax rules, Termux clone flow, and example
 command blocks for each supported shell.
 
+**This file applies only when Claude is presenting commands for the user to run
+in their own terminal** — that is, local and Termux sessions. Remote container
+sessions do not use it; see below.
+
+---
+
+## Remote containers — do not format, execute
+
+When the session runs in a remote container (Section 6, step 0), none of this
+file applies:
+
+- **There is no clone step.** The container is provisioned with the repo already
+  cloned. Never present `git clone`.
+- **There is no `cd` step.** Claude's working directory is already the repo.
+- **There is no shell question.** The shell is the container's own bash.
+- **Do not hand the user a command block to run.** Their terminal is a different
+  machine with a different clone that never received these edits — pasting the
+  block would commit nothing, and the container's work is destroyed when the
+  session ends. Claude commits and pushes from inside the container, after
+  approval (Section 1).
+- **`gh` is usually absent.** Use the GitHub MCP mapping table in Section 6,
+  step 0.
+
+Showing the user a summary of what you are about to run is fine. Handing them
+commands *instead of* pushing is not.
+
 ---
 
 ## `cd` format by shell
@@ -43,7 +69,9 @@ convert to `/mnt/c/...` form.
 
 ## Termux clone flow
 
-On Termux (Android), the repo may not exist locally. When the user's shell is
+On Termux (Android), the repo may not exist on the device. This is the only
+environment where Claude presents a clone step — remote containers arrive
+pre-cloned, and local sessions are already in the repo. When the user's shell is
 Termux, every command block must account for this:
 - **First time (repo not yet cloned):** start with `git clone <url>` then `cd`
   into the cloned directory. Use the repo URL stored at session start (Section 6,
