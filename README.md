@@ -68,12 +68,64 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~28KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
-| `SECURITY_REFERENCE.md` | ~14KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
-| `QUALITY_REFERENCE.md` | ~15KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
-| `SHELL_REFERENCE.md` | ~3KB | Section 5.7 — when git commands need shell-specific formatting |
+| `SKILL.md` | ~35KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `GATE_REFERENCE.md` | ~29KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SECURITY_REFERENCE.md` | ~22KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
 
-`SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. Shell-specific command formatting, detailed security/quality rule checklists, and pattern-matching code examples live in reference files, loaded on demand where they're needed most.
+The repo also ships `hooks/gate-preflight.sh`, an optional enforcement hook — it is not part of the skill bundle and is installed separately (see below).
+
+The split follows one rule: **triggers load every turn, recipes load on demand.** `SKILL.md` holds what has to fire without being asked — commit discipline, the gate pre-flight, the two tracks, shortcut detection, always-on security awareness, cost controls. How to actually *run* a gate lives in `GATE_REFERENCE.md`, loaded when the pre-flight says one is owed. Security and quality checklists and shell formatting work the same way.
+
+Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for on every request, so an understated figure hides a real per-turn cost.
+
+---
+
+## How gates are enforced
+
+Gate state is not something Claude remembers — it is a file, `.claude/dev-skills-gates.md`, written at session start and updated on every gate transition. Long sessions get compacted and a tracker rebuilt from memory is rebuilt optimistically, so the file is the source of truth. If it is missing or stale, Claude re-derives each gate from evidence (version files, build artifacts, the current diff, the changelog, open PRs, remote tags) rather than assuming anything passed.
+
+**Presenting a git command counts as running it.** Whether Claude executes `git push` or prints it in a block for you to paste, the same pre-flight runs and the tracker appears above the block. This closes the gap where a skill could be followed to the letter and still skip every gate.
+
+**Two tracks, so the checklist is always answerable:**
+
+| Track | What it covers | Gates required |
+|---|---|---|
+| **Work commit** | saving progress mid-session on a branch | Security (on the changed code) + commit approval |
+| **Release sequence** | version bump, artifact, merge to default branch, tag, or publish | all six, in order |
+
+Gates apply by default to any session that modified a tracked file. There is no "too small to bother" exemption — a gate leaves the workflow only by being marked ➖ N/A for a structural reason (no build system, for example), stated on the tracker.
+
+---
+
+## Enforcement hook (optional)
+
+`hooks/gate-preflight.sh` is a `PreToolUse` hook that **blocks** git write operations whose required gates have not passed, reading `.claude/dev-skills-gates.md` for state. Where it is installed, the pre-flight stops being advisory for anything Claude runs itself.
+
+| Operation | Gates required before it runs |
+|---|---|
+| `git commit`, `git push` to a branch | Security |
+| `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
+| `git tag`, `git push --tags`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
+
+Read-only git is never blocked. Install instructions, the settings snippet, and failure modes are in [`hooks/README.md`](hooks/README.md).
+
+It covers what Claude executes — not commands presented for you to paste, and not git you run yourself. So it is strongest on remote container sessions, where Claude executes git directly, and weakest on local sessions, where presenting commands is the default. The prose rule that presenting a command counts as performing it covers the rest.
+
+---
+
+## Execution environments
+
+The skill detects where the session is running, because it determines whether Claude's working tree and your terminal are the same clone:
+
+| Environment | Git behavior |
+|---|---|
+| **Local** (Claude Code CLI) | Commands are presented for you to run — same clone, and it costs no tool-call tokens |
+| **Remote container** (web/mobile) | Claude commits and pushes directly. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
+| **Termux** (Android) | Clone flow — the repo may not be on the device |
+
+Remote containers also skip the shell question, arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable.
 
 ---
 
@@ -128,7 +180,7 @@ The skill also keeps sessions cheap:
 - **MCP awareness** — identifies unused MCP servers adding token overhead and shows how to disable them
 - **Phase transitions** — offers handoff summaries at natural breakpoints so you can start a fresh, cheap session
 - **Token impact estimates** — rough end-of-task report showing what was saved and what was wasted
-- **Git command presentation** — defaults to presenting git commands for manual execution to minimize tool-call token overhead; asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and formats all commands for that shell, always starting with the proper `cd` command
+- **Git command presentation** — on local sessions, presents git commands for manual execution, as a single copy-once block per operation rather than split across several to minimize tool-call token overhead; asks your shell environment (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and formats all commands for that shell, always starting with the proper `cd` command. Remote container sessions execute directly instead, since a presented block would operate on the wrong clone
 - **Usage limit handoff** — proactively offers a handoff summary when the account is nearing its usage cap so you can resume in a fresh session without losing progress
 
 ---
@@ -148,6 +200,8 @@ Say "audit my project", "scan this codebase", or "security review" to trigger a 
 | "we can do security later" | Security scan runs now, no exceptions |
 | "just ship it" / "done" | All open gates walked through |
 | "just commit this" | Shows what would be committed, waits for approval |
+| "just give me the commands" | Same gates as executing them — tracker shown above the block |
+| "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A for structural reasons |
 
 ---
 
@@ -165,6 +219,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.11.0`
+`v2.14.0`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.

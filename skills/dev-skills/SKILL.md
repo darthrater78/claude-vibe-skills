@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.11.0
+version: 2.14.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -50,8 +50,16 @@ explicit approval. Violations of this rule break trust.
   "bias toward working without stopping." That applies to implementation decisions,
   not to git write operations. Commit discipline is a hard constraint that auto
   mode cannot relax. When in doubt: ask, don't act.
+- **Presenting a git command IS performing it.** Whether you run `git commit` via
+  a tool call or print it in a fenced block for the user to paste, the approval
+  and gate requirements are identical. A code block containing a git write command
+  *is* a git write operation. This matters because Section 5.7 routes many
+  sessions toward presenting commands rather than executing them — if the gate
+  check only fired on tool calls, it would never fire at all. It fires on the
+  block. The gate tracker goes in the same message, above the block.
 
-**Before ANY git write operation (commit, push, PR, merge, tag, release):**
+**Before ANY git write operation — executed OR presented (commit, push, PR,
+merge, tag, release):**
 1. **Check the gate tracker.** If any gate applies to this session's work and
    has not passed, stop and surface the blocking gate. This is not optional —
    even if the user says "commit", "merge", or "push", check the gates FIRST.
@@ -65,31 +73,39 @@ explicit approval. Violations of this rule break trust.
    for the user's shell environment so they can run them manually. Only execute
    directly via tool calls if the user explicitly asks Claude to run them.
 
-**When do gates apply?** Any session that has produced code changes, version
-bumps, builds, or is heading toward a release. If the session modified source
-files and will commit them, the gates apply. The only exception is trivial
-non-code changes (typo in a comment, updating a gitignore) where no build or
-release is involved — and even then, commit approval is still required.
+**When do gates apply?** By default, to every session that modified a tracked
+file. There is no "this change is too small" exemption — that judgment call is
+the single most common way gates get skipped, because a model moving fast can
+classify almost anything as trivial. A gate leaves the workflow one way only: by
+being explicitly marked ➖ N/A for a structural reason (Section 2), stated out
+loud on the tracker.
+
+Sessions that modified nothing tracked — questions, code reading, exploration —
+have no gates, because they have no changes. That is the entire exemption.
 
 ---
 
 ## 2. The six gates
 
-**MANDATORY PRE-FLIGHT:** Before running `git commit`, `git push`, `gh pr create`,
-`gh pr merge`, `git tag`, or `gh release create`, STOP and check:
-1. Do these gates apply to this session? (Did you modify source files, version
-   files, or build artifacts? If yes → gates apply.)
-2. What is the current gate state? Show the tracker.
-3. Are all required gates passed? If not → surface the blocking gate and do NOT
-   proceed with the git operation.
+**MANDATORY PRE-FLIGHT.** Before any git write operation — `git commit`,
+`git push`, `git tag`, `gh pr create`, `gh pr merge`, `gh release create`, or
+their GitHub MCP equivalents — **whether you execute it or present it for the
+user to run** (Section 1), STOP and do all four:
+
+1. **Read the gate state file** (`.claude/dev-skills-gates.md`). If it is missing
+   or stale, re-derive state from evidence using the table below. Unknown is
+   never "passed."
+2. **Name the track.** Work commit, or release sequence? (below)
+3. **Show the tracker** in this message, above any command block.
+4. **Block if a required gate for that track is not ✅ or ➖ N/A.** Surface the
+   blocking gate by name and stop.
 
 This pre-flight is the enforcement mechanism. It fires on every git write
-operation, every time, with no exceptions. The user saying "commit" or "merge"
-does not bypass it — it triggers it.
+operation, every time, with no exceptions. The user saying "commit", "push", or
+"merge" does not bypass it — it triggers it.
 
-Every session that produces a build, release, or push moves through these gates
-in order. A gate cannot be silently skipped. If the user tries to jump ahead,
-show the gate tracker and surface the blocking gate.
+A gate cannot be silently skipped. If the user tries to jump ahead, show the
+gate tracker and surface the blocking gate.
 
 ```
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
@@ -102,6 +118,98 @@ Gate indicators:
 - ⬜ PENDING
 - ➖ N/A — gate does not apply to this project
 
+### The gate pre-flight hook
+
+The repo ships an optional `PreToolUse` hook (`hooks/gate-preflight.sh`) that
+blocks git write operations whose required gates are not ✅ or ➖ N/A, reading
+`.claude/dev-skills-gates.md` for state. Where it is installed, the pre-flight
+above stops being advisory for anything Claude executes itself.
+
+**If the hook denies a call, it is telling you a gate has not run.** The correct
+response is to run the blocking gate and update the state file, then retry.
+Never:
+- edit `.claude/dev-skills-gates.md` to mark a gate ✅ that did not run
+- mark a gate ➖ N/A to clear the block, unless the structural reason is real
+  and stated on the tracker
+- set `DEV_SKILLS_GATE_HOOK=off`, or route the same operation through a path the
+  hook does not watch, to get around a denial
+
+Working around a gate denial is a worse failure than the skipped gate, because
+it also destroys the signal. If you believe the hook is wrong, say so to the
+user and let them decide.
+
+**The hook does not cover presented commands** — nothing intercepts the user's
+own terminal. On local sessions, where presenting is the default (Section 5.7),
+the prose pre-flight is the only enforcement there is. That is exactly why
+presenting a command counts as performing it (Section 1).
+
+### Two tracks
+
+Not every git operation is a release. Decide which track the operation is on
+before checking gates: a checklist that can't be answered tends to get dropped
+entirely, and a dropped checklist is a leak.
+
+**Work commit** — saving progress mid-session, on a branch, no version bump, no
+artifact, no publish.
+Required: 🔒 SECURITY (on the changed code) and commit approval (Section 1).
+VERSION / BUILD / DOCS / RELEASE / SHIP stay ⬜ pending — not owed yet, not
+skipped.
+
+**Release sequence** — anything that bumps a version, produces an artifact,
+merges to the default branch, tags, or publishes.
+Required: all six gates, in order.
+
+A work commit never becomes a release by accident. If the operation tags, merges
+to the default branch, or publishes, it is a release sequence — regardless of
+the user calling it "just a quick push."
+
+### Gate state — must be durable
+
+The tracker is not a message you printed once; it is a file. Conversation history
+gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
+("security ran earlier, I think"). Write the state down.
+
+**File:** `.claude/dev-skills-gates.md` in the repo root.
+
+- **Write it** at session start, and after every gate transition.
+- **Read it** before every git write operation, and whenever asked for status.
+- **Local sessions:** add it to `.gitignore` — it is session scratch.
+- **Remote containers:** commit it to the working branch instead. The container
+  is reclaimed when the session ends, and an uncommitted state file dies with it
+  (`GATE_REFERENCE.md`, session start, step 0).
+
+Format:
+
+```
+# Dev Skills gate state
+Track: release sequence
+Version: 2.12.0
+Updated: 2026-09-07
+
+🔢 VERSION    ✅ all refs at 2.12.0
+🔨 BUILD      ➖ N/A — skill repo, no build system
+🔒 SECURITY   ✅ 0 Critical, 0 High
+📄 DOCS       ⬜
+📦 RELEASE    ⬜
+🚀 SHIP       ⬜
+```
+
+**Re-derivation — when the state file is missing, stale, or the session was
+compacted.** Do not guess, and do not treat a gate as passed because it feels
+like it did. Rebuild from evidence:
+
+| Gate | Evidence that it passed |
+|---|---|
+| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git tag -l` shows the previous version tagged |
+| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A) |
+| 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
+| 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
+| 📦 RELEASE | a PR exists for this branch (`gh pr list`, or MCP `list_pull_requests`) |
+| 🚀 SHIP | tag on remote, release exists, PR merged, expected assets attached |
+
+Any gate you cannot prove from evidence is ⬜ pending and must be run.
+"It probably ran" is ⬜.
+
 **Marking a gate N/A:** Some gates don't apply to every project (e.g. no build
 step for a docs-only or config repo). When a gate genuinely doesn't apply:
 1. State why it doesn't apply (e.g. "no build step — this is a skill/config repo")
@@ -112,453 +220,49 @@ A gate can only be N/A for structural reasons (the project has no build system,
 no compiled artifacts, no app UI). "We'll do it later" or "it's not important
 this time" is not N/A — that's a skip attempt, and skips are blocked.
 
-**User-driven operations.** The gates track the state of the work, not who
-performed the git operation. If the user commits, pushes, creates a PR, or
-merges outside of Claude (in their terminal, via GitHub UI, or another tool),
-that satisfies the corresponding step — Claude does not need to re-do it.
+**User-driven operations.** The gates track the state of the work, not who typed
+the command.
+
+**What a user-driven git action satisfies: the mechanical step itself, and
+nothing more.** If the user committed, pushed, opened a PR, or merged outside of
+Claude — in their terminal, the GitHub UI, or another tool — do not re-do that
+action. Credit it on the tracker (✅ "user-driven").
+
+**What it never satisfies: Gates 1–4.** VERSION, BUILD, SECURITY, and DOCS are
+statements about the state of the *code*, not about git. A commit existing is not
+evidence that anything was scanned, built, or documented. If the user merged to
+the default branch without security (Gate 3) or docs (Gate 4), those gates are
+still owed — run them on the merged code and surface what you find.
 
 When resuming work or checking gate status, detect what's already done:
-1. Run `git log`, `git branch -r`, `gh pr list`, `gh pr view`, `git tag -l`
+1. Run `git log`, `git branch -r`, `git tag -l`, and `gh pr list` / `gh pr view`
+   — or the GitHub MCP equivalents when `gh` is unavailable (`GATE_REFERENCE.md`, session start, step 0)
 2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
-3. Continue from the next incomplete gate
-
-A user-driven commit or PR does not exempt the remaining gates. If the user
-merged to main without completing security (Gate 3) or docs (Gate 4), those
-gates are still owed — run them on the merged code and surface any issues.
-
-### Gate 1 — Version 🔢
-
-No build starts until versioning is resolved.
-
-**Check ALL of these:**
-1. Find every version-carrying file in the project: `package.json`, `pyproject.toml`,
-   `Cargo.toml`, `VERSION`, `setup.cfg`, `build.gradle`, `pom.xml`, manifest files,
-   `Info.plist`, `AndroidManifest.xml`, `.csproj`, `AssemblyInfo.cs`, etc.
-2. **Search source code for hardcoded version strings.** Grep the project for the
-   current version number (e.g. `1.0.0`, `v1.0.0`). Check XAML, HTML, UI templates,
-   "About" dialogs, splash screens, window titles, headers, footers, constants, and
-   config files. Every instance must be updated — not just the manifest files.
-   A missed version string in the app's UI is a gate failure.
-3. Every version reference must show the same version and it must be bumped from
-   the previous release.
-4. Version must follow semver (MAJOR.MINOR.PATCH).
-5. **Repository link is mandatory.** Every project that has an app manifest
-   (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
-   `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
-   it belongs to. If missing, add it before passing this gate.
-6. **Release notes link is mandatory.** Every app that displays a repository link
-   (in an "About" dialog, settings screen, footer, help menu, etc.) must also
-   include a link to the current version's release notes. Use the pattern
-   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>` — the version in
-   the URL must match the version being built. If the app already shows a repo
-   link but has no release notes link, add one before passing this gate.
-
-7. **Previous version tags must exist.** Run `git tag -l` and verify that prior
-   released versions have corresponding git tags. If the previous version (the one
-   being bumped from) has no tag, flag it:
-
-   > ⚠️ **Missing tag for previous version:** v1.2.2 was released but has no git tag.
-   > This should be fixed (retroactively tag the merge commit) before or alongside
-   > this release.
-
-   Missing tags for older versions should be noted but don't hard-block — fix them
-   if the merge commits are identifiable, flag them otherwise.
-
-If any check fails:
-
-> 🚫 **VERSION GATE BLOCKED**
-> Issues found:
-> - [specific issue, e.g. "package.json version is 1.0.0 but VERSION file says 1.0.1"]
-> - [e.g. "MainWindow.xaml still shows v1.0.0 in the title bar"]
-> - [e.g. "package.json missing repository field"]
-> - [e.g. "About dialog has repo link but no release notes link"]
-> - [e.g. "v1.2.2 has no git tag — needs retroactive tagging"]
->
-> Current version: [version or "none found"]
-> What version should this build be? (patch / minor / major)
-
-Update ALL version files, add missing repo links and release notes links before marking passed.
-
-### Gate 2 — Build 🔨
-
-Run the project's build command only after Gate 1 is ✅. If the build fails,
-fix and rebuild — do not advance.
-
-**A test build is mandatory before any commit.** When building an app, create a
-test/dev version and verify it runs correctly before staging or committing anything.
-This means:
-1. Build the project (dev/test mode where applicable)
-2. Launch or preview the app — confirm it starts, the golden path works, and
-   no regressions are visible
-3. Only after the test build is verified working does this gate pass
-
-If the app cannot be tested locally (e.g. requires external infrastructure),
-say so explicitly rather than skipping — the user decides whether to proceed.
-
-**Projects with CI release workflows.** If the project has a GitHub Actions
-workflow that builds release artifacts on tag push (check
-`.github/workflows/` for `on: push: tags:`), the local build gate covers
-only the **debug/test build**. The release artifact is built by CI during
-Gate 6 — do not build it locally. Gate 2 passes when the debug build
-compiles and the app is verified working.
-
-> ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred to CI)
-
-**Projects with no build step** (config repos, skill repos, documentation-only
-repos, pure script collections): mark this gate ➖ N/A with an explanation:
-
-> ➖ **BUILD GATE N/A** — this is a [skill/config/docs] repo with no build system.
-
-Do not silently skip — always show the N/A status on the tracker.
-
-> ✅ **BUILD GATE PASSED** — test build verified working
-> Output: [artifact path]
-
-### Gate 3 — Security & Quality 🔒
-
-**Mandatory after every build.** Two steps, both must pass: security scan and
-quality review.
-
-**Before scanning, load both reference files from this skill's base directory**
-(shown when the skill loaded, e.g. "Base directory for this skill: ..."):
-1. Read `SECURITY_REFERENCE.md` in the skill's base directory — bad/good code
-   examples for every security pattern.
-2. Read `QUALITY_REFERENCE.md` in the skill's base directory — bad/good code
-   examples for structure and performance anti-patterns.
-Use these examples to pattern-match against the code being reviewed.
-
-#### Step 1 — Security scan
-
-Run a full scan of all source files. Check for every pattern category in
-Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` (loaded
-above). Also run the project's native audit tool (`npm audit`,
-`pip audit`, `cargo audit`, etc.) if available.
-
-**Hard stops (must fix before proceeding):**
-- 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
-  disabled TLS, `pickle` on untrusted data, RCE vectors
-- ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
-  passwords, `random` for tokens, no input validation on endpoints
-
-**Show and let user decide:**
-- 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
-  logging sensitive data, unpinned deps
-- 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
-
-Security step passes at zero Critical and zero High:
-
-> ✅ **Security scan passed** — 0 Critical, 0 High
-> Medium: N (shown above, user accepted) | Low: N
-
-#### Step 2 — Quality review
-
-Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md` (loaded
-above) and the checklist below:
-
-**Structure issues (flag and fix):**
-- Deep nesting (>3 levels) — flatten with early returns
-- God functions (>~40 lines or multiple responsibilities) — split
-- Circular dependencies — restructure
-- Hidden side effects in getters or utility functions — rename or separate
-- Copy-pasted logic that should be shared — extract
-
-**Performance issues (flag and fix):**
-- N+1 queries — batch with IN/ANY or joins
-- Wrong data structures (lists for lookups instead of sets/dicts)
-- String concatenation in loops — use join/builders
-- Recomputation in loops (regex, config, API calls) — compute once
-- Allocations in hot paths — move constants to module level
-- Loading everything when a subset is needed — SELECT specific columns, paginate
-- Blocking I/O on async event loops — use async alternatives
-- Unbounded caches — use lru_cache with maxsize
-- Missing database indexes on queried columns
-- Event listeners never cleaned up — add teardown
-
-**Container / build issues (flag and fix):**
-- Dockerfile hardcodes package names instead of installing from dependency file — switch to `pip install -r requirements.txt` / `npm ci`
-- New import added but package missing from dependency file — add it
-- Dockerfile and dependency file list different packages — reconcile to one source of truth
-
-Report quality findings separately from security:
-
-> **Quality review — changed code:**
-> ⚠️ `app.py:45` — N+1 query inside loop (fetches orders per user)
->    Fix: batch with `WHERE user_id = ANY(%s)`
-> ⚠️ `utils.py:120` — function is 80 lines with 5 responsibilities
->    Fix: split into validate_input, transform_data, save_result
-> ✅ No deep nesting issues
-> ✅ No circular dependencies
-
-Quality issues don't hard-block the gate (they're not security vulnerabilities),
-but they must be surfaced and the user must acknowledge them. Fix what's
-reasonable within the current scope — flag the rest as known technical debt.
-
-#### Gate 3 combined output
-
-Both steps must complete before the gate passes:
-
-> ✅ **SECURITY & QUALITY GATE PASSED**
-> Security: 0 Critical, 0 High | Medium: N | Low: N
-> Quality: N structure issues, N performance issues (shown above, user accepted)
-
-If the user says "skip security" or "we can do security later":
-
-> 🚫 **SECURITY GATE BLOCKED**
-> Security scan is mandatory after every build. Running now.
-
-Then run it. Do not ask again.
-
-### Gate 4 — Docs 📄
-
-After security passes, check:
-1. **Version history / changelog** — the README or CHANGELOG must have an entry for
-   this version with the date and a summary of changes. Mandatory for every release.
-2. **New or changed features** — if the session added, removed, or changed any
-   user-facing behavior (new flags, commands, changed defaults, removed features),
-   the README usage/feature docs must reflect it.
-3. **Removed features** — scan the README for references to anything removed in this
-   session. Stale descriptions of removed features are a hard stop.
-4. **Architecture / dependency docs** — if the project documents external calls,
-   timeout tables, architecture, or dependencies, verify they still match the code.
-5. **Internal consistency** — if the README describes how the project works (gate
-   names, workflows, install steps, feature summaries, diagrams), cross-check every
-   description against the actual source of truth (SKILL.md, code, config). Renamed
-   concepts, restructured workflows, and changed terminology must be reflected
-   everywhere — not just in the changelog. Read the full README and flag any
-   description that no longer matches.
-
-Show what was checked:
-
-> ✅ **DOCS GATE PASSED**
-> - Version history: v1.2.3 entry added with date and changes
-> - New features: [list any docs updated]
-> - Removed features: [list any stale refs cleaned up, or "none"]
-> - Architecture/tables: [updated / no changes needed]
-> - Internal consistency: [README descriptions match source of truth, or list fixes]
-
-If documentation is missing or stale:
-
-> 🚫 **DOCS GATE BLOCKED**
-> The following documentation issues must be resolved:
-> - [specific issue, e.g. "README still references feature X which was removed"]
-> - [specific issue, e.g. "README calls Gate 6 'Push' but it was renamed to 'Ship'"]
-> - [specific issue, e.g. "No version history entry for v1.2.3"]
->
-> Fixing now...
-
-Fix any issues found. Rebuild if doc fixes affected source files.
-
-### Gate 5 — Release 📦
-
-This gate prepares the release: branch, commit, PR, and release notes draft.
-Execution (merge, tag, publish) happens in Gate 6.
-
-**Steps:**
-1. Create a feature branch if not on one (`release/vX.Y.Z`, `feature/desc`, `fix/desc`)
-2. **Sync with origin before committing.** Run `git fetch origin` and compare
-   the local branch with its remote counterpart. If the remote is ahead, pull
-   before staging. Present the sync commands formatted for the user's shell
-   (Section 5.7). This prevents committing on top of stale history, which causes
-   merge conflicts and can clobber others' work.
-
-   > 📡 **Pre-commit sync:** Fetching latest from origin...
-   > [status: up to date / N commits behind / diverged]
-
-   If diverged, resolve before proceeding. Do not skip this step.
-3. **Get commit approval** (per Section 1 above) — show what's staged, get explicit yes
-4. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
-   include `git remote add origin <url>` (using the URL stored at session start)
-   in the command block before any push commands. This prevents the "default repo
-   has not been set" error.
-5. **Present commands per Section 5.7** — format the commit, push, and PR creation
-   commands for the user's shell environment. The user runs them manually or asks
-   Claude to execute directly.
-6. After the branch is pushed and PR created, draft release notes and show the
-   PR + notes to the user:
-
-   > 📝 **PR created — review before shipping:**
-   >
-   > **v1.2.3**
-   > - [change 1 from this session]
-   > - [change 2 from this session]
-   >
-   > PR: [url]
-   >
-   > Do these accurately describe what's in this build? Reply "yes" to ship,
-   > or tell me what to change.
-
-7. Wait for explicit approval of the PR content and release notes
-
-**Never commit directly to main/master.** All work happens on feature/fix/release
-branches and merges via PR. If the session is on the default branch when Gate 5
-is reached, create a branch first.
-
-> ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
-> Pending: merge, tag, and publish (Gate 6)
-
-### Gate 6 — Ship 🚀
-
-Merge, tag, and publish. All three happen here, not in Gate 5.
-
-**Pre-ship summary — explicit confirmation required.** "Yeah" or "ok" is not
-enough — the user must say "ship", "yes push", or "go ahead."
-
-> **Ready to ship:**
-> Branch: `release/v1.2.3` → `main` | PR: [url]
-> Tag: `v1.2.3` | Artifact: [path/size, or "none"]
-> Type **"ship"** to confirm, or tell me what to adjust.
-
-**CI release detection — check before manual steps.** Look for a release
-workflow in `.github/workflows/` that triggers on tag push (`on: push: tags:`)
-and creates a GitHub release. If found, follow the **CI-driven path** below.
-If not, follow the **manual path**.
-
-#### CI-driven path
-
-When a CI release workflow exists:
-
-1. **Verify secrets are configured.** The workflow needs signing secrets
-   (e.g. `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD` for Android).
-   Check with: `gh secret list`. If secrets are missing:
-
-   > 🚫 **SHIP GATE BLOCKED — CI signing secrets not configured.**
-   > The release workflow needs these repository secrets: [list missing].
-   > Add them at: `https://github.com/<owner>/<repo>/settings/secrets/actions`
-
-2. **Merge the PR** (per Section 5.7 command formatting):
-   ```
-   gh pr merge <number> --merge --delete-branch
-   git checkout main && git pull origin main
-   ```
-
-3. **Tag and push — CI does the rest:**
-   ```
-   git tag v1.2.3
-   git push origin v1.2.3
-   ```
-
-4. **Wait for CI to complete.** Monitor with:
-   ```
-   gh run list --limit 3
-   gh run watch <run-id>
-   ```
-
-5. **Add release notes.** CI creates the release with the artifact attached
-   but no notes. Add them:
-   ```
-   gh release edit v1.2.3 --notes "..."
-   ```
-   Or if the user prefers, edit via the GitHub UI.
-
-6. **Post-ship verification (mandatory).** Same as manual path — all four
-   checks must pass:
-   - **Tag on remote:** `git ls-remote --tags origin v1.2.3`
-   - **Release exists:** `gh release view v1.2.3`
-   - **PR merged:** state is "merged"
-   - **Assets match:** CI-built artifact attached with correct name and
-     reasonable size. **For Android:** verify the APK name contains the
-     version and does NOT contain "debug".
-
-   If CI failed:
-   > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
-   > Check logs: `gh run view <run-id> --log-failed`
-   > Fix the issue, delete the tag, and re-tag after fixing:
-   > ```
-   > git tag -d v1.2.3
-   > git push origin :refs/tags/v1.2.3
-   > ```
-   > Then re-tag and push once the fix is on the default branch.
-
-> ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
-> Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
-
-#### Manual path (no CI release workflow)
-
-**Artifact detection — actively scan, never assume "none".** Check:
-1. **Build tooling:** PyInstaller specs, Makefile targets, `setup.py` entry_points,
-   `cargo build --release`, `go build`, `dotnet publish`, webpack/vite configs,
-   `.skill` source dirs, `scripts/`, `build/`
-2. **README:** download links, install instructions referencing binaries/packages
-3. **Prior releases:** `gh release view <previous-tag>` — if prior releases had
-   assets, this one should too
-
-If any indicator exists: rebuild from committed source, verify version/dates
-match, include in release. A release missing expected artifacts is a ship failure.
-README download links (e.g. `../../releases/latest/download/file.ext`) that point
-to missing assets are also a ship failure.
-
-**Android APK requirement.** When the project is an Android app (`build.gradle`,
-`AndroidManifest.xml`, or Gradle with Android plugins):
-1. Build release APK: `./gradlew assembleRelease` — never a debug build
-2. **Verify APK signing — debug signature is a ship failure.** Run:
-   ```
-   apksigner verify --print-certs <apk-file>
-   ```
-   or if `apksigner` is unavailable:
-   ```
-   keytool -printcert -jarfile <apk-file>
-   ```
-   Check the output:
-   - 🚨 **Ship failure** if the signer CN contains `Android Debug`, `debug`, or
-     the SHA-256 matches the well-known debug keystore fingerprint
-   - 🚨 **Ship failure** if the APK is unsigned (no signature block at all)
-   - ✅ Pass only if signed with a release keystore whose CN matches the project's
-     expected identity (e.g. the organization or developer name)
-
-   The default debug keystore (`~/.android/debug.keystore`, password `android`,
-   alias `androiddebugkey`) is generated automatically by Android tooling. Any APK
-   signed with it can be re-signed by anyone — it provides zero authenticity.
-   **Never ship a debug-signed APK.**
-3. Name it `<app-name>-v<VERSION>.apk` — rename Gradle's generic output if needed.
-   **"debug" in the filename = wrong variant = ship failure.**
-4. Attach as release asset — an Android release without an APK is a ship failure
-5. Verify the APK appears in release assets with correct name and reasonable size
-
-**Execution — present commands per Section 5.7:**
-
-```
-gh pr merge <number> --merge --delete-branch
-git checkout main && git pull origin main
-git tag v1.2.3
-git push origin v1.2.3
-gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
-```
-
-**Post-ship verification (mandatory):** The gate does not pass without all four:
-1. **Tag on remote:** `git ls-remote --tags origin v1.2.3` returns the tag
-2. **Release exists:** visible via `gh release view v1.2.3`
-3. **PR merged:** state is "merged", not just "closed"
-4. **Assets match:** expected artifacts are attached per detection above
-
-> ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
-> Verified: tag ✅ | release ✅ | PR merged ✅ | assets ✅
-
-If any check fails, fix and re-verify — do not pass with failures outstanding.
-
-**Post-merge cleanup.** After the PR is merged and verified, clean up branches:
-1. Delete the local feature branch: `git branch -d <branch-name>`
-2. Prune stale remote-tracking refs: `git remote prune origin`
-3. Present cleanup commands formatted for the user's shell (Section 5.7)
-
-This prevents stale branches from accumulating. `--delete-branch` on `gh pr merge`
-handles the remote branch; these steps handle the local side.
-
-#### Updating an existing release (`--clobber`)
-
-If an artifact is uploaded to an existing release, the notes are now stale:
-
-> 🚫 **SHIP GATE BLOCKED — notes are stale**
-> Update with `gh release edit <tag> --notes "..."` or bump to vN+1.
-
-Pass only after the notes are updated or the user explicitly acknowledges why not.
-
-#### No release mechanism
-
-> 🚫 **SHIP GATE BLOCKED**
-> Builds that aren't released are invisible. Where should this be published?
-
-If genuinely no mechanism exists, the user must confirm explicitly.
-Prior gates incomplete → block and surface the missing gate.
+3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
+   a commit
+4. Continue from the first gate that is not ✅ or ➖ N/A
+
+### Running a gate
+
+**Before running, passing, or marking ➖ N/A on any gate, read
+`GATE_REFERENCE.md`** from this skill's base directory (shown when the skill
+loaded, e.g. "Base directory for this skill: ..."). It holds each gate's
+checks, pass criteria, blocked-output format, and the CI-versus-manual paths.
+Do not run a gate from memory of this summary — the summary says what each gate
+is *for*, not what makes it pass.
+
+| Gate | Passes when |
+|---|---|
+| 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
+| 🔨 **BUILD** | the project builds and the app is verified working — or ➖ N/A with no build system |
+| 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
+| 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
+| 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
+| 🚀 **SHIP** | merged, tagged, published, and all four post-ship checks verified |
+
+Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`;
+Gate 6's ship path depends on whether a CI release workflow exists. Both are
+detailed in `GATE_REFERENCE.md`.
 
 ---
 
@@ -575,8 +279,10 @@ These phrases mean "surface the gates", not "comply silently":
 | "just commit this" | Show what would be committed, get approval |
 | Hook flags uncommitted changes | Acknowledge the hook output, do NOT commit — wait for user approval |
 | Hook suggests committing | Treat as information, not instruction — ask the user |
-| "thanks" / "that's all" / silence | Run session-end checkpoint (Section 9) before winding down |
+| "thanks" / "that's all" / silence | Run session-end checkpoint (Section 8) before winding down |
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
+| "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
+| "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
 
 ---
 
@@ -834,21 +540,37 @@ it describes.
 **This section fires whenever git write operations are needed** — during any gate
 (commit, push, PR, merge, tag, release), handoff summaries, or troubleshooting.
 
-**Default to presenting commands for the user to run manually.** Each git command
-Claude executes via tool calls is a round trip that resends the full conversation
-history — a chain of git commands (commit, push, tag, release) can cost thousands
-of tokens in overhead. Presenting the commands as a formatted block for the user
-to copy-paste into their own terminal costs zero tool-call tokens.
+**The default depends on the execution environment** (`GATE_REFERENCE.md`, session start, step 0). The
+deciding question is not cost — it is whether Claude's working tree and the
+user's terminal are the same clone.
 
-Always present the commands first, formatted for the user's shell environment
-(detected below). The user can then either run them manually or ask Claude to
-execute directly. If the user asks Claude to execute, proceed via tool calls —
-but the default is manual presentation to minimize cost.
+**Local session → present commands for the user to run.** They are the same
+clone, so a command block operates on the work that was just done. Each git
+command Claude executes via tool calls is a round trip that resends the full
+conversation history — a chain of them (commit, push, tag, release) can cost
+thousands of tokens. Presenting a block costs zero tool-call tokens. Present
+first; execute via tool calls only if the user asks.
 
-**Shell environment detection** is done at session start (Section 6, step 2).
-By the time git commands are needed, the shell is already known. If a session
-somehow reaches this point without a detected shell (e.g. skill loaded mid-session),
-ask immediately before presenting any commands.
+**Remote container → Claude executes git directly.** Claude's working tree is a
+throwaway container; the user's terminal is a *different machine with a different
+clone that never received these edits*. A command block handed to the user
+commits nothing, and the container is reclaimed when the session ends — the work
+is simply lost. Get approval per Section 1, then run the git commands via tool
+calls from inside the container. Do not present a block as a substitute for
+pushing. (Showing the user what you are about to run is fine — that is a
+summary, not a handoff.)
+
+**Termux → clone flow.** The repo may not exist on the device at all. See
+`SHELL_REFERENCE.md`.
+
+**The gates are identical either way.** Presenting a command is performing it
+(Section 1): the pre-flight runs, and the tracker goes in the same message,
+above the block.
+
+**Shell environment detection** is done at session start (`GATE_REFERENCE.md`, session start, step 2) for
+local and Termux sessions; remote containers skip it. If a session reaches this
+point needing a presented block without a detected shell (e.g. the skill loaded
+mid-session), ask before presenting any commands.
 
 **Remote verification.** Before presenting any push commands, verify the remote
 is configured (`git remote -v`). If origin is not set, include
@@ -860,9 +582,26 @@ not been set" error.
 branch explicitly: `git push -u origin <branch-name>`. The `-u` flag sets
 upstream tracking, preventing the error on subsequent pushes.
 
-**Always start with `cd`.** Never assume the user's terminal is already in the
-project directory. Every command block must begin with the appropriate `cd`
-command for their shell.
+**One block, not several.** When commands are presented for the user to run,
+put the whole sequence in a **single fenced block they can copy once** — `cd`,
+branch, add, commit, push, tag, release, all of it. Do not split an operation
+across multiple blocks, and do not interleave prose between the commands.
+Copy-pasting five separate blocks is five chances to miss one, run them out of
+order, or land in the wrong directory.
+
+Split into a second block only when the user genuinely has to stop and look at
+something before continuing — a merge conflict to resolve, a build to verify, a
+PR number needed by the next command. When you do split, say what to check
+before moving on.
+
+Explanation goes above or below the block, never inside it as interleaved prose.
+Brief `#` comments within the block are fine.
+
+**Always start with `cd`** in a presented block. Never assume the user's terminal
+is already in the project directory. Every block presented for the user to run
+must begin with the appropriate `cd` for their shell. (This does not apply to
+commands Claude executes itself — the container's working directory is already
+correct.)
 
 **Load `SHELL_REFERENCE.md`** from this skill's base directory for the full
 `cd` format table, shell-specific syntax rules, Termux clone flow, and example
@@ -889,7 +628,7 @@ If yes, produce the same handoff format as Section 5.5:
 **Gate status:** show the tracker with current state
 **Key files:** path:line — why it matters
 **Decisions made:** constraints the next session must respect
-**Shell environment:** [user's shell from Section 6, step 2]
+**Shell environment:** [user's shell from session start, step 2]
 **Next step:** the single concrete next action
 ```
 
@@ -910,150 +649,20 @@ Don't nag. Once offered, drop it unless the user asks.
 
 ## 6. Session start
 
-When this skill loads:
+When this skill loads, **read `GATE_REFERENCE.md` from this skill's base
+directory** (shown when the skill loaded, e.g. "Base directory for this
+skill: ...") and follow its session-start procedure. It covers, in order:
 
-**Self-check:** Verify that `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
-and `SHELL_REFERENCE.md` exist in this skill's base directory (shown when the
-skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
-warn immediately:
-
-> ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
-> The security/quality gate cannot run properly without it.
-
-**Git repo detection — run at session start.** Check if the current working
-directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
-If yes:
-
-1. **Detect and store the repo URL.** Run `git remote -v` to capture the origin
-   URL. Store it for the session — this URL is used in clone commands (Termux),
-   `git remote add` recovery, release URLs, and PR links. Never assume or
-   hardcode a repo URL — always derive from `git remote -v`.
-
-   If no remote is configured:
-
-   > ⚠️ **No remote configured.** This repo has no `origin` remote set.
-   > What is the GitHub URL for this project? (e.g. `https://github.com/owner/repo`)
-
-   Store the answer, and include `git remote add origin <url>` in the first
-   command block presented to the user.
-
-2. **Shell environment detection.** Ask the user which shell they work in —
-   this determines how all git commands are formatted for the rest of the session:
-
-   > **Which shell will you be running these commands in?**
-   > 1. Windows PowerShell
-   > 2. Linux PowerShell (pwsh)
-   > 3. Git Bash (Windows)
-   > 4. Termux (Android)
-   > 5. macOS Terminal (zsh/bash)
-   > 6. Linux Terminal (bash/zsh)
-   > 7. WSL (Windows Subsystem for Linux)
-
-   Store the answer for the rest of the session — don't ask again.
-
-3. **Offer to sync with origin.** The user may be working with outdated files.
-   Present the option before any work begins, formatted for the user's detected
-   shell (Section 5.7):
-
-   > 📡 **Git repo detected:** `<repo-name>` on branch `<current-branch>`
-   > Want to sync with origin before we start? This ensures we're working
-   > with the latest files.
-   >
-   > 1. **Yes — sync now** (fetch + pull from origin)
-   > 2. **No — work with what's here**
-
-   If the user chooses to sync, present the fetch/pull commands formatted for
-   their shell. Report any conflicts or divergence.
-
-4. **Check the branch.** If the user is on `main` or `master`, flag it:
-
-   > ⚠️ **You're on `<branch>`.** This skill enforces branch-based development
-   > — all work happens on feature/fix branches, then merges to the default
-   > branch via PR. Want to create a working branch now?
-
-   If yes, ask for a branch name or suggest one based on the task. Never
-   proceed with implementation work directly on the default branch.
-
-5. **Report the repo state** in the session start banner (see below).
-
-6. **CI workflow detection.** Check `.github/workflows/` for:
-   - A **release workflow** — triggers on tag push (`on: push: tags:`) and
-     creates a GitHub release with artifacts
-   - A **build check workflow** — triggers on pull requests and compiles
-     the project
-
-   Report what's found in the session banner (see template below).
-
-   **If the project is buildable (Gate 2 is not N/A) but has no release
-   workflow**, suggest creating one:
-
-   > 💡 **No CI release workflow detected.** This project has a build step
-   > but no automated release pipeline. A release workflow would let CI
-   > build signed artifacts and publish GitHub releases automatically when
-   > you push a version tag — no local release build needed.
-   >
-   > Want me to create `.github/workflows/release.yml`?
-
-   If the user says yes, ask what the project needs:
-   - What secrets does signing require? (keystore, certificates, tokens)
-   - What's the build command for a release artifact?
-   - What should the artifact be named?
-
-   Then generate the workflow. Do not assume a template — build it from the
-   project's actual build tooling.
-
-   **If a release workflow exists but no build check workflow**, mention it:
-
-   > 💡 **No CI build check detected.** PRs are not compiled before merge.
-   > A build check workflow catches compile errors before they land on the
-   > default branch. Want me to create one?
-
-Then show the gate tracker:
-
-```
-Dev Skills v2.11.0 active.
-
-Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
-Shell: <detected shell> | Last sync: <just now / not synced>
-CI release: <✅ workflow name / ❌ not detected>
-
-🔢 VERSION    ⬜
-🔨 BUILD      ⬜
-🔒 SECURITY   ⬜
-📄 DOCS       ⬜
-📦 RELEASE    ⬜
-🚀 SHIP       ⬜
-
-Commits require explicit approval. Security scan runs after every build.
-All work on branches — merge to default branch via PR only.
-```
-
-**Important:** The version shown must match the `version` field in this file's
-frontmatter. If they differ, the skill was not repackaged after a version bump —
-surface this to the user.
-
-**Updates:** Check for new versions at
-https://github.com/darthrater78/claude-vibe-skills/releases
-
-**MCP check — run at session start, every time.** Scan your context for active
-MCP tool prefixes (`mcp__<server>__`). Report what's connected:
-
-```
-MCP servers active: [list names derived from tool prefixes]
-To disable for this session: /mcp → toggle off any you don't need
-```
-
-Rules for the MCP check:
-- **Only name servers whose `mcp__<server>__` tool prefixes are literally in your
-  context.** Never infer or guess.
-- Distinguish **active** (full tool definitions loaded — expensive, thousands of
-  tokens per request) from **deferred** (name-only, schemas loaded on demand —
-  cheap). Report deferred as a count only: "N deferred (low overhead)".
-- If active servers look irrelevant to the work ahead, say so: "Consider
-  disabling [name] — not needed for this task. Run `/mcp` to toggle."
-- `/mcp` is the in-session command. It toggles servers on/off without leaving
-  the session. This is the primary recommendation for disabling during a session.
-- For permanent removal, see Section 5.4.
+- **Self-check** — the skill's reference files are all present
+- **Step 0 — execution environment detection** (local / remote container /
+  Termux). This decides whether Claude executes git or presents it, whether to
+  ask the shell question, whether `gh` or GitHub MCP tools are used, and where
+  the gate state file lives. Run it before anything else.
+- **Steps 1–6** — repo URL, shell, sync offer, branch check, repo state, CI
+  workflow detection
+- **The gate state file** — write `.claude/dev-skills-gates.md` with all six
+  gates ⬜ pending (Section 2)
+- **The session banner and MCP check**
 
 Then: "What are we building?"
 
@@ -1061,8 +670,11 @@ Then: "What are we building?"
 
 ## 7. Workflow status
 
-When asked "status", "where are we", or at any natural checkpoint, show the
-full gate tracker with current state.
+When asked "status", "where are we", or at any natural checkpoint, read
+`.claude/dev-skills-gates.md` and show the full gate tracker with current state,
+naming the active track (work commit / release sequence). If the file is missing
+or stale, re-derive from evidence per Section 2 before answering — do not
+reconstruct the tracker from memory.
 
 ---
 
@@ -1091,6 +703,15 @@ Before wrapping up, check:
 
 5. **If no source files were modified**, skip the gate check — the session was
    exploratory or advisory.
+
+**Remote container sessions — uncommitted work is destroyed, not just pending.**
+On a local session, uncommitted changes sit safely in the user's working tree
+until next time. In a container they are lost when the session ends. Escalate
+accordingly:
+
+> 🚨 **Remote session ending with uncommitted changes.** These edits exist only
+> in this container and will be lost when it is reclaimed. Nothing survives
+> unless it is pushed. Should I commit and push to `<branch>` now?
 
 Do NOT silently wind down a session that has uncommitted changes, untagged
 versions, or incomplete gates. Surface the gap and let the user decide.
