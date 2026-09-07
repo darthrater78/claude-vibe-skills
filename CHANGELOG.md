@@ -14,8 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Cost discipline (Section 5) deliberately stays in `SKILL.md`. Gates have a hard trigger that forces the reference read; cost advice has none, so moving it behind a load would mean it silently stops applying
 
 ### Added
+- `.github/workflows/release.yml` — publishes the GitHub release on tag push. Verifies the tag matches `VERSION`, builds `dev-skills.skill` from the tagged source rather than trusting the committed copy, extracts release notes from the matching `CHANGELOG.md` entry, publishes with the artifact attached, then verifies the asset actually landed — README download links point at it, so a release without it is a ship failure. Uses the runner's preinstalled `gh` rather than a third-party action, so the release path adds no supply-chain surface
 - `scripts/validate.sh` verifies the README size table against actual file sizes (2KB tolerance) and requires a row per skill file. The table had drifted to roughly half the real figures — `SKILL.md` documented as ~31KB while actually 61KB — and two prior releases incremented the stale numbers instead of measuring them. Since `SKILL.md` is billed on every request, an understated figure hides a real cost
 - `GATE_REFERENCE.md` added to the session-start self-check and the validator's required-files list
+- `scripts/validate.sh` also verifies each bundled file matches its source, so a stale archive cannot ship old rules under a current version number
 
 ### Fixed
 - Cross-references to "Section 6, step 0/1/2" now point at `GATE_REFERENCE.md`, across `SKILL.md`, `SHELL_REFERENCE.md`, and `hooks/README.md`
