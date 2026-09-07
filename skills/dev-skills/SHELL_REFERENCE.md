@@ -13,7 +13,7 @@ sessions do not use it; see below.
 
 ## Remote containers — do not format, execute
 
-When the session runs in a remote container (Section 6, step 0), none of this
+When the session runs in a remote container (`GATE_REFERENCE.md`, session start, step 0), none of this
 file applies:
 
 - **There is no clone step.** The container is provisioned with the repo already
@@ -86,8 +86,8 @@ environment where Claude presents a clone step — remote containers arrive
 pre-cloned, and local sessions are already in the repo. When the user's shell is
 Termux, every command block must account for this:
 - **First time (repo not yet cloned):** start with `git clone <url>` then `cd`
-  into the cloned directory. Use the repo URL stored at session start (Section 6,
-  step 1).
+  into the cloned directory. Use the repo URL stored at session start
+  (`GATE_REFERENCE.md`, step 1).
 - **Subsequent commands (repo already cloned):** start with `cd` then
   `git fetch origin && git pull origin <branch>` to sync before any work.
 

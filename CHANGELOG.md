@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.14.0] — 2026-09-07
+
+### Changed
+- **Extracted gate execution detail and the session-start procedure into `GATE_REFERENCE.md`**, loaded on demand. `SKILL.md` is loaded on every request, and it had grown to ~13,200 tokens — larger than all three reference files combined, inverting the tiered-loading design the skill is built on. Nearly half of it was content needed at one specific moment: gate recipes consulted when a gate runs, and a session-start procedure consulted once
+- `SKILL.md` is now ~7,600 tokens per turn, down from ~13,200 (**-42%**), and below where it stood before the 2.12.0/2.13.0 additions. What remains is trigger logic that must fire unprompted: commit discipline, the pre-flight, the two tracks, gate state and re-derivation, the hook contract, shortcut detection, always-on security awareness, and cost discipline
+- Section 2 gains a compact gate summary table (what each gate is *for*) and an explicit instruction to load `GATE_REFERENCE.md` before running, passing, or marking ➖ N/A on any gate — the summary is not a substitute for the pass criteria
+- Section 6 is now a pointer to the session-start procedure in `GATE_REFERENCE.md`
+- Cost discipline (Section 5) deliberately stays in `SKILL.md`. Gates have a hard trigger that forces the reference read; cost advice has none, so moving it behind a load would mean it silently stops applying
+
+### Added
+- `scripts/validate.sh` verifies the README size table against actual file sizes (2KB tolerance) and requires a row per skill file. The table had drifted to roughly half the real figures — `SKILL.md` documented as ~31KB while actually 61KB — and two prior releases incremented the stale numbers instead of measuring them. Since `SKILL.md` is billed on every request, an understated figure hides a real cost
+- `GATE_REFERENCE.md` added to the session-start self-check and the validator's required-files list
+
+### Fixed
+- Cross-references to "Section 6, step 0/1/2" now point at `GATE_REFERENCE.md`, across `SKILL.md`, `SHELL_REFERENCE.md`, and `hooks/README.md`
+- The validator's banner check follows the session banner into `GATE_REFERENCE.md`
+
 ## [2.13.0] — 2026-09-07
 
 ### Added

@@ -68,14 +68,17 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~31KB | Every turn (gates, commit discipline, cost discipline, category-level security/quality awareness) |
-| `SECURITY_REFERENCE.md` | ~14KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
-| `QUALITY_REFERENCE.md` | ~15KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `SKILL.md` | ~35KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `GATE_REFERENCE.md` | ~29KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SECURITY_REFERENCE.md` | ~22KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
 
 The repo also ships `hooks/gate-preflight.sh`, an optional enforcement hook — it is not part of the skill bundle and is installed separately (see below).
 
-`SKILL.md` carries the gate workflow, commit discipline, cost controls, and category-level security/quality awareness — enough for Claude to write secure, clean code by default. Shell-specific command formatting, detailed security/quality rule checklists, and pattern-matching code examples live in reference files, loaded on demand where they're needed most.
+The split follows one rule: **triggers load every turn, recipes load on demand.** `SKILL.md` holds what has to fire without being asked — commit discipline, the gate pre-flight, the two tracks, shortcut detection, always-on security awareness, cost controls. How to actually *run* a gate lives in `GATE_REFERENCE.md`, loaded when the pre-flight says one is owed. Security and quality checklists and shell formatting work the same way.
+
+Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for on every request, so an understated figure hides a real per-turn cost.
 
 ---
 
@@ -216,6 +219,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.13.0`
+`v2.14.0`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.

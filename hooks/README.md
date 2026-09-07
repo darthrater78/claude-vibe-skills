@@ -18,7 +18,7 @@ deterministic half of gate enforcement, and prose is the other half.
 
 That gap is why SKILL.md Section 1 defines presenting a command as performing it.
 The hook is strongest exactly where Claude executes git directly — remote
-container sessions (SKILL.md Section 6, step 0) — and weakest on local sessions,
+container sessions (`GATE_REFERENCE.md`, session start, step 0) — and weakest on local sessions,
 where presenting commands is the default.
 
 ## Install
