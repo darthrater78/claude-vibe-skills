@@ -176,7 +176,11 @@ gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
 - **Local sessions:** add it to `.gitignore` — it is session scratch.
 - **Remote containers:** commit it to the working branch instead. The container
   is reclaimed when the session ends, and an uncommitted state file dies with it
-  (`GATE_REFERENCE.md`, session start, step 0).
+  (`GATE_REFERENCE.md`, session start, step 0). If the repo already gitignores
+  the file — this one does, for local users — stage it explicitly with
+  `git add -f .claude/dev-skills-gates.md`, or accept that state will not survive
+  the session and re-derive from evidence next time. Do not silently let it
+  vanish.
 
 Format:
 

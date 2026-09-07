@@ -10,7 +10,7 @@ One skill for disciplined vibe coding: commit approval, branch-based development
 
 2. **Branch-based development.** All work happens on feature/fix branches — never directly on main/master. At session start, the skill detects the git repo, offers to sync with origin, and flags if you're on the default branch.
 
-3. **Six gates before anything ships.** Every session that produces a build moves through version → build → security → docs → release → ship in order. No gate can be silently skipped.
+3. **Gates before anything ships.** A work commit needs the security gate and your approval. Anything that bumps a version, builds an artifact, merges, tags, or publishes runs the full six — version → build → security → docs → release → ship, in order. No gate can be silently skipped, and presenting a git command for you to paste counts as running it.
 
 4. **Security and quality scanning.** After every build, a full code scan runs automatically — checking for hardcoded secrets, injection vectors, spaghetti code, N+1 queries, and more. Critical and high findings block the release.
 

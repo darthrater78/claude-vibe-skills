@@ -30,6 +30,9 @@ deny() {
   reason="${reason//$'\n'/\\n}"
   reason="${reason//$'\t'/\\t}"
   reason="${reason//$'\r'/}"
+  # Strip any remaining raw control character — it would make the JSON invalid.
+  # Real newlines and tabs became two-character escapes above, so this is safe.
+  reason="$(printf '%s' "$reason" | tr -d '\000-\037')"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
   exit 0
 }
