@@ -82,6 +82,11 @@ If the signals are ambiguous, ask — do not assume local:
    moved during a long session.
 6. **Gate state file goes on the working branch,** not in `.gitignore`
    (Section 2).
+7. **Executing git here does not extend to tag pushes.** Container credentials
+   are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
+   that fires the release workflow. Present the tag block to the user even
+   though everything else runs here — Section 5.7, "Tag pushes are the one
+   exception.
 
 Report the detected environment in the session banner.
 
@@ -142,37 +147,91 @@ If yes:
 
 5. **Report the repo state** in the session start banner (see below).
 
-6. **CI workflow detection.** Check `.github/workflows/` for:
-   - A **release workflow** — triggers on tag push (`on: push: tags:`) and
-     creates a GitHub release with artifacts
-   - A **build check workflow** — triggers on pull requests and compiles
-     the project
+6. **Workflow detection — two workflows, and both are needed.** A project has a
+   *local development workflow* and a *CI workflow*. They are not substitutes
+   for one another, and different gates depend on each. Detect both, and report
+   both in the banner.
 
-   Report what's found in the session banner (see template below).
+   **The local development workflow** — what a developer runs on their own
+   machine to build, test, and lint before anything is pushed. Look for:
+   `scripts/`, `Makefile` / `justfile` / `Taskfile.yml`, `package.json`
+   `"scripts"`, `tox.ini`, `noxfile.py`, `gradlew`, `Cargo.toml`, `.csproj` /
+   `.sln`, a `docker compose` dev stack, or build instructions in
+   `CONTRIBUTING.md` / `README.md`.
 
-   **If the project is buildable (Gate 2 is not N/A) but has no release
-   workflow**, suggest creating one:
+   **Gate 2 (BUILD) runs this one.** It is the only thing that turns "the code
+   should work" into "the code was run." A project with no local dev workflow
+   has nothing for Gate 2 to execute.
 
-   > 💡 **No CI release workflow detected.** This project has a build step
-   > but no automated release pipeline. A release workflow would let CI
-   > build signed artifacts and publish GitHub releases automatically when
-   > you push a version tag — no local release build needed.
-   >
-   > Want me to create `.github/workflows/release.yml`?
+   **The CI workflow** — what runs on the server. Two distinct kinds, and a
+   project can easily have one without the other:
+   - a **build check** — triggers on push or pull request, compiles and tests
+   - a **release workflow** — triggers on tag push (`on: push: tags:`), builds
+     artifacts and publishes the release
 
-   If the user says yes, ask what the project needs:
-   - What secrets does signing require? (keystore, certificates, tokens)
+   **Gate 5's PR is validated by the build check; Gate 6 (SHIP) fires the
+   release workflow.**
+
+   Then flag whichever is missing. Each gap breaks a different gate, so name the
+   gate rather than reporting a generic absence:
+
+   | Missing | What it breaks | Surface |
+   |---|---|---|
+   | Local dev workflow | Gate 2 has no command to run — "verified working" becomes a guess | 💡 **No local build/test workflow found.** Gate 2 can only confirm this builds if there's something to run. How do you build and test this locally? |
+   | CI build check | PRs merge without ever being compiled | 💡 **No CI build check detected.** PRs are not compiled before merge. A build check catches compile errors before they land on the default branch. Want me to create one? |
+   | CI release workflow (and Gate 2 is not ➖ N/A) | Gate 6 has no publish path; release artifacts get built by hand | 💡 **No CI release workflow detected.** A release workflow would let CI build and publish artifacts when you push a version tag — no local release build needed. Want me to create `.github/workflows/release.yml`? |
+
+   **When both exist, check that they agree.** CI should invoke the project's
+   own scripts — `bash scripts/validate.sh`, `npm test`, `./gradlew test` — not
+   reimplement them inline. A CI job carrying its own hand-rolled copy of the
+   build is testing something the developer never runs locally, and the two
+   drift apart silently until a release breaks. Flag the divergence:
+
+   > ⚠️ **CI and local dev have drifted.** `validate.yml` runs its checks
+   > inline, but `scripts/validate.sh` is what a developer runs. They can pass
+   > and fail independently. CI should call the script.
+
+   If the user asks for a workflow to be created, ask what the project needs:
+   - Which platform does it target? (Linux / Windows / Android — see Gate 6)
    - What's the build command for a release artifact?
    - What should the artifact be named?
+   - What secrets does signing require? (keystore, certificate, GPG key, tokens)
 
-   Then generate the workflow. Do not assume a template — build it from the
-   project's actual build tooling.
+   Then generate it from the project's actual build tooling. Do not paste a
+   template — a workflow that does not run the project's real build is worse
+   than none, because it goes green without proving anything.
 
-   **If a release workflow exists but no build check workflow**, mention it:
+7. **Unfinished release check — did the last release actually ship?** Gate 6 has
+   four parts (merge, tag, publish, verify) and a session can die between any two
+   of them: a container reclaimed, a usage limit, or a tag push denied `403`
+   (Section 5.7). When that happens the work is stranded on the default branch
+   and **nothing in a later session goes looking for it** — the next session
+   starts with all gates ⬜ pending *for the version it is about to build*, and
+   never asks about the one before.
 
-   > 💡 **No CI build check detected.** PRs are not compiled before merge.
-   > A build check workflow catches compile errors before they land on the
-   > default branch. Want me to create one?
+   Section 8's session-end check only covers the current version, and only if the
+   session gets a chance to wind down. A container that is simply reclaimed never
+   winds down. So the check belongs here, at start, where it always runs.
+
+   Compare released versions against tags on the remote:
+
+   ```
+   git ls-remote --tags origin | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V
+   git log --oneline -- VERSION        # or the project's version file
+   ```
+
+   Every version with a changelog entry and no tag is an unfinished Gate 6:
+
+   > ⚠️ **Unfinished release detected.** v1.2.2 and v1.2.3 are in `CHANGELOG.md`
+   > and on the default branch, but neither is tagged on the remote — Gate 6
+   > never completed for them, so no release was published.
+   >
+   > Want me to finish them (tag their merge commits, let CI publish) before we
+   > start new work?
+
+   Report it in the banner and let the user decide. Do not silently continue: a
+   gap here means the *next* release is about to be stacked on an unpublished
+   one, and Gate 1 will hard-block on it anyway.
 
 **Write the gate state file.** Create `.claude/dev-skills-gates.md` with all six
 gates ⬜ pending (format in Section 2). On local sessions add it to `.gitignore`;
@@ -182,12 +241,14 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.14.0 active.
+Dev Skills v2.15.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
 Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced>
-CI release: <✅ workflow name / ❌ not detected>
+CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
+Local dev: <✅ build/test command / ❌ not found>
+Releases: <✅ all versions tagged / ⚠️ N unfinished: vX.Y.Z, ...>
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -204,6 +265,8 @@ All work on branches — merge to default branch via PR only.
 frontmatter. If they differ, the skill was not repackaged after a version bump —
 surface this to the user.
 
+**Release notes for this version:**
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -266,16 +329,33 @@ No build starts until versioning is resolved.
    the URL must match the version being built. If the app already shows a repo
    link but has no release notes link, add one before passing this gate.
 
-7. **Previous version tags must exist.** Run `git tag -l` and verify that prior
-   released versions have corresponding git tags. If the previous version (the one
-   being bumped from) has no tag, flag it:
+7. **Previous version tags must exist.** Run `git ls-remote --tags origin` —
+   **not `git tag -l`**, which reads local tags and returns empty in any fresh
+   clone (SKILL.md Section 2). Compare the tags against the versions in
+   `CHANGELOG.md` / the version history.
 
-   > ⚠️ **Missing tag for previous version:** v1.2.2 was released but has no git tag.
-   > This should be fixed (retroactively tag the merge commit) before or alongside
-   > this release.
+   **A missing tag for the immediately preceding version is a hard block.** It
+   does not mean "someone forgot to tag" — it means the last release never
+   finished Gate 6, so the default branch carries a version that was never
+   published. Bumping on top of it buries the gap one version deeper, which is
+   exactly how two and three versions go missing in a row:
 
-   Missing tags for older versions should be noted but don't hard-block — fix them
-   if the merge commits are identifiable, flag them otherwise.
+   > 🚫 **VERSION GATE BLOCKED — the previous release never shipped.**
+   > v1.2.2 is in the changelog and on the default branch, but has no tag on
+   > the remote. Gate 6 did not complete for it — most often a tag push that
+   > came back `403` (Section 5.7) or a session that ended between merge and
+   > tag.
+   >
+   > Finish it before bumping: tag its merge commit and let the release
+   > publish, or state explicitly that v1.2.2 is being abandoned and why.
+
+   Retroactively tagging is usually a one-liner — find the merge commit that
+   bumped `VERSION` to that release (`git log --oneline -- VERSION`) and tag it.
+   That block goes to the user like any tag push (Section 5.7).
+
+   **Older gaps are advisory,** not blocking: note them, fix them if the merge
+   commits are identifiable, flag them otherwise. The distinction is that the
+   *previous* version is the one this release is built on top of.
 
 If any check fails:
 
@@ -294,8 +374,22 @@ Update ALL version files, add missing repo links and release notes links before 
 
 ### Gate 2 — Build 🔨
 
-Run the project's build command only after Gate 1 is ✅. If the build fails,
-fix and rebuild — do not advance.
+**This gate runs the local development workflow** detected at session start
+(session start, step 6) — the project's own build and test commands, not CI.
+CI runs later and on a different machine; it cannot tell you now whether the
+code you just wrote works. Run the project's build command only after Gate 1
+is ✅. If the build fails, fix and rebuild — do not advance.
+
+If no local dev workflow was found, this gate has nothing to execute. That is
+not ➖ N/A — N/A is for projects with no build system at all, not for projects
+whose build you cannot find. Ask:
+
+> 🚫 **BUILD GATE BLOCKED — no local build/test command found.**
+> This project has a build system but I can't tell how it's run locally.
+> What do you run to build and test this on your own machine?
+
+Never substitute "CI will catch it" for running the build. CI runs after the
+commit; this gate exists to stop a broken commit from being made.
 
 **A test build is mandatory before any commit.** When building an app, create a
 test/dev version and verify it runs correctly before staging or committing anything.
@@ -528,26 +622,87 @@ If not, follow the **manual path**.
 
 #### CI-driven path
 
-When a CI release workflow exists:
+When a CI release workflow exists.
 
-1. **Verify secrets are configured.** The workflow needs signing secrets
-   (e.g. `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD` for Android).
-   Check with: `gh secret list`. If secrets are missing:
+**The git flow is identical on every platform.** Linux, Windows, and Android
+differ in what CI *builds*; they do not differ in the sequence of git operations
+that gets there:
+
+```
+merge the PR → checkout the default branch → pull
+             → tag → push the tag → CI builds and publishes → verify
+```
+
+Do not invent a platform-specific git flow. If a project's release seems to need
+something other than "push a tag, let CI publish," that is a CI design problem
+to fix, not a git flow to work around by hand.
+
+**What actually differs per platform:**
+
+| | Linux | Windows | Android |
+|---|---|---|---|
+| Runner | `ubuntu-latest` | `windows-latest` | `ubuntu-latest` |
+| Release build | `make release`, `cargo build --release`, `go build -ldflags="-s -w"`, `pyinstaller` | `dotnet publish -c Release`, `msbuild /p:Configuration=Release`, `pyinstaller` | `./gradlew assembleRelease` (APK) or `bundleRelease` (AAB) |
+| Artifact | tarball, `.deb` / `.rpm`, AppImage, bare binary | `.exe`, `.msi`, `.zip` | `.apk` / `.aab` |
+| Signing secrets | GPG detached signature, optional (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`) | Authenticode (`SIGNING_CERT_BASE64`, `CERT_PASSWORD`) | release keystore (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD`) |
+| Job shell | `bash` (default) | set `shell: bash` explicitly, or write real PowerShell — never assume | `bash` |
+| Ship failure | artifact missing, or a debug/unstripped build shipped as the release | unsigned, or signed with a self-signed test certificate | debug-signed, unsigned, or `debug` in the filename |
+
+Two cross-platform traps worth naming, because each produces a release that
+looks fine and is not:
+
+- **Line endings.** Without `.gitattributes` normalizing them, a Windows runner
+  can check out CRLF shell scripts that then die with `bad interpreter`. Fix it
+  in the repo, not with a `dos2unix` step in the job.
+- **Case sensitivity.** Linux runners are case-sensitive; Windows runners are
+  not. A wrong-case path works on the developer's Windows machine and fails only
+  in CI, and only on the Linux job.
+
+**Steps:**
+
+1. **Verify secrets are configured** for the target platform (table above).
+   Check with `gh secret list`, or GitHub MCP where `gh` is absent. If secrets
+   are missing:
 
    > 🚫 **SHIP GATE BLOCKED — CI signing secrets not configured.**
    > The release workflow needs these repository secrets: [list missing].
    > Add them at: `https://github.com/<owner>/<repo>/settings/secrets/actions`
 
-2. **Merge the PR** (per Section 5.7 command formatting):
+   A workflow that builds unsigned artifacts because a secret is absent usually
+   still goes green. Check the secrets, not just the run.
+
+2. **Merge the PR** (per Section 5.7 — Claude executes this in a remote
+   container, presents it locally):
    ```
    gh pr merge <number> --merge --delete-branch
    git checkout main && git pull origin main
    ```
 
-3. **Tag and push — CI does the rest:**
+3. **Tag and push — the user runs this block.** Tag pushes are denied (`403`)
+   to Claude's credentials far more often than they succeed, and this is the
+   push that starts the release build (Section 5.7, "Tag pushes are the one
+   exception"). Present it, in one block, with the sync in front so the tag
+   lands on the merged commit:
+
    ```
+   cd <project-dir>
+   git checkout main
+   git pull origin main
    git tag v1.2.3
    git push origin v1.2.3
+   ```
+
+   > 📌 **Pushing that tag is what starts the release build.** Run the block
+   > above and tell me when it's done — I'll watch the workflow from here.
+
+   No local clone (web or mobile session)? Offer the UI instead: **Releases →
+   Draft a new release → Choose a tag → create it on the default branch.** Same
+   ref, same trigger.
+
+   🚀 SHIP stays ⏳ until the tag is confirmed on the remote. Confirm it
+   yourself — reading refs is not a write and is not restricted:
+   ```
+   git ls-remote --tags origin v1.2.3
    ```
 
 4. **Wait for CI to complete.** Monitor with:
@@ -555,9 +710,10 @@ When a CI release workflow exists:
    gh run list --limit 3
    gh run watch <run-id>
    ```
+   Or `actions_list` / `actions_get` / `get_job_logs` via GitHub MCP.
 
-5. **Add release notes.** CI creates the release with the artifact attached
-   but no notes. Add them:
+5. **Add release notes.** CI typically creates the release with the artifact
+   attached but no notes. Add them:
    ```
    gh release edit v1.2.3 --notes "..."
    ```
@@ -568,19 +724,27 @@ When a CI release workflow exists:
    - **Tag on remote:** `git ls-remote --tags origin v1.2.3`
    - **Release exists:** `gh release view v1.2.3`
    - **PR merged:** state is "merged"
-   - **Assets match:** CI-built artifact attached with correct name and
-     reasonable size. **For Android:** verify the APK name contains the
-     version and does NOT contain "debug".
+   - **Assets match:** CI-built artifact attached with the right name and a
+     plausible size, checked against the platform row above. **Linux:** the
+     release build, not a debug or unstripped one. **Windows:** signed with a
+     real certificate, not unsigned or self-signed. **Android:** the filename
+     contains the version and does NOT contain `debug`.
 
    If CI failed:
    > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
    > Check logs: `gh run view <run-id> --log-failed`
-   > Fix the issue, delete the tag, and re-tag after fixing:
+   > Fix the issue, then delete and re-push the tag. **Deleting and re-pushing
+   > a tag are tag writes — they go to the user in one block, same as the
+   > original push:**
    > ```
+   > cd <project-dir>
    > git tag -d v1.2.3
    > git push origin :refs/tags/v1.2.3
+   > # after the fix is merged to the default branch:
+   > git checkout main && git pull origin main
+   > git tag v1.2.3
+   > git push origin v1.2.3
    > ```
-   > Then re-tag and push once the fix is on the default branch.
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
@@ -627,13 +791,32 @@ to missing assets are also a ship failure.
 4. Attach as release asset — an Android release without an APK is a ship failure
 5. Verify the APK appears in release assets with correct name and reasonable size
 
-**Execution — present commands per Section 5.7:**
+**Platform expectations.** The Linux / Windows / Android table in the CI-driven
+path above applies here too — it describes what a correct release artifact looks
+like, not how CI happens to produce it. Check the artifact against its platform
+row before publishing.
 
+**Execution — present commands per Section 5.7.** The tag push goes to the user
+even when Claude is executing the rest (Section 5.7, "Tag pushes are the one
+exception"), so this splits into two blocks:
+
+Claude runs (or presents, on a local session):
 ```
 gh pr merge <number> --merge --delete-branch
 git checkout main && git pull origin main
+```
+
+The user runs — stop here until they confirm the tag is on the remote:
+```
+cd <project-dir>
+git checkout main
+git pull origin main
 git tag v1.2.3
 git push origin v1.2.3
+```
+
+Then, once `git ls-remote --tags origin v1.2.3` shows the tag:
+```
 gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 ```
 

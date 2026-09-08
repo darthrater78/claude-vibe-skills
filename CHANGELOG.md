@@ -4,6 +4,111 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.15.0] — 2026-09-08
+
+### Added
+- **Local development workflow detection.** Session start (step 6) now detects
+  two distinct workflows instead of one, because different gates depend on
+  each. The **local dev workflow** — `scripts/`, `Makefile`, `package.json`
+  scripts, `gradlew`, `tox.ini`, `CONTRIBUTING.md` build instructions — is what
+  **Gate 2 (BUILD)** runs; it is the only thing that turns "the code should
+  work" into "the code was run." The **CI workflow** splits into a build check
+  (validates Gate 5's PR) and a release workflow (fired by Gate 6). Each missing
+  piece is now surfaced against the gate it breaks, rather than reported as a
+  generic absence
+- **Drift check between the two.** When a project has both, CI is expected to
+  invoke the project's own scripts rather than reimplement the build inline. A
+  CI job carrying a hand-rolled copy of the build tests something the developer
+  never runs locally, and the two diverge silently until a release breaks
+- **A standard CI git flow, with a platform table for Linux, Windows, and
+  Android.** Gate 6's CI-driven path previously documented Android signing as
+  though it were the general case. The git sequence — merge, checkout, pull,
+  tag, push, verify — is now stated as identical on every platform, with a table
+  covering what actually differs: runner, release build command, artifact type,
+  signing secrets, job shell, and the platform-specific ship failure (debug or
+  unstripped on Linux, unsigned or self-signed on Windows, debug-signed on
+  Android). Adds the two cross-platform traps that produce a release that looks
+  fine and is not — CRLF line endings on Windows runners, and case sensitivity
+  differing between Linux and Windows runners
+
+### Fixed
+- **`git tag -l` was the wrong command, and it was reading tag state in three
+  places.** It lists *local* tags, and a fresh clone — every remote container,
+  and any `--no-tags` or shallow checkout — has none, so it returns empty on a
+  repo with a hundred tags. Gate 1's previous-version check, Section 2's
+  re-derivation table, and Section 8's session-end check all used it, which made
+  each of them report every prior version as untagged. A check that fires on
+  everything is a check nobody reads, and a genuine missing tag hides in that
+  noise. All tag reads now use `git ls-remote --tags origin`, which Gate 6's
+  post-ship verification was already using — the detection paths were the
+  inconsistent ones. Reading refs is not a write, so this is safe even where tag
+  pushes are denied
+- **A missing tag for the immediately preceding version now hard-blocks Gate 1.**
+  Previously it was advisory ("note but don't hard-block"), so a release that
+  never finished Gate 6 could be bumped straight over. That is how this repo
+  shipped v2.12.0 and v2.13.0 with no tag and no GitHub release: each one was
+  buried a version deeper by the next bump. A gap at the immediately preceding
+  version means the default branch carries a version that was never published,
+  and the blocked message names the two usual causes — a `403` on the tag push,
+  or a session that ended between merge and tag. Older gaps stay advisory
+- **Unfinished releases are now detected at session start** (`GATE_REFERENCE.md`
+  step 7). Gate 6 has four parts — merge, tag, publish, verify — and a session
+  can die between any two of them. The work is then stranded on the default
+  branch, and **nothing in a later session went looking for it**: the next
+  session starts with all gates ⬜ pending for the version it is about to build
+  and never asks about the one before. Section 8's session-end check was the
+  only backstop, and it only fires if the session gets to wind down — a
+  reclaimed container, a usage limit, or a crash skips it entirely, which is
+  exactly when a release is most likely to be half-finished. Session start
+  compares released versions against remote tags and surfaces any that never
+  shipped, before new work begins. Reported on the banner as a `Releases:` line
+
+### Security
+- **`release.yml` now verifies the tag is on the default branch before
+  publishing.** `on: push: tags: 'v*'` fires for a tag on *any* commit, so a tag
+  placed on an unreviewed branch would have published a real release from
+  unreviewed code. The job now resolves the repo's default branch and fails
+  unless the tagged commit is an ancestor of it. Verified both ways before
+  shipping: it accepts the `master` tip and rejects a commit that exists only on
+  an unmerged branch
+- **`actions/checkout` pinned to a commit SHA** (`11d5960` = v4.4.0) in both
+  workflows. A version tag is mutable and can be repointed at different code;
+  a SHA cannot
+- **`persist-credentials: false`** on both checkouts. Neither job pushes with
+  git — the release job publishes with `GH_TOKEN` — so the credential had no
+  reason to sit in `.git/config` while `scripts/validate.sh` runs
+- Both workflows gain `concurrency` groups and `timeout-minutes`: the release
+  group never cancels in flight (two tag pushes must not race for one release),
+  while validate supersedes its own in-flight runs, since only the newest push's
+  result matters
+
+### Changed
+- **Tag pushes are always handed to the user, in every environment.** The
+  credentials Claude runs under are routinely denied on tag refs: a token that
+  pushes branch commits all session gets `403` on `git push origin v1.2.3`,
+  because creating a `refs/tags/*` ref — and creating a ref that triggers a
+  workflow — is a separate permission, commonly withheld even where
+  `contents: write` is granted. The blast radius is worse than an ordinary
+  denial, since the tag push is what fires the release workflow: a 403 there
+  strands a merged, version-bumped default branch with no release behind it.
+  This is now a carve-out from §5.7's remote-container rule (where Claude
+  otherwise executes git directly), covering tag creation, deletion, and
+  re-push. 🚀 SHIP stays ⏳ until the tag is confirmed on the remote with
+  `git ls-remote` — never ✅ on the assumption the user ran the block. Gate 6
+  carries the block's shape, the sync that must precede the tag so it lands on
+  the merged commit, and a GitHub UI fallback for users with no local clone
+- **Gate 2 can no longer be satisfied by CI.** "CI will catch it" is explicitly
+  rejected: CI runs after the commit this gate exists to protect. A project with
+  a build system but no discoverable local build command now blocks the gate and
+  asks, rather than passing on ➖ N/A — N/A is for projects with no build system,
+  not for builds you could not find
+- Gate 6's manual path splits its command block in two, so the tag push is the
+  user's regardless of which ship path the project is on, and points at the
+  platform table for what a correct artifact looks like
+- Gate 1's release-notes link requirement is now met by the skill itself — the
+  session-start block shows the versioned
+  `releases/tag/v<VERSION>` URL alongside the releases index
+
 ## [2.14.0] — 2026-09-07
 
 ### Changed
