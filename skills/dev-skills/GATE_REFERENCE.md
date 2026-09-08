@@ -74,9 +74,26 @@ If the signals are ambiguous, ask — do not assume local:
 
    If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
    rather than discovering it mid-ship.
-4. **Skip step 2 (shell detection).** The shell is the container's own bash. The
-   `cd` table in `SHELL_REFERENCE.md` describes user-desktop paths that do not
-   apply here.
+4. **Skip step 2 (shell detection) at session start — but not forever.** Every
+   git command Claude runs here uses the container's own bash, so there is
+   nothing to ask about up front. The tag-push carve-out changes that at exactly
+   one moment: a remote session that reaches Gate 6 *always* hands the user a
+   block to run on their own machine (Section 5.7), and that block needs their
+   shell's `cd` syntax and a real path.
+
+   So ask the shell question **when a tag block is about to be presented**, not
+   at session start — a session that never releases never needs it:
+
+   > Before I hand you the tag commands — **which shell will you run them in?**
+   > 1. Windows PowerShell  2. Linux PowerShell (pwsh)  3. Git Bash (Windows)
+   > 4. Termux (Android)  5. macOS Terminal  6. Linux Terminal  7. WSL
+   >
+   > And the path to your clone, so the block starts in the right directory.
+
+   Then format per `SHELL_REFERENCE.md` and store both for the rest of the
+   session. Presenting `cd <your-repo-path>` as a placeholder is a defect, not a
+   neutral default: it is the one line the user cannot copy as given, in the one
+   block they must run by hand.
 5. **Step 3 (sync offer) is usually unnecessary** — the clone is fresh as of
    session start. Still run `git fetch origin` before Gate 5 in case the branch
    moved during a long session.
@@ -107,9 +124,11 @@ If yes:
    Store the answer, and include `git remote add origin <url>` in the first
    command block presented to the user.
 
-2. **Shell environment detection.** *Local and Termux sessions only — skip this
-   on remote containers (step 0).* Ask the user which shell they work in — this
-   determines how all git commands are formatted for the rest of the session:
+2. **Shell environment detection.** *Local and Termux sessions ask this now.
+   Remote containers defer it until a tag block is due (step 0, item 4) — they
+   do need it eventually, just not yet.* Ask the user which shell they work in —
+   this determines how all git commands are formatted for the rest of the
+   session:
 
    > **Which shell will you be running these commands in?**
    > 1. Windows PowerShell
@@ -241,7 +260,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.15.0 active.
+Dev Skills v2.15.1 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -266,7 +285,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.1
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -683,6 +702,10 @@ looks fine and is not:
    push that starts the release build (Section 5.7, "Tag pushes are the one
    exception"). Present it, in one block, with the sync in front so the tag
    lands on the merged commit:
+
+   **If the shell and clone path are not known yet — every remote session, by
+   design (step 0, item 4) — ask for them before writing this block.** A `cd`
+   the user has to edit is a broken first line.
 
    ```
    cd <project-dir>

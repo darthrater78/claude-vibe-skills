@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.15.0
+version: 2.15.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -615,7 +615,9 @@ fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
 above the block.
 
 **Shell environment detection** is done at session start (`GATE_REFERENCE.md`, session start, step 2) for
-local and Termux sessions; remote containers skip it. If a session reaches this
+local and Termux sessions. Remote containers defer it rather than skip it: they
+present exactly one block all session — the tag push — so they ask for the shell
+and clone path at that moment (`GATE_REFERENCE.md`, step 0, item 4). If a session reaches this
 point needing a presented block without a detected shell (e.g. the skill loaded
 mid-session), ask before presenting any commands.
 
