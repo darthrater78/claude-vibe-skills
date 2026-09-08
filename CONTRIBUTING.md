@@ -21,11 +21,26 @@ This project follows the same 6-gate workflow the skill enforces. See the [READM
 
 ## Validation
 
-Run the version consistency check before submitting:
+Rebuild the packaged skill after changing anything under `skills/dev-skills/`,
+then run the checks:
 
 ```bash
+bash scripts/build-skill.sh
 bash scripts/validate.sh
 ```
+
+`validate.sh` checks version consistency across every file, the README size
+table, and the bundle against its source — so a stale `dev-skills.skill` fails
+validation even when every source file is correct.
+
+**On Git Bash (Windows), `validate.sh` may stall partway through and never
+return.** It spawns a few hundred subprocesses across its per-file loops, and
+Git Bash emulates `fork()` rather than calling it. This is not a failure — the
+stall has no exit code, moves position between runs, and every command it
+stops at runs fine on its own. Run the script's sections as separate
+invocations (its `echo` headers mark the boundaries), or run it under WSL,
+which is also what CI uses. See "Git Bash stalls on spawn-heavy scripts" in
+`skills/dev-skills/SHELL_REFERENCE.md`.
 
 ## Pull requests
 
