@@ -68,11 +68,11 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~39KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
-| `GATE_REFERENCE.md` | ~41KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
-| `SECURITY_REFERENCE.md` | ~22KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
+| `SKILL.md` | ~36KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `GATE_REFERENCE.md` | ~42KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
-| `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
+| `SHELL_REFERENCE.md` | ~12KB | Section 5.7 — before writing any command block: `cd` formats, the tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
 
 The repo also ships `hooks/gate-preflight.sh`, an optional enforcement hook — it is not part of the skill bundle and is installed separately (see below).
 
@@ -172,7 +172,7 @@ Mandatory after every build. Loads both reference files and scans all source cod
 **Security:**
 - Hardcoded secrets, SQL injection, command injection, disabled TLS
 - Path traversal, missing auth, weak crypto, unsafe deserialization
-- Platform-specific: PowerShell injection, UNC path attacks, DLL hijacking (Windows); SUID misuse, container security, symlink races, systemd hardening (Linux); exported components, WebView RCE, Intent spoofing, insecure storage (Android)
+- Platform-specific: UAC elevation, PowerShell injection, UNC path attacks, DLL hijacking, registry ACLs, unquoted service paths, code signing (Windows); SUID misuse, container security, symlink races, systemd hardening (Linux); exported components, WebView RCE, Intent spoofing, insecure storage (Android)
 - Dependency auditing: typosquatting, unpinned versions, known CVEs
 
 **Code quality:**
@@ -247,6 +247,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.15.2`
+`v2.16.0`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.

@@ -4,6 +4,110 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.16.0] — 2026-09-08
+
+### Added
+- **Windows security coverage brought to parity with Linux and Android.** A
+  prior Gate 3 pass on a Windows desktop app checked a URL-opening call for
+  injection, found none, and marked it safe — missing that the app's
+  `requireAdministrator` manifest meant the browser it launched came up
+  elevated. The pass was faithful to the reference; the reference had no
+  Windows privilege section to check against. The gap was wider than that one
+  rule: `SECURITY_REFERENCE.md` advertised eight Windows checks in its
+  flag-on-sight list but carried worked examples for only three (PowerShell
+  injection, UNC paths, credential storage), so the other five were checks in
+  name only — Gate 3 loads that file to pattern-match against. Six new
+  sections, each with the bad/good pair the rest of the file uses:
+  - **Windows — UAC and process elevation.** `requireAdministrator` hands the
+    admin token to *every* process the app launches, so an ordinary "open this
+    link" call opens an elevated browser. Covers the `asInvoker` default, the
+    `explorer.exe` re-launch that drops back to the shell's integrity level,
+    validating the scheme before handing anything to `explorer.exe` (it will
+    run a file path or an `.exe` just as readily), and elevating a single
+    helper with `Verb = "runas"` instead of the whole app
+  - **Windows — DLL search-order hijacking.** `SetDllDirectory("")` plus
+    absolute loads; `DefaultDllImportSearchPaths` for P/Invoke
+  - **Windows — registry security.** `HKLM` keys with default ACLs as a
+    code-execution path into an elevated process, and validating values read
+    back before acting on them
+  - **Windows — service configuration.** The unquoted `binPath=` privilege
+    escalation, and virtual accounts over `LocalSystem`
+  - **Windows — code signing and execution policy.** Signing with a timestamp
+    rather than reaching for `Set-ExecutionPolicy Bypass`, and verifying a
+    signature before shipping
+  - **Windows — reserved names and path limits.** Device names with or without
+    an extension, trailing dots and spaces stripped by Win32, case-insensitive
+    path comparison
+- **New flag-on-sight rule: elevation.** The Windows rule list in
+  `SECURITY_REFERENCE.md` had no entry for the app manifest at all. It now
+  leads with one, so the check fires as code is written and not only when
+  Gate 3 runs. The services rule also gained the `binPath=` quoting
+  requirement
+- `SKILL.md` §4.2 now names UAC elevation in the Windows category list, which
+  previously ran PowerShell → UNC → DLL → registry → services → signing →
+  reserved names with the privilege model missing from the middle
+- **`scripts/build-skill.sh`.** `validate.sh` compares the `.skill` bundle
+  against its source, but nothing in the repo rebuilt that bundle and
+  `CONTRIBUTING.md` never mentioned it — so a contributor who followed the
+  documented workflow could not get a green run no matter how correct their
+  changes were. The script rebuilds the bundle deterministically with LF entries
+  at the archive root, and CONTRIBUTING now names it as step one of validation
+- **Git Bash spawn stalls are now a documented, non-blocking condition.**
+  `SHELL_REFERENCE.md` gains "Git Bash stalls on spawn-heavy scripts". Git Bash
+  emulates `fork()` rather than calling it, and `validate.sh` spawns a few
+  hundred subprocesses across its per-file loops — enough that the script
+  stalls partway through, with no error and no exit, at a position that moves
+  between runs. Every command it stalls on runs fine individually, so the
+  natural readings are both wrong: it is not a defect in the script, and a
+  partial run is not a pass. The section gives the recognition shape (partial
+  output, `137`/`124` on kill, non-reproducible position), prescribes running
+  the script in split invocations under `timeout`, and requires that the split
+  cover every section and be recorded as split in the gate state file. It also
+  closes the tempting exit: deferring the check to CI converts a pre-commit
+  gate into a post-commit report, which is precisely what Gate 2 exists to
+  prevent. WSL is offered as the durable fix, not as a precondition — a split
+  run is a complete local verification on its own
+- `GATE_REFERENCE.md` Gate 2 now points at that section, so the guidance is
+  found from where the stall actually happens rather than only by someone
+  already reading the shell reference
+
+### Changed
+- **§5.7 moved out of the every-turn path.** `SKILL.md` is resent on every
+  request, and §5.7 "Git command presentation" had grown to 6.6KB — the largest
+  subsection in the file, and larger than the six gates it supports. Almost all
+  of it (the 403 rationale, the one-block rule, the `cd` rule, the never-bare-
+  `git push` rule, remote verification) is only needed at the moment a command
+  block is written, which is exactly when `SHELL_REFERENCE.md` is loaded
+  anyway. What stays in `SKILL.md` is the routing decision, the tag and
+  ref-deletion carve-out, and the rule that 🚀 SHIP is not ✅ until the tag is
+  confirmed on the remote. `SKILL.md` drops 40KB → 36KB, about 1k tokens off
+  every request; `SHELL_REFERENCE.md` grows 5KB → 9KB on demand. No rule was
+  removed
+- `GATE_REFERENCE.md` step 0 quoted §5.7 by its pre-2.15.2 name ("Tag pushes
+  are the one exception") with an unclosed quotation mark. Now quotes the
+  current heading
+
+### Fixed
+- **A CRLF checkout broke both the build check and the pre-flight hook.** The
+  repo had no `.gitattributes`, so `core.autocrlf=true` gave every Windows
+  clone a CRLF working tree. Two things broke, and both failed in ways that
+  pointed somewhere else:
+  - `scripts/validate.sh` compares the `.skill` bundle (always LF) against
+    the working tree byte for byte. On Windows all five files reported
+    "differs — rebuild the bundle" no matter how freshly the bundle had been
+    built, so Gate 2 was unrunnable on the platform most likely to be editing
+    the skill, and every green run this repo has had came from a Linux container
+  - `hooks/gate-preflight.sh` is invoked directly by `settings.example.json`,
+    so a CRLF shebang makes it die with `bad interpreter`. The repo shipped a
+    gate-enforcement hook that silently failed to load on Windows
+
+  `GATE_REFERENCE.md` Gate 6 already prescribes the fix for other projects —
+  "fix it in the repo, not with a `dos2unix` step" — so the repo now follows
+  its own rule with `* text=auto eol=lf`. `validate.sh` keeps its strict
+  byte-exact comparison and gains a second pass on the failure path only, to
+  say "this is a CRLF checkout" instead of misreporting a current bundle as
+  stale
+
 ## [2.15.2] — 2026-09-08
 
 ### Fixed
