@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.16.1] — 2026-09-08
+
+### Fixed
+- **Three cost-discipline behaviors were unreachable and had never fired once.**
+  Sections 5.5, 5.6 and 5.8 were each written as an *offer* gated on a condition
+  the model could not observe, so in practice none of them ever ran. Reported by
+  a user who had never seen any of the three.
+  - **§5.5 phase transitions** triggered on "when work shifts phase" — a pure
+    judgment call, which loses every time to the system prompt's bias toward
+    continuing without stopping. Replaced with three observable events: a
+    release sequence reaching ✅/➖ across all six gates, the user opening work
+    unrelated to the current tracker with no release in flight, or the
+    conversation having been compacted. The offer is now a one-line statement of
+    the observation and its reason, not an open question that is easy to drop.
+  - **§5.6 token estimate** triggered on "when a task wraps up" and then handed
+    back an escape hatch — *"Skip for trivial exchanges."* Re-anchored to the
+    session-end checkpoint (§8), which already has a firm trigger, and added
+    there as step 6. The only skip condition is now the one §1 already uses for
+    gates: the session modified no tracked file. "This felt like a small task"
+    is explicitly not a skip condition.
+  - **§5.8 usage-limit handoff** watched for a context budget below ~2M. On
+    Claude Code for web that figure starts at 15M every session and effectively
+    never falls, so the check was structurally dead. Re-anchored to signals that
+    do occur: an explicit system notice about overage or rate limits, the user
+    saying they are low, or a compacted conversation. A visible low number still
+    counts, but its absence is no longer a reason to stay silent.
+- **The session banner's release-notes link pointed at the previous version.**
+  `GATE_REFERENCE.md` hardcoded the v2.16.0 release URL, which Gate 1 requires to
+  track the current version.
+
+### Changed
+- **The handoff format is defined once.** §5.5 and §5.8 carried near-identical
+  copies; §5.8's was the better of the two (it included gate status and shell
+  environment). The richer version is now canonical in §5.5 and referenced from
+  §5.8.
+- **README restructured for readability.** Added a table of contents and a
+  "What's new" section; moved "The six gates" from position 10 to position 5,
+  ahead of the enforcement mechanics that depend on it; split "Two tracks" into
+  its own section; added a worked example of a shortcut interception and a gate
+  state file; folded deep rationale into three `<details>` blocks; moved release
+  CI internals into a "For maintainers" section. No behavioral claims changed
+  except the cost-discipline corrections above.
+
 ## [2.16.0] — 2026-09-08
 
 ### Added

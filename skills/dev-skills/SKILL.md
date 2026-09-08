@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.16.0
+version: 2.16.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -520,31 +520,59 @@ Estimated overhead: ~12k/turn, down from ~40k/turn
 
 ### 5.5 Phase transitions → fresh session
 
-When work shifts phase (exploration → implementation, implementation → testing,
-task complete → new task), offer a handoff summary:
+A long session resends its entire history on every request, so a fresh start is
+often the largest saving available. Offer a handoff at any of these points.
+**Each is an observable event, not a judgment call** — "work shifted phase" was
+the old trigger, and a model biased toward continuing never once decided that it
+had:
 
-> "Good point to start a fresh session — this one's carrying [N] messages of
-> exploration history. Want a handoff summary to paste into a new session?"
+1. **A release sequence finished.** The tracker reads ✅ or ➖ N/A across all six
+   gates. The work shipped; nothing in the history is load-bearing any more.
+2. **The user opens work unrelated to the current tracker** — a different
+   feature, a different area of the repo — while no release is mid-flight.
+3. **The conversation was compacted.** History is now both expensive enough to
+   matter and lossy enough that a written handoff beats scrolling it.
 
-If yes, produce:
+State the observation and the reason in one line. Do not phrase it as an
+open-ended question, which is easy to drop:
+
+> This session is carrying [N] turns and the release is done — a fresh one would
+> be cheaper. Want a handoff summary?
+
+**Handoff format** (also used by Section 5.8):
 
 ```
 ## Handoff: [task name]
 **Goal:** one sentence
 **Current state:** what's done, what's verified
+**Gate status:** the tracker, with current state
 **Key files:** path:line — why it matters
 **Decisions made:** constraints the next session must respect
+**Shell environment:** [user's shell from session start, step 2]
 **Next step:** the single concrete next action
 ```
 
 Keep it under ~30 lines. The point is to replace a long history with a cheap
-restart.
+restart. Include the gate tracker so the next session knows where to resume, and
+the shell environment so it doesn't have to re-ask.
 
-### 5.6 End-of-task token impact estimate
+### 5.6 Token impact estimate
 
-When a task wraps up (or the user asks "how did we do?"), surface a rough
-order-of-magnitude estimate. You can't see billing data, so be clear it's
-approximate. Build it from what you can observe:
+**Two triggers, both firm:**
+
+1. **The session-end checkpoint** (Section 8). Include the estimate every time
+   that checkpoint runs — it already has a reliable trigger, this section did
+   not.
+2. **On request** — "how did we do?", "what did that cost?".
+
+**The only skip condition is the one Section 1 already uses for gates: the
+session modified no tracked file.** An exploratory or advisory session has no
+token story worth telling. "This felt like a small task" is *not* a skip
+condition — that judgment call is precisely what kept this section from ever
+firing.
+
+You can't see billing data, so be clear it's approximate. Build it from what you
+can observe:
 
 - **Per-request overhead**: MCP tool definitions, skills, rules on every request
 - **Conversation growth**: each turn resends the whole history
@@ -561,8 +589,7 @@ Token impact (rough estimate):
 Biggest win next time: disable unused connectors
 ```
 
-Skip for trivial exchanges. Never let the report become longer than the savings
-it describes.
+Never let the report become longer than the savings it describes.
 
 ### 5.7 Git command presentation
 
@@ -612,39 +639,26 @@ restricted.
 above the block.
 ### 5.8 Usage limit handoff
 
-**When the system prompt shows the account is nearing its usage cap** (e.g.
-`<total_tokens>` is low, the system mentions overage or rate limits, or the
-user says they're running low on usage), proactively offer a handoff summary
-before the session is forced to end:
+**Trigger on any of these. All three are things you can actually observe:**
 
-> ⚠️ **Heads up — this account looks close to its usage limit.** If the session
-> cuts off mid-task, you'll lose the working context. Want me to produce a
-> handoff summary now so you can pick up in a fresh session (or on a different
-> plan tier) without losing progress?
+- The system prompt or a system message mentions overage, rate limits, or a
+  usage cap being approached
+- The user says they are running low, near a limit, or about to be cut off
+- The conversation has been compacted (also a Section 5.5 trigger)
 
-If yes, produce the same handoff format as Section 5.5:
+**Do not gate this on a numeric token budget.** Earlier versions watched for a
+context budget below ~2M. On Claude Code for web that figure starts at 15M every
+session and effectively never falls, so the check never fired once. A visible
+number that is genuinely low still counts — but it is not the condition, and its
+absence is not a reason to stay quiet.
 
-```
-## Handoff: [task name]
-**Goal:** one sentence
-**Current state:** what's done, what's verified
-**Gate status:** show the tracker with current state
-**Key files:** path:line — why it matters
-**Decisions made:** constraints the next session must respect
-**Shell environment:** [user's shell from session start, step 2]
-**Next step:** the single concrete next action
-```
+> ⚠️ **Heads up — this session looks close to a limit.** If it cuts off mid-task
+> you lose the working context. Want a handoff summary now, so you can resume in
+> a fresh session without losing progress?
 
-Include the gate tracker state so the next session knows where to resume the
-workflow. Include the shell environment so the next session doesn't have to
-re-ask.
-
-If the user hasn't explicitly said they're low, but you observe signs (the
-system prompt's token budget is below ~2M, the session has been long, or the
-conversation was compressed), mention it once lightly:
-
-> "We've been going a while — want a handoff summary in case you want to
-> continue in a fresh session?"
+Use the handoff format in Section 5.5 — it carries the gate tracker and the
+shell environment, which is exactly what a resumed session would otherwise have
+to rediscover.
 
 Don't nag. Once offered, drop it unless the user asks.
 
@@ -716,8 +730,13 @@ Before wrapping up, check:
    to be half-finished. The check that always runs is at session *start*
    (`GATE_REFERENCE.md`, step 7).
 
-5. **If no source files were modified**, skip the gate check — the session was
-   exploratory or advisory.
+5. **If no source files were modified**, skip the gate check *and* the token
+   estimate — the session was exploratory or advisory.
+
+6. **Surface the token impact estimate** (Section 5.6). This checkpoint is that
+   section's firm trigger: if source files were modified, the estimate is part
+   of winding down, not an optional extra. Three to five lines, and never longer
+   than the savings it describes.
 
 **Remote container sessions — uncommitted work is destroyed, not just pending.**
 On a local session, uncommitted changes sit safely in the user's working tree
