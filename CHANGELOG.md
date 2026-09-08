@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.15.2] — 2026-09-08
+
+### Fixed
+- **The 403 ref-write carve-out only named tags.** Section 5.7 routed tag
+  pushes to the user because Claude's credentials are commonly denied on
+  `refs/tags/*`, but the same denial applies to deleting *any* ref — a branch
+  delete (`git push origin --delete <branch>`) gets the identical `403` from a
+  token that pushes commits and creates tags without issue. The carve-out is
+  now framed as one principle with two faces (creating a tag ref, deleting any
+  ref), not a tag-only special case, so a denied branch deletion is recognized
+  and handed to the user instead of retried or worked around
+- **The tag block asked for a shell it didn't need.** 2.15.1 fixed remote
+  sessions skipping the shell question entirely, but still asked for a 7-way
+  shell choice before presenting the tag block. Everything in that block below
+  `cd` is a plain single-line `git` command — no heredocs, no shell-specific
+  syntax — identical in all seven shells. Only the `cd` line varies, and a
+  quoted path (`cd "<clone-path>"`) parses the same way regardless of shell.
+  Remote sessions now ask only for the clone path
+- **`git branch -r` had the same staleness flaw as `git tag -l`.** 2.15.0
+  fixed ref-state reads for tags (`git ls-remote --tags origin` instead of the
+  local-only `git tag -l`), but the "detect what's already done" step still
+  read branches with `git branch -r` — cached remote-tracking refs that go
+  stale the moment someone else pushes or deletes a branch. It now reads
+  `git ls-remote --heads origin`, matching the tag-side fix
+- **Missing troubleshooting entry: `src refspec … does not match any`.** Two
+  sessions misread this git error as the credential `403` denial covered by
+  the tag-push carve-out. It's unrelated — it means `git tag v1.2.3` was never
+  run, or was run from a different directory than the one being pushed from,
+  so there's no local tag for `push` to send. `GATE_REFERENCE.md` Gate 6 now
+  calls this out explicitly, with the fix (re-run `git tag` from the clone
+  path, then push)
+- Nit: `SHELL_REFERENCE.md` cited the session-start procedure two different
+  ways (`GATE_REFERENCE.md, session start, step 0` vs. `Section 6, step 0`).
+  Unified on the first form
+
 ## [2.15.1] — 2026-09-08
 
 ### Fixed

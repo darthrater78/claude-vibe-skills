@@ -74,26 +74,30 @@ If the signals are ambiguous, ask — do not assume local:
 
    If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
    rather than discovering it mid-ship.
-4. **Skip step 2 (shell detection) at session start — but not forever.** Every
-   git command Claude runs here uses the container's own bash, so there is
-   nothing to ask about up front. The tag-push carve-out changes that at exactly
-   one moment: a remote session that reaches Gate 6 *always* hands the user a
-   block to run on their own machine (Section 5.7), and that block needs their
-   shell's `cd` syntax and a real path.
+4. **Skip step 2 (shell detection) at session start — and skip it for the tag
+   and ref-deletion blocks too.** Every git command Claude runs here uses the
+   container's own bash, so there is nothing to ask about up front. The
+   tag-push and ref-deletion carve-out (Section 5.7) changes that at exactly
+   one moment: a remote session that reaches Gate 6, or that needs to delete a
+   branch or tag, *always* hands the user a block to run on their own
+   machine — but that block needs a real clone path, not a shell choice.
+   Everything in it below `cd` is a plain single-line `git` command (`git
+   checkout`, `git pull`, `git tag`, `git push`) with no heredocs, no
+   multi-line strings, no shell-specific syntax at all — it runs unmodified in
+   every shell `SHELL_REFERENCE.md` lists. The only line that varies is `cd`,
+   and a quoted path (`cd "<clone-path>"`) parses the same way regardless of
+   which of the seven the user pastes it into.
 
-   So ask the shell question **when a tag block is about to be presented**, not
-   at session start — a session that never releases never needs it:
+   So ask only for the clone path, **when the block is about to be
+   presented**, not at session start — a session that never releases and never
+   deletes a ref never needs it:
 
-   > Before I hand you the tag commands — **which shell will you run them in?**
-   > 1. Windows PowerShell  2. Linux PowerShell (pwsh)  3. Git Bash (Windows)
-   > 4. Termux (Android)  5. macOS Terminal  6. Linux Terminal  7. WSL
-   >
-   > And the path to your clone, so the block starts in the right directory.
+   > Before I hand you this block — **what's the path to your local clone**,
+   > so it starts in the right directory?
 
-   Then format per `SHELL_REFERENCE.md` and store both for the rest of the
-   session. Presenting `cd <your-repo-path>` as a placeholder is a defect, not a
-   neutral default: it is the one line the user cannot copy as given, in the one
-   block they must run by hand.
+   Store it for the rest of the session. Presenting `cd <your-repo-path>` as a
+   placeholder is a defect, not a neutral default: it is the one line the user
+   cannot copy as given, in the one block they must run by hand.
 5. **Step 3 (sync offer) is usually unnecessary** — the clone is fresh as of
    session start. Still run `git fetch origin` before Gate 5 in case the branch
    moved during a long session.
@@ -260,7 +264,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.15.1 active.
+Dev Skills v2.15.2 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -285,7 +289,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.2
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -699,16 +703,16 @@ looks fine and is not:
 
 3. **Tag and push — the user runs this block.** Tag pushes are denied (`403`)
    to Claude's credentials far more often than they succeed, and this is the
-   push that starts the release build (Section 5.7, "Tag pushes are the one
-   exception"). Present it, in one block, with the sync in front so the tag
-   lands on the merged commit:
+   push that starts the release build (Section 5.7, "Tag pushes and ref
+   deletions are the exceptions"). Present it, in one block, with the sync in
+   front so the tag lands on the merged commit:
 
-   **If the shell and clone path are not known yet — every remote session, by
-   design (step 0, item 4) — ask for them before writing this block.** A `cd`
-   the user has to edit is a broken first line.
+   **If the clone path is not known yet — every remote session, by design
+   (step 0, item 4) — ask for it before writing this block.** A `cd` the user
+   has to edit is a broken first line.
 
    ```
-   cd <project-dir>
+   cd "<clone-path>"
    git checkout main
    git pull origin main
    git tag v1.2.3
@@ -727,6 +731,14 @@ looks fine and is not:
    ```
    git ls-remote --tags origin v1.2.3
    ```
+
+   **If the push instead reports `error: src refspec v1.2.3 does not match
+   any`, that is not a `403` and not a permissions problem.** It means `git tag
+   v1.2.3` never actually ran — or ran in a different directory than the one
+   this block is pushing from — so there is no local tag for `push` to send.
+   Two sessions have misread this message as the credential denial above and
+   gone looking for a permissions fix; the fix here is simpler: from inside
+   `<clone-path>`, re-run `git tag v1.2.3`, then push again.
 
 4. **Wait for CI to complete.** Monitor with:
    ```
@@ -757,10 +769,10 @@ looks fine and is not:
    > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
    > Check logs: `gh run view <run-id> --log-failed`
    > Fix the issue, then delete and re-push the tag. **Deleting and re-pushing
-   > a tag are tag writes — they go to the user in one block, same as the
+   > a tag are both ref writes — they go to the user in one block, same as the
    > original push:**
    > ```
-   > cd <project-dir>
+   > cd "<clone-path>"
    > git tag -d v1.2.3
    > git push origin :refs/tags/v1.2.3
    > # after the fix is merged to the default branch:
@@ -820,8 +832,8 @@ like, not how CI happens to produce it. Check the artifact against its platform
 row before publishing.
 
 **Execution — present commands per Section 5.7.** The tag push goes to the user
-even when Claude is executing the rest (Section 5.7, "Tag pushes are the one
-exception"), so this splits into two blocks:
+even when Claude is executing the rest (Section 5.7, "Tag pushes and ref
+deletions are the exceptions"), so this splits into two blocks:
 
 Claude runs (or presents, on a local session):
 ```
@@ -831,12 +843,17 @@ git checkout main && git pull origin main
 
 The user runs — stop here until they confirm the tag is on the remote:
 ```
-cd <project-dir>
+cd "<clone-path>"
 git checkout main
 git pull origin main
 git tag v1.2.3
 git push origin v1.2.3
 ```
+
+If this reports `error: src refspec v1.2.3 does not match any` instead of a
+`403`, the tag was never created locally — see the troubleshooting note under
+the CI-driven path's tag step above. Re-run `git tag v1.2.3` from inside
+`<clone-path>` and push again.
 
 Then, once `git ls-remote --tags origin v1.2.3` shows the tag:
 ```

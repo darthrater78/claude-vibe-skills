@@ -25,8 +25,8 @@ file applies:
   block would commit nothing, and the container's work is destroyed when the
   session ends. Claude commits and pushes from inside the container, after
   approval (Section 1).
-- **`gh` is usually absent.** Use the GitHub MCP mapping table in Section 6,
-  step 0.
+- **`gh` is usually absent.** Use the GitHub MCP mapping table in
+  `GATE_REFERENCE.md`, session start, step 0.
 
 Showing the user a summary of what you are about to run is fine. Handing them
 commands *instead of* pushing is not.
