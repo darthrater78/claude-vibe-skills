@@ -95,7 +95,19 @@ if [ -f skills/dev-skills.skill ]; then
     # a stale archive ships old rules under a current version number.
     for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md; do
       if ! unzip -p skills/dev-skills.skill "$f" 2>/dev/null | diff -q - "skills/dev-skills/$f" > /dev/null 2>&1; then
-        echo "  FAIL: bundled $f differs from skills/dev-skills/$f (rebuild the bundle)"
+        # Tell a stale bundle apart from a CRLF checkout. The bundle always holds
+        # LF and .gitattributes keeps checkouts LF, but an older clone predating
+        # it still has CRLF — and "rebuild the bundle" sends that person chasing
+        # the wrong problem, however freshly they just rebuilt it.
+        if unzip -p skills/dev-skills.skill "$f" 2>/dev/null | tr -d '\r' \
+             | diff -q - <(tr -d '\r' < "skills/dev-skills/$f") > /dev/null 2>&1; then
+          echo "  FAIL: $f matches the bundle except for line endings — this is a CRLF checkout."
+          echo "        Fix: git add --renormalize . && git checkout -- ."
+          echo "        WARNING: 'git checkout -- .' discards uncommitted changes."
+          echo "        Commit or stash first."
+        else
+          echo "  FAIL: bundled $f differs from skills/dev-skills/$f (rebuild the bundle)"
+        fi
         errors=$((errors + 1))
       fi
     done

@@ -1,0 +1,12 @@
+# Normalize line endings in the repository and on checkout.
+#
+# scripts/validate.sh compares the .skill bundle (always LF) against the
+# working tree byte for byte, and hooks/gate-preflight.sh is executed
+# directly by its shebang. Both break on a CRLF checkout, which is what
+# core.autocrlf=true produces on Windows -- the platform most likely to be
+# editing this skill. GATE_REFERENCE.md Gate 6 prescribes exactly this fix
+# for other projects; the repo now follows its own rule.
+* text=auto eol=lf
+
+# Never touch the packaged skill: it is a zip.
+*.skill binary

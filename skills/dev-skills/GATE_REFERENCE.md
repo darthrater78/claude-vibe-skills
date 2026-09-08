@@ -106,8 +106,8 @@ If the signals are ambiguous, ask — do not assume local:
 7. **Executing git here does not extend to tag pushes.** Container credentials
    are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
    that fires the release workflow. Present the tag block to the user even
-   though everything else runs here — Section 5.7, "Tag pushes are the one
-   exception.
+   though everything else runs here — Section 5.7, "Tag pushes and ref
+   deletions are the exceptions."
 
 Report the detected environment in the session banner.
 
@@ -264,7 +264,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.15.2 active.
+Dev Skills v2.16.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -289,7 +289,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.15.2
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.16.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -413,6 +413,13 @@ whose build you cannot find. Ask:
 
 Never substitute "CI will catch it" for running the build. CI runs after the
 commit; this gate exists to stop a broken commit from being made.
+
+**If the build or validation script stalls instead of finishing**, and the
+shell is Git Bash, read `SHELL_REFERENCE.md` — "Git Bash stalls on spawn-heavy
+scripts". A stall there is a fork-emulation limit, not a script defect and not
+a gate failure; the script is run in split invocations and the gate passes
+normally. A stalled run is never a pass on its own, and it is never a reason
+to hand the check to CI.
 
 **A test build is mandatory before any commit.** When building an app, create a
 test/dev version and verify it runs correctly before staging or committing anything.

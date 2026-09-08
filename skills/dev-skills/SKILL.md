@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.15.2
+version: 2.16.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -352,10 +352,11 @@ examples are in `SECURITY_REFERENCE.md` (loaded during Gate 3 and audit mode).
 **Categories to watch for:** secrets/credentials, dangerous execution
 (eval/exec/shell), input validation, SQL injection, network/TLS, filesystem/path
 traversal, serialization, JavaScript (XSS/prototype pollution/open redirect),
-Windows (PowerShell/UNC/DLL/registry/services/signing/reserved names), Linux
-(SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages), Android
-(exported components/manifest hardening/WebView/Intents/storage/network security
-config/permissions/logging/ProGuard/APK signing), cross-platform (permissions/paths/credentials).
+Windows (UAC elevation/PowerShell/UNC/DLL/registry/services/signing/reserved
+names), Linux (SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages),
+Android (exported components/manifest hardening/WebView/Intents/storage/network
+security config/permissions/logging/ProGuard/APK signing), cross-platform
+(permissions/paths/credentials).
 
 ### 4.3 Language best practices
 
@@ -565,121 +566,50 @@ it describes.
 
 ### 5.7 Git command presentation
 
-**This section fires whenever git write operations are needed** — during any gate
-(commit, push, PR, merge, tag, release), handoff summaries, or troubleshooting.
+**This section fires whenever git write operations are needed** — during any
+gate (commit, push, PR, merge, tag, release), handoff summaries, or
+troubleshooting.
 
-**The default depends on the execution environment** (`GATE_REFERENCE.md`, session start, step 0). The
-deciding question is not cost — it is whether Claude's working tree and the
-user's terminal are the same clone.
+**Before composing any command block, load `SHELL_REFERENCE.md`** from this
+skill's base directory. It holds the mechanics in full: the `cd` format table
+per shell, the one-block rule, remote verification, the Termux clone flow, the
+403 rationale, and worked examples. Do not build a block from memory of this
+summary — this summary says which way commands go, not how to write them.
 
-**Local session → present commands for the user to run.** They are the same
-clone, so a command block operates on the work that was just done. Each git
-command Claude executes via tool calls is a round trip that resends the full
-conversation history — a chain of them (commit, push, tag, release) can cost
-thousands of tokens. Presenting a block costs zero tool-call tokens. Present
-first; execute via tool calls only if the user asks.
+**Which way they go depends on the execution environment**
+(`GATE_REFERENCE.md`, session start, step 0). The deciding question is not cost;
+it is whether Claude's working tree and the user's terminal are the same clone.
 
-**Remote container → Claude executes git directly.** Claude's working tree is a
-throwaway container; the user's terminal is a *different machine with a different
-clone that never received these edits*. A command block handed to the user
-commits nothing, and the container is reclaimed when the session ends — the work
-is simply lost. Get approval per Section 1, then run the git commands via tool
-calls from inside the container. Do not present a block as a substitute for
-pushing. (Showing the user what you are about to run is fine — that is a
-summary, not a handoff.) **One operation is carved out of this: the tag push —
-see below.**
-
-**Termux → clone flow.** The repo may not exist on the device at all. See
-`SHELL_REFERENCE.md`.
+| Environment | Git operations |
+|---|---|
+| **Local** | Same clone — **present** the commands for the user to run. A block costs zero tool-call tokens; a chain of executed git commands resends the whole conversation each time |
+| **Remote container** | A throwaway container the user's terminal never sees — **Claude executes** git directly, after approval (Section 1). A block handed over commits nothing, and the work dies with the container |
+| **Termux** | Present, and the repo may not be on the device at all — clone flow in `SHELL_REFERENCE.md` |
 
 **Tag pushes and ref deletions are the exceptions — always hand them to the
-user.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are
-presented as a block for the user to run — and so is deleting any ref, a
-branch (`git push origin --delete <branch>` / `git push origin
-:refs/heads/<branch>`) or a tag (`git push origin :refs/tags/v<X.Y.Z>`).
-Never execute either via tool calls, and never create a tag ref or delete a
-branch ref through a GitHub MCP tool. Re-pushing a tag is a delete followed by
-a create — both halves go to the user.
+user.** In every environment, remote containers included: creating a tag
+(`git tag`, `git push origin v<X.Y.Z>`) and deleting any ref, branch
+(`git push origin --delete <branch>`) or tag (`git push origin
+:refs/tags/v<X.Y.Z>`), are presented as a block for the user to run. Never
+execute either via tool calls, and never create a tag ref or delete a branch ref
+through a GitHub MCP tool. Re-pushing a tag is a delete followed by a create —
+both halves go to the user.
 
-Why these two and not ordinary branch pushes: the credentials Claude runs
-under are routinely denied on two specific ref operations, both narrower than
-the `contents: write` scope that lets branch commits push fine all session.
-**Creating** a `refs/tags/*` ref — especially one that *triggers a
-workflow* — is commonly withheld even where ordinary pushes succeed. And
-**deleting** any ref, tag or branch, is its own separate permission again: a
-token that pushes commits and creates tags without issue all session can still
-**403** on `git push origin --delete some-branch`. Same failure, different
-command, easy to miss the pattern and go looking for a fix in the wrong place.
-The tag side also carries a worse blast radius than an ordinary denial: the
-tag push is what fires the release workflow, so a 403 there strands a merged,
-version-bumped default branch with no release behind it. Route both kinds to
-the user's credentials from the start rather than discovering this mid-ship or
-mid-cleanup.
+Claude's credentials are routinely denied on exactly these two ref operations
+while ordinary branch pushes succeed all session, and a denied tag push strands
+a merged, version-bumped default branch with no release behind it. Why that is,
+and what to do when one returns `403`, is in `SHELL_REFERENCE.md`. Do not retry,
+re-route, or act on a different ref.
 
 🚀 SHIP stays ⏳ until the tag is confirmed on the remote — never ✅ on the
-assumption the user ran the block. Confirm it yourself with
-`git ls-remote --tags origin v<X.Y.Z>`; reading refs is not a write and is not
-restricted. The same goes for a branch deletion: confirm it with
-`git ls-remote --heads origin <branch>` returning nothing, not on the
-assumption the user ran the block. If you are told to attempt either push
-anyway and it 403s, do not retry, re-route, or act on a different ref —
-report it and hand over the block.
-
-The block's exact shape, the sync that must precede the tag, and the GitHub UI
-fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
+assumption that the user ran the block. Confirm it yourself with `git ls-remote
+--tags origin v<X.Y.Z>`, and a branch deletion with `git ls-remote --heads
+origin <branch>` returning nothing. Reading refs is not a write and is not
+restricted.
 
 **The gates are identical either way.** Presenting a command is performing it
 (Section 1): the pre-flight runs, and the tracker goes in the same message,
 above the block.
-
-**Shell environment detection** is done at session start (`GATE_REFERENCE.md`,
-session start, step 2) for local and Termux sessions — those sessions present
-full command blocks (heredocs, multi-line commit messages) that genuinely
-differ by shell. Remote containers defer differently: the only blocks they
-ever present are the tag push and ref deletions above, and everything in them
-below `cd` is a plain single-line `git` invocation — identical across all
-seven shells. So remote containers ask for the user's **clone path only**, not
-their shell (`GATE_REFERENCE.md`, step 0, item 4), and open the block with
-`cd "<clone-path>"`, which parses the same way in PowerShell, pwsh, Git Bash,
-Termux, macOS/Linux Terminal, and WSL alike. If a session reaches this point
-needing a presented block without a stored clone path (e.g. the skill loaded
-mid-session), ask for it before presenting any commands.
-
-**Remote verification.** Before presenting any push commands, verify the remote
-is configured (`git remote -v`). If origin is not set, include
-`git remote add origin <url>` (using the URL stored at session start, Section 6
-step 1) as the first command in the block. This prevents the "default repo has
-not been set" error.
-
-**Never use bare `git push`.** Every push command must specify the remote and
-branch explicitly: `git push -u origin <branch-name>`. The `-u` flag sets
-upstream tracking, preventing the error on subsequent pushes.
-
-**One block, not several.** When commands are presented for the user to run,
-put the whole sequence in a **single fenced block they can copy once** — `cd`,
-branch, add, commit, push, tag, release, all of it. Do not split an operation
-across multiple blocks, and do not interleave prose between the commands.
-Copy-pasting five separate blocks is five chances to miss one, run them out of
-order, or land in the wrong directory.
-
-Split into a second block only when the user genuinely has to stop and look at
-something before continuing — a merge conflict to resolve, a build to verify, a
-PR number needed by the next command. When you do split, say what to check
-before moving on.
-
-Explanation goes above or below the block, never inside it as interleaved prose.
-Brief `#` comments within the block are fine.
-
-**Always start with `cd`** in a presented block. Never assume the user's terminal
-is already in the project directory. Every block presented for the user to run
-must begin with the appropriate `cd` for their shell. (This does not apply to
-commands Claude executes itself — the container's working directory is already
-correct.)
-
-**Load `SHELL_REFERENCE.md`** from this skill's base directory for the full
-`cd` format table, shell-specific syntax rules, Termux clone flow, and example
-command blocks for each supported shell.
-
 ### 5.8 Usage limit handoff
 
 **When the system prompt shows the account is nearing its usage cap** (e.g.
