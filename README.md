@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.16.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.16.1`
 
 ---
 
@@ -80,6 +80,10 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 - **Lower per-turn cost.** Gate execution detail and shell mechanics moved out
   of the every-turn file into [references](#whats-inside) loaded on demand.
   *(2.14.0, 2.16.0)*
+- **[Three cost behaviors that never fired now do](#cost-discipline).** The
+  token estimate, the phase-transition handoff, and the usage-limit handoff were
+  gated on judgment calls and on a token threshold that Claude Code for web
+  never crosses. All three now trigger on observable events. *(2.16.1)*
 
 ---
 
@@ -90,7 +94,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.16.0 — all refs agree
+     🔢 VERSION    ✅ v2.16.1 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -105,9 +109,9 @@ Gate state lives in a file, not in Claude's memory:
 ```
 # .claude/dev-skills-gates.md
 Track: release sequence
-Version: 2.16.0
+Version: 2.16.1
 
-🔢 VERSION    ✅ all refs at 2.16.0; prev v2.15.2 tagged on remote
+🔢 VERSION    ✅ all refs at 2.16.1; prev v2.16.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -410,6 +414,12 @@ release breaks.
   (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and always starting with the
   right `cd`. Remote container sessions execute directly instead, since a
   presented block would operate on the wrong clone
+- **Token impact estimate** — part of the session-end checkpoint whenever the
+  session modified a tracked file: what was saved, what was wasted, the biggest
+  win next time
+- **Handoff offers** — proposed at three observable points: a release sequence
+  finished, you opened unrelated work with no release in flight, or the
+  conversation was compacted. Also when a usage limit is actually signalled
 
 **On request — ask by name:**
 
@@ -451,16 +461,22 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~36KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `SKILL.md` | ~38KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `GATE_REFERENCE.md` | ~42KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
-| `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode — full rule checklists with bad/good code examples |
-| `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — full rule checklists with bad/good code examples |
+| `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
+| `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
 gate lives in `GATE_REFERENCE.md`, loaded when the pre-flight says one is owed.
 Security, quality, and shell formatting work the same way.
+
+Security is the clearest case. *Knowing* that a `pickle.loads` on untrusted
+input is worth flagging has to be resident — nobody asks for it, and Gate 3 runs
+too late if the pattern was written an hour ago. The worked example of how to
+fix it does not: that loads with the gate. So the flag-on-sight categories stay
+in `SKILL.md` and the rules and examples live in `SECURITY_REFERENCE.md`.
 
 Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for
 on every request, so an understated figure hides a real per-turn cost.
@@ -509,4 +525,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.16.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.16.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

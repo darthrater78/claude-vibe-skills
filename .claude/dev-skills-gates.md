@@ -1,11 +1,11 @@
 # Dev Skills gate state
-Track: work commit
-Version: 2.16.0 (unchanged — README-only, skill bundle untouched)
+Track: release sequence
+Version: 2.16.1
 Updated: 2026-09-08
 
-🔢 VERSION    ⬜ not owed — no version bump; v2.16.0 tagged on remote, no stranded release
-🔨 BUILD      ➖ N/A — skill repo, no build system (scripts/validate.sh green regardless)
-🔒 SECURITY   ✅ 0 Critical, 0 High — prose-only diff to README.md, no executable code, no secrets
-📄 DOCS       ⬜ not owed on this track — though the change itself is a docs-accuracy fix
-📦 RELEASE    ⬜ not owed — branch push only, no PR requested
-🚀 SHIP       ⬜ not owed
+🔢 VERSION    ✅ all refs at 2.16.1 (VERSION, SKILL.md frontmatter, banner, README); prev v2.16.0 tagged on remote (hard block passed); release-notes link bumped
+🔨 BUILD      ✅ scripts/build-skill.sh rebuilt the bundle; scripts/validate.sh green, bundle version 2.16.1
+🔒 SECURITY   ✅ 0 Critical, 0 High — prose-only diff to SKILL.md/GATE_REFERENCE.md/README.md/CHANGELOG.md; no scripts, workflows or executable code touched
+📄 DOCS       ✅ CHANGELOG 2.16.1 entry; README cost-discipline section and What's new updated to match the fixed triggers; SKILL.md size row corrected 36→38KB
+📦 RELEASE    ⬜ awaiting commit approval
+🚀 SHIP       ⬜ tag push goes to the user
