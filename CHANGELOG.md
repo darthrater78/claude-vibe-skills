@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.15.1] — 2026-09-08
+
+### Fixed
+- **Remote container sessions asked for a shell too late to ever ask at all.**
+  Session start skips the shell question on remote containers, on the reasoning
+  that Claude runs every git command in the container's own bash. 2.15.0's
+  tag-push carve-out broke that reasoning: a remote session that reaches Gate 6
+  now *always* hands the user one block to run on their own machine, and that
+  block needs their shell's `cd` syntax and a real clone path — neither of which
+  was ever collected. The result was a tag block opening with a literal
+  `cd <your-repo-path>` placeholder, in the one block a user cannot skip and
+  must run by hand. The question is now deferred rather than skipped: remote
+  containers ask for shell and clone path at the moment a tag block is due, so
+  sessions that never release are still never asked. Found while presenting the
+  v2.15.0 tag block — the release that introduced the carve-out
+
 ## [2.15.0] — 2026-09-08
 
 ### Added

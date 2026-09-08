@@ -68,8 +68,8 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~38KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
-| `GATE_REFERENCE.md` | ~40KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SKILL.md` | ~39KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `GATE_REFERENCE.md` | ~41KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~22KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
@@ -131,7 +131,7 @@ The skill detects where the session is running, because it determines whether Cl
 | **Remote container** (web/mobile) | Claude commits and pushes directly — except tag pushes. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Clone flow — the repo may not be on the device |
 
-Remote containers also skip the shell question, arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable.
+Remote containers arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable. They *defer* the shell question rather than skipping it — Claude runs every git command in the container's own bash, but the tag push below is always handed back to you, so the shell and clone path are asked for at that moment instead of up front.
 
 **Tag pushes are the one operation that always comes back to you.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block for you to run — never executed by Claude, never created through a GitHub MCP tool. The credentials Claude runs under are routinely denied on tag refs: a token that pushes branch commits all session gets `403` on `git push origin v1.2.3`, because creating a `refs/tags/*` ref — and creating a ref that *triggers a workflow* — is a separate permission, commonly withheld even where `contents: write` is granted. And the blast radius is worse than an ordinary denial, since the tag push is what fires the release workflow: a 403 there strands a merged, version-bumped default branch with no release behind it. Gate 6 stays ⏳ until the tag is confirmed on the remote with `git ls-remote` — never ✅ on the assumption you ran it. Deleting and re-pushing a tag follow the same rule, and there's a GitHub UI fallback (**Releases → Draft a new release → Choose a tag**) if you have no local clone.
 
@@ -247,6 +247,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.15.0`
+`v2.15.1`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
