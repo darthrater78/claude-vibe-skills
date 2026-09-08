@@ -1,11 +1,11 @@
 # Dev Skills gate state
-Track: release sequence
-Version: 2.15.2
+Track: work commit
+Version: 2.16.0 (unchanged — README-only, skill bundle untouched)
 Updated: 2026-09-08
 
-🔢 VERSION    ✅ all refs at 2.15.2; prev v2.15.1 tagged on remote (hard block passed)
-🔨 BUILD      ✅ scripts/validate.sh green; .skill bundle rebuilt from source
-🔒 SECURITY   ✅ 0 Critical, 0 High — prose-only diff to SKILL.md/GATE_REFERENCE.md/SHELL_REFERENCE.md/README.md/CHANGELOG.md, no executable code changed
-📄 DOCS       ✅ CHANGELOG 2.15.2 entry added; README cross-refs (tag/ref-deletion carve-out, shell-vs-clone-path, ref-read table) updated to match; size table re-measured
-📦 RELEASE    ⬜ awaiting commit approval
-🚀 SHIP       ⬜ tag push goes to the user
+🔢 VERSION    ⬜ not owed — no version bump; v2.16.0 tagged on remote, no stranded release
+🔨 BUILD      ➖ N/A — skill repo, no build system (scripts/validate.sh green regardless)
+🔒 SECURITY   ✅ 0 Critical, 0 High — prose-only diff to README.md, no executable code, no secrets
+📄 DOCS       ⬜ not owed on this track — though the change itself is a docs-accuracy fix
+📦 RELEASE    ⬜ not owed — branch push only, no PR requested
+🚀 SHIP       ⬜ not owed
