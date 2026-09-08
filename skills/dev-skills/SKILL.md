@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.14.0
+version: 2.15.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -198,13 +198,28 @@ Updated: 2026-09-07
 🚀 SHIP       ⬜
 ```
 
+**Never read tag state with `git tag -l`.** It lists *local* tags, and a fresh
+clone — every remote container, and any `--no-tags` or shallow checkout — has
+none, so it returns empty on repos with a hundred tags. Every tag check in this
+skill uses the remote:
+
+```
+git ls-remote --tags origin              # all tags
+git ls-remote --tags origin v1.2.3       # one tag
+```
+
+This matters more than it looks. A check that reports *every* prior version as
+untagged is a check nobody reads, and a real missing tag hides in that noise.
+Reading refs is not a write, so this is safe to run yourself even where tag
+*pushes* are denied (Section 5.7).
+
 **Re-derivation — when the state file is missing, stale, or the session was
 compacted.** Do not guess, and do not treat a gate as passed because it feels
 like it did. Rebuild from evidence:
 
 | Gate | Evidence that it passed |
 |---|---|
-| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git tag -l` shows the previous version tagged |
+| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git ls-remote --tags origin` shows the previous version tagged |
 | 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A) |
 | 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
 | 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
@@ -239,7 +254,7 @@ the default branch without security (Gate 3) or docs (Gate 4), those gates are
 still owed — run them on the merged code and surface what you find.
 
 When resuming work or checking gate status, detect what's already done:
-1. Run `git log`, `git branch -r`, `git tag -l`, and `gh pr list` / `gh pr view`
+1. Run `git log`, `git branch -r`, `git ls-remote --tags origin`, and `gh pr list` / `gh pr view`
    — or the GitHub MCP equivalents when `gh` is unavailable (`GATE_REFERENCE.md`, session start, step 0)
 2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
 3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
@@ -258,7 +273,7 @@ is *for*, not what makes it pass.
 | Gate | Passes when |
 |---|---|
 | 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
-| 🔨 **BUILD** | the project builds and the app is verified working — or ➖ N/A with no build system |
+| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
@@ -287,6 +302,8 @@ These phrases mean "surface the gates", not "comply silently":
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
 | "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
 | "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
+| "just tag it" / "push the tag for me" | Tag pushes are always the user's to run (§5.7) — present the block, don't execute it |
+| Tag push returns 403 | Not a retry and not a workaround — hand the block to the user (§5.7) |
 
 ---
 
@@ -562,10 +579,36 @@ commits nothing, and the container is reclaimed when the session ends — the wo
 is simply lost. Get approval per Section 1, then run the git commands via tool
 calls from inside the container. Do not present a block as a substitute for
 pushing. (Showing the user what you are about to run is fine — that is a
-summary, not a handoff.)
+summary, not a handoff.) **One operation is carved out of this: the tag push —
+see below.**
 
 **Termux → clone flow.** The repo may not exist on the device at all. See
 `SHELL_REFERENCE.md`.
+
+**Tag pushes are the one exception — always hand them to the user.** In every
+environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block
+for the user to run. Never execute a tag push via tool calls, and never create
+the tag ref through a GitHub MCP tool. Deleting or re-pushing a tag is the same
+operation and the same rule.
+
+Why this one and not the others: the credentials Claude runs under are routinely
+denied on tag refs. A token that pushes branch commits all session gets **403**
+on `git push origin v1.2.3`, because creating a `refs/tags/*` ref — and creating
+a ref that *triggers a workflow* — is a separate permission, commonly withheld
+even where `contents: write` is granted. And the blast radius is worse than an
+ordinary denial: the tag push is what fires the release workflow, so a 403 there
+strands a merged, version-bumped default branch with no release behind it. Route
+it to the user's credentials from the start rather than discovering this
+mid-ship.
+
+🚀 SHIP stays ⏳ until the tag is confirmed on the remote — never ✅ on the
+assumption the user ran the block. Confirm it yourself with
+`git ls-remote --tags origin v<X.Y.Z>`; reading refs is not a write and is not
+restricted. If you are told to attempt the push anyway and it 403s, do not
+retry, re-route, or tag a different ref — report it and hand over the block.
+
+The block's exact shape, the sync that must precede the tag, and the GitHub UI
+fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
 
 **The gates are identical either way.** Presenting a command is performing it
 (Section 1): the pre-flight runs, and the tracker goes in the same message,
@@ -662,8 +705,14 @@ skill: ...") and follow its session-start procedure. It covers, in order:
   Termux). This decides whether Claude executes git or presents it, whether to
   ask the shell question, whether `gh` or GitHub MCP tools are used, and where
   the gate state file lives. Run it before anything else.
-- **Steps 1–6** — repo URL, shell, sync offer, branch check, repo state, CI
-  workflow detection
+- **Steps 1–6** — repo URL, shell, sync offer, branch check, repo state, and
+  **workflow detection: the local development workflow (what Gate 2 runs) and
+  the CI workflow (what Gate 5's PR is checked by and Gate 6 fires).** Both are
+  detected, and a missing one is surfaced against the gate it breaks
+- **Step 7 — the unfinished release check.** Compare released versions against
+  tags on the remote. A release that never got tagged is a Gate 6 that never
+  finished, and start-of-session is the only place that reliably catches it — a
+  container that is reclaimed never reaches Section 8
 - **The gate state file** — write `.claude/dev-skills-gates.md` with all six
   gates ⬜ pending (Section 2)
 - **The session banner and MCP check**
@@ -699,11 +748,17 @@ Before wrapping up, check:
    > ⚠️ **Session-end check: branch `feature/xyz` has unmerged commits.**
    > Should we finish the release workflow (Gates 5-6) before wrapping up?
 
-4. **Check for untagged versions.** Run `git tag -l` and compare against the
+4. **Check for untagged versions.** Run `git ls-remote --tags origin` and compare against the
    version in the project's version file(s). If the current version has no tag:
 
    > ⚠️ **Session-end check: version v1.2.3 has no git tag or GitHub release.**
    > The code is merged but not tagged/released. Should we finish Gates 5-6 now?
+
+   **This is a backstop, not the primary check.** It only fires if the session
+   gets to wind down — a remote container that is reclaimed, a usage limit, or a
+   crash skips it entirely, and that is precisely when a release is most likely
+   to be half-finished. The check that always runs is at session *start*
+   (`GATE_REFERENCE.md`, step 7).
 
 5. **If no source files were modified**, skip the gate check — the session was
    exploratory or advisory.

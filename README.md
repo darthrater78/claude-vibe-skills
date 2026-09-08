@@ -68,8 +68,8 @@ The skill uses a tiered loading strategy to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~35KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
-| `GATE_REFERENCE.md` | ~29KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SKILL.md` | ~38KB | **Every turn** — commit discipline, the gate pre-flight, the two tracks, gate state, shortcut detection, always-on security awareness, cost discipline |
+| `GATE_REFERENCE.md` | ~40KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~22KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode (full rule checklists + bad/good code examples) |
 | `SHELL_REFERENCE.md` | ~5KB | Section 5.7 — when git commands need shell-specific formatting (local and Termux sessions) |
@@ -80,7 +80,7 @@ The split follows one rule: **triggers load every turn, recipes load on demand.*
 
 Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for on every request, so an understated figure hides a real per-turn cost.
 
-Releases are published by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which rebuilds `dev-skills.skill` from the tagged source, publishes the release with notes taken from `CHANGELOG.md`, and fails if the artifact does not end up attached.
+Releases are published by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which verifies the tagged commit is on the default branch, rebuilds `dev-skills.skill` from the tagged source, publishes the release with notes taken from `CHANGELOG.md`, and fails if the artifact does not end up attached. The default-branch check matters because a tag trigger fires for a tag on *any* commit — without it, tagging an unreviewed branch would publish a real release from unreviewed code. Both workflows pin `actions/checkout` to a commit SHA rather than a mutable version tag, check out with `persist-credentials: false`, and carry concurrency groups and timeouts.
 
 ---
 
@@ -98,6 +98,10 @@ Gate state is not something Claude remembers — it is a file, `.claude/dev-skil
 | **Release sequence** | version bump, artifact, merge to default branch, tag, or publish | all six, in order |
 
 Gates apply by default to any session that modified a tracked file. There is no "too small to bother" exemption — a gate leaves the workflow only by being marked ➖ N/A for a structural reason (no build system, for example), stated on the tracker.
+
+**Unfinished releases are caught at session start.** Gate 6 has four parts — merge, tag, publish, verify — and a session can die between any two of them: a container reclaimed, a usage limit, a tag push denied `403`. The work is then stranded on the default branch, and the next session would otherwise never look for it, because it starts with all gates pending for the version it is *about* to build. So session start compares released versions against tags on the remote and reports any that never shipped, before new work begins.
+
+Every tag check reads the remote (`git ls-remote --tags origin`), never `git tag -l` — the latter lists *local* tags and returns empty in any fresh clone, which is every remote container. A check that reports every prior version as untagged is a check nobody reads, and a genuine missing tag hides in that noise.
 
 ---
 
@@ -124,10 +128,28 @@ The skill detects where the session is running, because it determines whether Cl
 | Environment | Git behavior |
 |---|---|
 | **Local** (Claude Code CLI) | Commands are presented for you to run — same clone, and it costs no tool-call tokens |
-| **Remote container** (web/mobile) | Claude commits and pushes directly. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
+| **Remote container** (web/mobile) | Claude commits and pushes directly — except tag pushes. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Clone flow — the repo may not be on the device |
 
 Remote containers also skip the shell question, arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable.
+
+**Tag pushes are the one operation that always comes back to you.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block for you to run — never executed by Claude, never created through a GitHub MCP tool. The credentials Claude runs under are routinely denied on tag refs: a token that pushes branch commits all session gets `403` on `git push origin v1.2.3`, because creating a `refs/tags/*` ref — and creating a ref that *triggers a workflow* — is a separate permission, commonly withheld even where `contents: write` is granted. And the blast radius is worse than an ordinary denial, since the tag push is what fires the release workflow: a 403 there strands a merged, version-bumped default branch with no release behind it. Gate 6 stays ⏳ until the tag is confirmed on the remote with `git ls-remote` — never ✅ on the assumption you ran it. Deleting and re-pushing a tag follow the same rule, and there's a GitHub UI fallback (**Releases → Draft a new release → Choose a tag**) if you have no local clone.
+
+---
+
+## Two workflows: local dev and CI
+
+Session start detects two distinct workflows, because different gates depend on each and a project can easily have one without the other.
+
+| Workflow | What it is | Which gate uses it |
+|---|---|---|
+| **Local development** | what you run on your own machine to build and test — `scripts/`, `Makefile`, `package.json` scripts, `gradlew`, `tox.ini`, `CONTRIBUTING.md` instructions | **Gate 2 (Build)** runs this |
+| **CI build check** | compiles and tests on push or pull request | validates the PR opened by **Gate 5** |
+| **CI release workflow** | builds artifacts and publishes on tag push (`on: push: tags:`) | fired by **Gate 6 (Ship)** |
+
+Whichever is missing is surfaced against the gate it breaks, not reported as a generic absence. No local dev workflow means Gate 2 has no command to run, so "verified working" is a guess — and "CI will catch it" is explicitly rejected, because CI runs *after* the commit Gate 2 exists to protect. No release workflow means Gate 6 has no publish path.
+
+When both exist, they are checked for drift: CI should invoke the project's own scripts (`bash scripts/validate.sh`, `npm test`, `./gradlew test`) rather than reimplementing the build inline, or the two pass and fail independently until a release breaks.
 
 ---
 
@@ -137,9 +159,11 @@ Remote containers also skip the shell question, arrive pre-cloned (no `git clone
 
 No build starts until every version file (`package.json`, `pyproject.toml`, `VERSION`, etc.) is bumped, consistent, and includes the repository URL. Also greps the entire project for hardcoded version strings in source code, UI templates (XAML, HTML), window titles, "About" dialogs, and config files — every match must be updated. Any app that displays a repo link must also link to the current version's release notes.
 
+**A missing tag for the immediately preceding version hard-blocks this gate.** It doesn't mean someone forgot to tag — it means the last release never finished Gate 6, so the default branch carries a version that was never published. Bumping on top of it buries the gap one version deeper. Older gaps stay advisory.
+
 ### Gate 2 — Build 🔨
 
-Runs the project's build command. Build failure stops everything.
+Runs the project's **local development workflow** — its own build and test commands, not CI. Build failure stops everything. A project with a build system but no discoverable local build command blocks the gate and asks, rather than passing as ➖ N/A: N/A is for projects with no build system, not for builds that couldn't be found.
 
 ### Gate 3 — Security & Quality 🔒
 
@@ -169,7 +193,9 @@ Checks prerequisites first (GitHub remote exists, default branch is pushed, `gh`
 
 ### Gate 6 — Ship 🚀
 
-Merges the PR, tags the merge commit, creates a GitHub release with artifacts, and runs post-ship verification (tag on remote, release exists, PR merged, release assets attached). Android projects must include a properly named APK (`<app-name>-v<VERSION>.apk`) — "debug" in the filename is a ship failure. Shows the full ship summary and waits for explicit confirmation — "yeah" is not enough, type "ship" or "confirm ship".
+Merges the PR, tags the merge commit, creates a GitHub release with artifacts, and runs post-ship verification (tag on remote, release exists, PR merged, release assets attached). Shows the full ship summary and waits for explicit confirmation — "yeah" is not enough, type "ship" or "confirm ship". The tag push itself always comes back to you (see above).
+
+**The git flow is identical on Linux, Windows, and Android** — merge, checkout, pull, tag, push, verify. Only what CI *builds* differs, and Gate 6 carries a table of it: runner, release build command, artifact type, signing secrets, job shell, and the platform-specific ship failure — a debug or unstripped binary on Linux, an unsigned or self-signed executable on Windows, a debug-signed or wrongly named APK on Android (`<app-name>-v<VERSION>.apk`; "debug" in the filename is a ship failure). It also names the two cross-platform traps that produce a release that looks fine and is not: CRLF line endings reaching a Windows runner, and case sensitivity differing between Linux and Windows runners.
 
 ---
 
@@ -221,6 +247,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.14.0`
+`v2.15.0`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
