@@ -101,7 +101,7 @@ Gates apply by default to any session that modified a tracked file. There is no 
 
 **Unfinished releases are caught at session start.** Gate 6 has four parts — merge, tag, publish, verify — and a session can die between any two of them: a container reclaimed, a usage limit, a tag push denied `403`. The work is then stranded on the default branch, and the next session would otherwise never look for it, because it starts with all gates pending for the version it is *about* to build. So session start compares released versions against tags on the remote and reports any that never shipped, before new work begins.
 
-Every tag check reads the remote (`git ls-remote --tags origin`), never `git tag -l` — the latter lists *local* tags and returns empty in any fresh clone, which is every remote container. A check that reports every prior version as untagged is a check nobody reads, and a genuine missing tag hides in that noise.
+Every ref check reads the remote — `git ls-remote --tags origin` for tags, `git ls-remote --heads origin` for branches — never `git tag -l` or `git branch -r`. Both local forms return empty or stale in a fresh clone (every remote container) or once anyone else pushes or deletes a ref the session hasn't re-fetched. A check that reports every prior version as untagged, or every branch as gone, is a check nobody reads, and a genuine missing tag or live branch hides in that noise.
 
 ---
 
@@ -128,12 +128,12 @@ The skill detects where the session is running, because it determines whether Cl
 | Environment | Git behavior |
 |---|---|
 | **Local** (Claude Code CLI) | Commands are presented for you to run — same clone, and it costs no tool-call tokens |
-| **Remote container** (web/mobile) | Claude commits and pushes directly — except tag pushes. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
+| **Remote container** (web/mobile) | Claude commits and pushes directly — except tag pushes and ref deletions. Your terminal is a different machine with a different clone; a pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Clone flow — the repo may not be on the device |
 
-Remote containers arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable. They *defer* the shell question rather than skipping it — Claude runs every git command in the container's own bash, but the tag push below is always handed back to you, so the shell and clone path are asked for at that moment instead of up front.
+Remote containers arrive pre-cloned (no `git clone` step), commit the gate state file with the work instead of gitignoring it, and fall back to GitHub MCP tools when `gh` is unavailable. They skip the shell question entirely — Claude runs every git command in the container's own bash, and the tag/ref-deletion blocks below need only a clone path, since everything in them below `cd` is a plain single-line `git` command with no shell-specific syntax. So they ask for the clone path when that block is about to be presented, instead of up front.
 
-**Tag pushes are the one operation that always comes back to you.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block for you to run — never executed by Claude, never created through a GitHub MCP tool. The credentials Claude runs under are routinely denied on tag refs: a token that pushes branch commits all session gets `403` on `git push origin v1.2.3`, because creating a `refs/tags/*` ref — and creating a ref that *triggers a workflow* — is a separate permission, commonly withheld even where `contents: write` is granted. And the blast radius is worse than an ordinary denial, since the tag push is what fires the release workflow: a 403 there strands a merged, version-bumped default branch with no release behind it. Gate 6 stays ⏳ until the tag is confirmed on the remote with `git ls-remote` — never ✅ on the assumption you ran it. Deleting and re-pushing a tag follow the same rule, and there's a GitHub UI fallback (**Releases → Draft a new release → Choose a tag**) if you have no local clone.
+**Tag pushes and ref deletions are the operations that always come back to you.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block for you to run — and so is deleting any ref, a branch or a tag. Neither is executed by Claude, and neither is created or deleted through a GitHub MCP tool. The credentials Claude runs under are routinely denied on both: creating a `refs/tags/*` ref — especially one that *triggers a workflow* — is commonly withheld even where ordinary branch pushes succeed, and deleting any ref, tag or branch, is its own separate permission again. A token that pushes commits and creates tags fine all session can still get `403` on a branch delete. The tag side carries the worse blast radius, since the tag push is what fires the release workflow: a 403 there strands a merged, version-bumped default branch with no release behind it. Gate 6 stays ⏳ until the tag is confirmed on the remote with `git ls-remote` — never ✅ on the assumption you ran it. Deleting and re-pushing a tag follow the same rule, and there's a GitHub UI fallback (**Releases → Draft a new release → Choose a tag**) if you have no local clone.
 
 ---
 
@@ -247,6 +247,6 @@ Uninstall the old skills and install `dev-skills.skill`. Everything that worked 
 
 ## Version
 
-`v2.15.1`
+`v2.15.2`
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.

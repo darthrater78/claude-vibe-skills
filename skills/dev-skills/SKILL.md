@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.15.1
+version: 2.15.2
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -198,20 +198,26 @@ Updated: 2026-09-07
 🚀 SHIP       ⬜
 ```
 
-**Never read tag state with `git tag -l`.** It lists *local* tags, and a fresh
-clone — every remote container, and any `--no-tags` or shallow checkout — has
-none, so it returns empty on repos with a hundred tags. Every tag check in this
-skill uses the remote:
+**Never read ref state from local copies — tags or branches.** `git tag -l`
+lists *local* tags, and a fresh clone — every remote container, and any
+`--no-tags` or shallow checkout — has none, so it returns empty on repos with
+a hundred tags. `git branch -r` has the identical flaw: it lists cached
+remote-tracking refs, which go stale the moment anyone else pushes or deletes
+a branch and nothing in the session re-fetches them. Both report absence that
+means nothing. Every ref check in this skill queries the remote directly:
 
 ```
 git ls-remote --tags origin              # all tags
 git ls-remote --tags origin v1.2.3       # one tag
+git ls-remote --heads origin             # all branches
+git ls-remote --heads origin main        # one branch
 ```
 
 This matters more than it looks. A check that reports *every* prior version as
-untagged is a check nobody reads, and a real missing tag hides in that noise.
-Reading refs is not a write, so this is safe to run yourself even where tag
-*pushes* are denied (Section 5.7).
+untagged, or every branch as gone, is a check nobody reads, and a real missing
+tag or a real live branch hides in that noise. Reading refs is not a write, so
+this is safe to run yourself even where ref-writing pushes are denied
+(Section 5.7).
 
 **Re-derivation — when the state file is missing, stale, or the session was
 compacted.** Do not guess, and do not treat a gate as passed because it feels
@@ -254,7 +260,7 @@ the default branch without security (Gate 3) or docs (Gate 4), those gates are
 still owed — run them on the merged code and surface what you find.
 
 When resuming work or checking gate status, detect what's already done:
-1. Run `git log`, `git branch -r`, `git ls-remote --tags origin`, and `gh pr list` / `gh pr view`
+1. Run `git log`, `git ls-remote --heads origin`, `git ls-remote --tags origin`, and `gh pr list` / `gh pr view`
    — or the GitHub MCP equivalents when `gh` is unavailable (`GATE_REFERENCE.md`, session start, step 0)
 2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
 3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
@@ -303,7 +309,8 @@ These phrases mean "surface the gates", not "comply silently":
 | "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
 | "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
 | "just tag it" / "push the tag for me" | Tag pushes are always the user's to run (§5.7) — present the block, don't execute it |
-| Tag push returns 403 | Not a retry and not a workaround — hand the block to the user (§5.7) |
+| "just delete that branch for me" | Ref deletions are always the user's to run, same as tags (§5.7) — present the block, don't execute it |
+| Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.7) |
 
 ---
 
@@ -585,27 +592,38 @@ see below.**
 **Termux → clone flow.** The repo may not exist on the device at all. See
 `SHELL_REFERENCE.md`.
 
-**Tag pushes are the one exception — always hand them to the user.** In every
-environment, `git tag` and `git push origin v<X.Y.Z>` are presented as a block
-for the user to run. Never execute a tag push via tool calls, and never create
-the tag ref through a GitHub MCP tool. Deleting or re-pushing a tag is the same
-operation and the same rule.
+**Tag pushes and ref deletions are the exceptions — always hand them to the
+user.** In every environment, `git tag` and `git push origin v<X.Y.Z>` are
+presented as a block for the user to run — and so is deleting any ref, a
+branch (`git push origin --delete <branch>` / `git push origin
+:refs/heads/<branch>`) or a tag (`git push origin :refs/tags/v<X.Y.Z>`).
+Never execute either via tool calls, and never create a tag ref or delete a
+branch ref through a GitHub MCP tool. Re-pushing a tag is a delete followed by
+a create — both halves go to the user.
 
-Why this one and not the others: the credentials Claude runs under are routinely
-denied on tag refs. A token that pushes branch commits all session gets **403**
-on `git push origin v1.2.3`, because creating a `refs/tags/*` ref — and creating
-a ref that *triggers a workflow* — is a separate permission, commonly withheld
-even where `contents: write` is granted. And the blast radius is worse than an
-ordinary denial: the tag push is what fires the release workflow, so a 403 there
-strands a merged, version-bumped default branch with no release behind it. Route
-it to the user's credentials from the start rather than discovering this
-mid-ship.
+Why these two and not ordinary branch pushes: the credentials Claude runs
+under are routinely denied on two specific ref operations, both narrower than
+the `contents: write` scope that lets branch commits push fine all session.
+**Creating** a `refs/tags/*` ref — especially one that *triggers a
+workflow* — is commonly withheld even where ordinary pushes succeed. And
+**deleting** any ref, tag or branch, is its own separate permission again: a
+token that pushes commits and creates tags without issue all session can still
+**403** on `git push origin --delete some-branch`. Same failure, different
+command, easy to miss the pattern and go looking for a fix in the wrong place.
+The tag side also carries a worse blast radius than an ordinary denial: the
+tag push is what fires the release workflow, so a 403 there strands a merged,
+version-bumped default branch with no release behind it. Route both kinds to
+the user's credentials from the start rather than discovering this mid-ship or
+mid-cleanup.
 
 🚀 SHIP stays ⏳ until the tag is confirmed on the remote — never ✅ on the
 assumption the user ran the block. Confirm it yourself with
 `git ls-remote --tags origin v<X.Y.Z>`; reading refs is not a write and is not
-restricted. If you are told to attempt the push anyway and it 403s, do not
-retry, re-route, or tag a different ref — report it and hand over the block.
+restricted. The same goes for a branch deletion: confirm it with
+`git ls-remote --heads origin <branch>` returning nothing, not on the
+assumption the user ran the block. If you are told to attempt either push
+anyway and it 403s, do not retry, re-route, or act on a different ref —
+report it and hand over the block.
 
 The block's exact shape, the sync that must precede the tag, and the GitHub UI
 fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
@@ -614,12 +632,18 @@ fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
 (Section 1): the pre-flight runs, and the tracker goes in the same message,
 above the block.
 
-**Shell environment detection** is done at session start (`GATE_REFERENCE.md`, session start, step 2) for
-local and Termux sessions. Remote containers defer it rather than skip it: they
-present exactly one block all session — the tag push — so they ask for the shell
-and clone path at that moment (`GATE_REFERENCE.md`, step 0, item 4). If a session reaches this
-point needing a presented block without a detected shell (e.g. the skill loaded
-mid-session), ask before presenting any commands.
+**Shell environment detection** is done at session start (`GATE_REFERENCE.md`,
+session start, step 2) for local and Termux sessions — those sessions present
+full command blocks (heredocs, multi-line commit messages) that genuinely
+differ by shell. Remote containers defer differently: the only blocks they
+ever present are the tag push and ref deletions above, and everything in them
+below `cd` is a plain single-line `git` invocation — identical across all
+seven shells. So remote containers ask for the user's **clone path only**, not
+their shell (`GATE_REFERENCE.md`, step 0, item 4), and open the block with
+`cd "<clone-path>"`, which parses the same way in PowerShell, pwsh, Git Bash,
+Termux, macOS/Linux Terminal, and WSL alike. If a session reaches this point
+needing a presented block without a stored clone path (e.g. the skill loaded
+mid-session), ask for it before presenting any commands.
 
 **Remote verification.** Before presenting any push commands, verify the remote
 is configured (`git remote -v`). If origin is not set, include
