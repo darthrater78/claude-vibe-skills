@@ -53,7 +53,7 @@ explicit approval. Violations of this rule break trust.
 - **Presenting a git command IS performing it.** Whether you run `git commit` via
   a tool call or print it in a fenced block for the user to paste, the approval
   and gate requirements are identical. A code block containing a git write command
-  *is* a git write operation. This matters because Section 5.7 routes many
+  *is* a git write operation. This matters because Section 5.8 routes many
   sessions toward presenting commands rather than executing them — if the gate
   check only fired on tool calls, it would never fire at all. It fires on the
   block. The gate tracker goes in the same message, above the block.
@@ -69,7 +69,7 @@ merge, tag, release):**
 3. Run `git status` and `git diff` to show what will be committed.
 4. Draft a commit message and show it.
 5. Wait for explicit approval.
-6. **Present commands per Section 5.7.** Always present the git commands formatted
+6. **Present commands per Section 5.8.** Always present the git commands formatted
    for the user's shell environment so they can run them manually. Only execute
    directly via tool calls if the user explicitly asks Claude to run them.
 
@@ -139,7 +139,7 @@ it also destroys the signal. If you believe the hook is wrong, say so to the
 user and let them decide.
 
 **The hook does not cover presented commands** — nothing intercepts the user's
-own terminal. On local sessions, where presenting is the default (Section 5.7),
+own terminal. On local sessions, where presenting is the default (Section 5.8),
 the prose pre-flight is the only enforcement there is. That is exactly why
 presenting a command counts as performing it (Section 1).
 
@@ -217,7 +217,7 @@ This matters more than it looks. A check that reports *every* prior version as
 untagged, or every branch as gone, is a check nobody reads, and a real missing
 tag or a real live branch hides in that noise. Reading refs is not a write, so
 this is safe to run yourself even where ref-writing pushes are denied
-(Section 5.7).
+(Section 5.8).
 
 **Re-derivation — when the state file is missing, stale, or the session was
 compacted.** Do not guess, and do not treat a gate as passed because it feels
@@ -308,9 +308,9 @@ These phrases mean "surface the gates", not "comply silently":
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
 | "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
 | "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
-| "just tag it" / "push the tag for me" | Tag pushes are always the user's to run (§5.7) — present the block, don't execute it |
-| "just delete that branch for me" | Ref deletions are always the user's to run, same as tags (§5.7) — present the block, don't execute it |
-| Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.7) |
+| "just tag it" / "push the tag for me" | Tag pushes are always the user's to run (§5.8) — present the block, don't execute it |
+| "just delete that branch for me" | Ref deletions are always the user's to run, same as tags (§5.8) — present the block, don't execute it |
+| Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.8) |
 
 ---
 
@@ -479,7 +479,30 @@ Recommend `/effort` changes when the task doesn't match the current level:
 - **medium**: routine edits, mechanical refactors, running tests, writing boilerplate
 - Remind the user to switch back down after a high-effort stretch
 
-### 5.4 MCP server and connector awareness
+### 5.4 Subagent model delegation
+
+When spawning a subagent (the Agent tool), use the cheapest model that can
+handle the task. Each spawn starts cold with full context re-injection — the
+model tier on top of that is the lever you control.
+
+| Tier | Model | Use for |
+|---|---|---|
+| **Cheap** | Haiku | single-target lookups, grep/glob searches, reading one file, mechanical checks, simple Q&A |
+| **Standard** | Sonnet | multi-step research, code implementation, refactoring, code review, test writing |
+| **Expensive** | Opus / Fable | complex architecture, deep root-cause debugging, security analysis — only when the main session is already approved above the Sonnet ceiling |
+
+**Rules:**
+- Never spawn a subagent on a more expensive model than the main session is
+  approved for. If the session is on Sonnet, subagents are Sonnet or Haiku.
+- Default to Haiku for any task that is essentially "find X and report back."
+  The Explore agent type is already read-only — pairing it with Haiku is the
+  cheapest delegation available.
+- Use Sonnet for subagents that write code, review code, or need multi-step
+  reasoning across files.
+- Escalate to the main session's model only when the subagent's task is the
+  kind that justified the main session's model in the first place.
+
+### 5.5 MCP server and connector awareness
 
 MCP servers add per-request overhead. Check how their tools are loaded before
 reporting — don't conflate the two states:
@@ -518,7 +541,7 @@ Connections now: Home Assistant, Slack (was: + Jira, Gmail, Calendar, Drive)
 Estimated overhead: ~12k/turn, down from ~40k/turn
 ```
 
-### 5.5 Phase transitions → fresh session
+### 5.6 Phase transitions → fresh session
 
 A long session resends its entire history on every request, so a fresh start is
 often the largest saving available. Offer a handoff at any of these points.
@@ -539,7 +562,7 @@ open-ended question, which is easy to drop:
 > This session is carrying [N] turns and the release is done — a fresh one would
 > be cheaper. Want a handoff summary?
 
-**Handoff format** (also used by Section 5.8):
+**Handoff format** (also used by Section 5.9):
 
 ```
 ## Handoff: [task name]
@@ -556,7 +579,7 @@ Keep it under ~30 lines. The point is to replace a long history with a cheap
 restart. Include the gate tracker so the next session knows where to resume, and
 the shell environment so it doesn't have to re-ask.
 
-### 5.6 Token impact estimate
+### 5.7 Token impact estimate
 
 **Two triggers, both firm:**
 
@@ -591,7 +614,7 @@ Biggest win next time: disable unused connectors
 
 Never let the report become longer than the savings it describes.
 
-### 5.7 Git command presentation
+### 5.8 Git command presentation
 
 **This section fires whenever git write operations are needed** — during any
 gate (commit, push, PR, merge, tag, release), handoff summaries, or
@@ -637,14 +660,14 @@ restricted.
 **The gates are identical either way.** Presenting a command is performing it
 (Section 1): the pre-flight runs, and the tracker goes in the same message,
 above the block.
-### 5.8 Usage limit handoff
+### 5.9 Usage limit handoff
 
 **Trigger on any of these. All three are things you can actually observe:**
 
 - The system prompt or a system message mentions overage, rate limits, or a
   usage cap being approached
 - The user says they are running low, near a limit, or about to be cut off
-- The conversation has been compacted (also a Section 5.5 trigger)
+- The conversation has been compacted (also a Section 5.6 trigger)
 
 **Do not gate this on a numeric token budget.** Earlier versions watched for a
 context budget below ~2M. On Claude Code for web that figure starts at 15M every
@@ -656,7 +679,7 @@ absence is not a reason to stay quiet.
 > you lose the working context. Want a handoff summary now, so you can resume in
 > a fresh session without losing progress?
 
-Use the handoff format in Section 5.5 — it carries the gate tracker and the
+Use the handoff format in Section 5.6 — it carries the gate tracker and the
 shell environment, which is exactly what a resumed session would otherwise have
 to rediscover.
 
@@ -733,7 +756,7 @@ Before wrapping up, check:
 5. **If no source files were modified**, skip the gate check *and* the token
    estimate — the session was exploratory or advisory.
 
-6. **Surface the token impact estimate** (Section 5.6). This checkpoint is that
+6. **Surface the token impact estimate** (Section 5.7). This checkpoint is that
    section's firm trigger: if source files were modified, the estimate is part
    of winding down, not an optional extra. Three to five lines, and never longer
    than the savings it describes.
