@@ -264,7 +264,7 @@ conversation â€” is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.16.1 active.
+Dev Skills v2.17.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -289,7 +289,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump â
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.16.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.17.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 

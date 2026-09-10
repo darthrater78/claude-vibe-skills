@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.16.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.17.0`
 
 ---
 
@@ -84,6 +84,10 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   token estimate, the phase-transition handoff, and the usage-limit handoff were
   gated on judgment calls and on a token threshold that Claude Code for web
   never crosses. All three now trigger on observable events. *(2.16.1)*
+- **[Subagent model delegation](#cost-discipline).** When spawning subagents,
+  the cheapest model tier that fits the task is used — Haiku for lookups, Sonnet
+  for code work, expensive models only when the session is already approved
+  above the Sonnet ceiling. *(2.17.0)*
 
 ---
 
@@ -94,7 +98,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.16.1 — all refs agree
+     🔢 VERSION    ✅ v2.17.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -109,9 +113,9 @@ Gate state lives in a file, not in Claude's memory:
 ```
 # .claude/dev-skills-gates.md
 Track: release sequence
-Version: 2.16.1
+Version: 2.17.0
 
-🔢 VERSION    ✅ all refs at 2.16.1; prev v2.16.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.17.0; prev v2.16.1 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -407,6 +411,9 @@ release breaks.
   before proceeding
 - **Effort fit** — recommends `/effort` changes when the task doesn't match the
   level
+- **Subagent model delegation** — when spawning subagents, uses the cheapest
+  model tier that fits the task (Haiku for lookups, Sonnet for code, Opus/Fable
+  only when approved)
 - **MCP awareness** — identifies unused MCP servers adding token overhead and
   shows how to disable them
 - **Git command presentation** — on local sessions, presents git as a single
@@ -461,7 +468,7 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~38KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SKILL.md` | ~39KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `GATE_REFERENCE.md` | ~42KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
@@ -525,4 +532,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.16.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.17.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

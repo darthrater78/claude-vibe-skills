@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.17.0] — 2026-09-10
+
+### Added
+- **Subagent model delegation (Section 5.4).** New cost-discipline rule: when
+  spawning subagents via the Agent tool, use the cheapest model tier that fits
+  the task — Haiku for lookups and searches, Sonnet for code work and review,
+  Opus/Fable only when the main session is already approved above the Sonnet
+  ceiling. Includes a tier table and four rules, the hardest being that a
+  subagent can never run on a more expensive model than the main session is
+  approved for.
+
+### Changed
+- Existing sections 5.4–5.8 renumbered to 5.5–5.9. All ~25 cross-references
+  across SKILL.md, GATE_REFERENCE.md, and SHELL_REFERENCE.md updated.
+
 ## [2.16.1] — 2026-09-08
 
 ### Fixed
