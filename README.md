@@ -473,6 +473,7 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
+| `WORKFLOW_REFERENCE.md` | ~56KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, audit procedures, best practices, and review checklist |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a

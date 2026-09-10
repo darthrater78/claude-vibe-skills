@@ -70,7 +70,8 @@ jobs:
             GATE_REFERENCE.md \
             SECURITY_REFERENCE.md \
             QUALITY_REFERENCE.md \
-            SHELL_REFERENCE.md
+            SHELL_REFERENCE.md \
+            WORKFLOW_REFERENCE.md
           cd "$GITHUB_WORKSPACE"
           unzip -l dev-skills.skill
 

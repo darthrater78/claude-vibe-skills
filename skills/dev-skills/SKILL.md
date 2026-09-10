@@ -6,8 +6,9 @@ description: >
   cost control, and a strict gate workflow that never advances silently. Trigger
   on: "dev mode", "dev skills", "start coding", "build", "ship it", "push",
   "release", "commit", "done", "just push it", "skip the version", "audit",
-  "security review", "scan this", "check my code", or any attempt to bypass a
-  gate.
+  "security review", "scan this", "check my code", "create a workflow",
+  "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
+  "review my CI", or any attempt to bypass a gate.
 ---
 
 # Dev Skills
@@ -804,3 +805,46 @@ Then:
 5. Output findings using severity levels (🚨 Critical, ⚠️ High, 📝 Medium, 💡 Low)
    with file:line, description, and fix for each
 6. End with summary: files scanned, total findings by severity, top 3 next steps
+
+### 9.1 Workflow audit
+
+On "audit my workflows", "review my CI", "check my GitHub Actions", "review
+my workflows", or when the full project audit discovers `.github/workflows/`:
+
+**Load `WORKFLOW_REFERENCE.md`** from this skill's base directory and follow
+its **Workflow audit** procedure. This runs the workflow review checklist
+against every `.yml` file in `.github/workflows/`, reports findings by
+severity, flags missing workflows against the detected environment, and
+checks for CI/local-dev drift.
+
+The workflow audit can run standalone or as part of a full project audit
+(Section 9). When part of a full audit, include the workflow findings in the
+overall summary.
+
+### 9.2 Guided workflow creation
+
+On "create a workflow", "set up CI", "add GitHub Actions", "I need a
+pipeline", "add CI/CD", "set up continuous integration", "help me with
+GitHub Actions", "I want to automate builds", "add a release workflow", or
+any request to create, add, or set up a GitHub Actions workflow:
+
+**Load `WORKFLOW_REFERENCE.md`** from this skill's base directory and follow
+its **Workflow selection procedure.** This walks the user through:
+
+1. Detecting the project environment (Docker, Windows, Linux, Android,
+   Home Assistant, Python, Node.js, scripts)
+2. Checking for existing workflows
+3. Asking all configuration questions in a single turn
+4. Generating the workflow from the matching template
+5. Validating the generated workflow against best practices
+
+The guided procedure empowers the citizen coder to set up professional-grade
+CI/CD without needing to understand the underlying GitHub Actions
+infrastructure. Every generated workflow follows security best practices
+(SHA-pinned actions, least-privilege permissions, credential hygiene) and
+reliability patterns (concurrency groups, timeouts, explicit failure) by
+default.
+
+Also recommend [Dependabot configuration](#keeping-action-shas-current-with-dependabot)
+for keeping action SHAs current — suggest this whenever creating or auditing
+workflows.

@@ -43,7 +43,7 @@ fi
 # Check required skill files exist
 echo ""
 echo "=== Required files ==="
-for f in skills/dev-skills/SKILL.md skills/dev-skills/GATE_REFERENCE.md skills/dev-skills/SECURITY_REFERENCE.md skills/dev-skills/QUALITY_REFERENCE.md skills/dev-skills/SHELL_REFERENCE.md; do
+for f in skills/dev-skills/SKILL.md skills/dev-skills/GATE_REFERENCE.md skills/dev-skills/SECURITY_REFERENCE.md skills/dev-skills/QUALITY_REFERENCE.md skills/dev-skills/SHELL_REFERENCE.md skills/dev-skills/WORKFLOW_REFERENCE.md; do
   if [ -f "$f" ]; then
     echo "  OK: $f"
   else
@@ -83,7 +83,7 @@ if [ -f skills/dev-skills.skill ]; then
     echo "  OK: dev-skills.skill is a valid zip"
     # Every required file must actually be in the bundle, and the bundled
     # SKILL.md must carry the current version — a stale archive ships old rules.
-    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md; do
+    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md; do
       if unzip -l skills/dev-skills.skill | grep -q "  $f\$"; then
         echo "  OK: bundled $f"
       else
@@ -93,7 +93,7 @@ if [ -f skills/dev-skills.skill ]; then
     done
     # The bundle must match the source, not merely contain the right filenames —
     # a stale archive ships old rules under a current version number.
-    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md; do
+    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md; do
       if ! unzip -p skills/dev-skills.skill "$f" 2>/dev/null | diff -q - "skills/dev-skills/$f" > /dev/null 2>&1; then
         # Tell a stale bundle apart from a CRLF checkout. The bundle always holds
         # LF and .gitattributes keeps checkouts LF, but an older clone predating
