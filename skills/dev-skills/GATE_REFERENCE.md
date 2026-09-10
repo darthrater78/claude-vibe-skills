@@ -38,7 +38,7 @@ same clone as the user's terminal?** Resolve it into one of three environments:
 
 | Environment | Signals | Consequences |
 |---|---|---|
-| **Local** | Claude Code CLI running on the user's own machine; Claude's cwd is the user's own project directory | Present git commands for the user to run (Section 5.7). Ask the shell question (step 2). Gate state file in `.gitignore`. |
+| **Local** | Claude Code CLI running on the user's own machine; Claude's cwd is the user's own project directory | Present git commands for the user to run (Section 5.8). Ask the shell question (step 2). Gate state file in `.gitignore`. |
 | **Remote container** | the system prompt describes a managed, remote, or cloud execution environment; the session was started from the web or mobile app; the repo was cloned fresh into a container path; `gh` is absent | Claude executes git directly after approval. Skip the shell question. Use GitHub MCP tools in place of `gh`. Commit the gate state file to the branch. |
 | **Termux** | the user names Termux, or an Android userland path | Clone flow per `SHELL_REFERENCE.md`. Ask the shell question. |
 
@@ -77,7 +77,7 @@ If the signals are ambiguous, ask — do not assume local:
 4. **Skip step 2 (shell detection) at session start — and skip it for the tag
    and ref-deletion blocks too.** Every git command Claude runs here uses the
    container's own bash, so there is nothing to ask about up front. The
-   tag-push and ref-deletion carve-out (Section 5.7) changes that at exactly
+   tag-push and ref-deletion carve-out (Section 5.8) changes that at exactly
    one moment: a remote session that reaches Gate 6, or that needs to delete a
    branch or tag, *always* hands the user a block to run on their own
    machine — but that block needs a real clone path, not a shell choice.
@@ -106,7 +106,7 @@ If the signals are ambiguous, ask — do not assume local:
 7. **Executing git here does not extend to tag pushes.** Container credentials
    are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
    that fires the release workflow. Present the tag block to the user even
-   though everything else runs here — Section 5.7, "Tag pushes and ref
+   though everything else runs here — Section 5.8, "Tag pushes and ref
    deletions are the exceptions."
 
 Report the detected environment in the session banner.
@@ -147,7 +147,7 @@ If yes:
 
 3. **Offer to sync with origin.** The user may be working with outdated files.
    Present the option before any work begins, formatted for the user's detected
-   shell (Section 5.7):
+   shell (Section 5.8):
 
    > 📡 **Git repo detected:** `<repo-name>` on branch `<current-branch>`
    > Want to sync with origin before we start? This ensures we're working
@@ -227,7 +227,7 @@ If yes:
 7. **Unfinished release check — did the last release actually ship?** Gate 6 has
    four parts (merge, tag, publish, verify) and a session can die between any two
    of them: a container reclaimed, a usage limit, or a tag push denied `403`
-   (Section 5.7). When that happens the work is stranded on the default branch
+   (Section 5.8). When that happens the work is stranded on the default branch
    and **nothing in a later session goes looking for it** — the next session
    starts with all gates ⬜ pending *for the version it is about to build*, and
    never asks about the one before.
@@ -264,7 +264,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.16.1 active.
+Dev Skills v2.17.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -289,7 +289,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.16.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.17.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -311,7 +311,7 @@ Rules for the MCP check:
   disabling [name] — not needed for this task. Run `/mcp` to toggle."
 - `/mcp` is the in-session command. It toggles servers on/off without leaving
   the session. This is the primary recommendation for disabling during a session.
-- For permanent removal, see Section 5.4.
+- For permanent removal, see Section 5.5.
 
 Then: "What are we building?"
 
@@ -366,7 +366,7 @@ No build starts until versioning is resolved.
    > 🚫 **VERSION GATE BLOCKED — the previous release never shipped.**
    > v1.2.2 is in the changelog and on the default branch, but has no tag on
    > the remote. Gate 6 did not complete for it — most often a tag push that
-   > came back `403` (Section 5.7) or a session that ended between merge and
+   > came back `403` (Section 5.8) or a session that ended between merge and
    > tag.
    >
    > Finish it before bumping: tag its merge commit and let the release
@@ -374,7 +374,7 @@ No build starts until versioning is resolved.
 
    Retroactively tagging is usually a one-liner — find the merge commit that
    bumped `VERSION` to that release (`git log --oneline -- VERSION`) and tag it.
-   That block goes to the user like any tag push (Section 5.7).
+   That block goes to the user like any tag push (Section 5.8).
 
    **Older gaps are advisory,** not blocking: note them, fix them if the merge
    commits are identifiable, flag them otherwise. The distinction is that the
@@ -595,7 +595,7 @@ Execution (merge, tag, publish) happens in Gate 6.
 2. **Sync with origin before committing.** Run `git fetch origin` and compare
    the local branch with its remote counterpart. If the remote is ahead, pull
    before staging. Present the sync commands formatted for the user's shell
-   (Section 5.7). This prevents committing on top of stale history, which causes
+   (Section 5.8). This prevents committing on top of stale history, which causes
    merge conflicts and can clobber others' work.
 
    > 📡 **Pre-commit sync:** Fetching latest from origin...
@@ -607,7 +607,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    include `git remote add origin <url>` (using the URL stored at session start)
    in the command block before any push commands. This prevents the "default repo
    has not been set" error.
-5. **Present commands per Section 5.7** — format the commit, push, and PR creation
+5. **Present commands per Section 5.8** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
    Claude to execute directly.
 6. After the branch is pushed and PR created, draft release notes and show the
@@ -701,7 +701,7 @@ looks fine and is not:
    A workflow that builds unsigned artifacts because a secret is absent usually
    still goes green. Check the secrets, not just the run.
 
-2. **Merge the PR** (per Section 5.7 — Claude executes this in a remote
+2. **Merge the PR** (per Section 5.8 — Claude executes this in a remote
    container, presents it locally):
    ```
    gh pr merge <number> --merge --delete-branch
@@ -710,7 +710,7 @@ looks fine and is not:
 
 3. **Tag and push — the user runs this block.** Tag pushes are denied (`403`)
    to Claude's credentials far more often than they succeed, and this is the
-   push that starts the release build (Section 5.7, "Tag pushes and ref
+   push that starts the release build (Section 5.8, "Tag pushes and ref
    deletions are the exceptions"). Present it, in one block, with the sync in
    front so the tag lands on the merged commit:
 
@@ -838,8 +838,8 @@ path above applies here too — it describes what a correct release artifact loo
 like, not how CI happens to produce it. Check the artifact against its platform
 row before publishing.
 
-**Execution — present commands per Section 5.7.** The tag push goes to the user
-even when Claude is executing the rest (Section 5.7, "Tag pushes and ref
+**Execution — present commands per Section 5.8.** The tag push goes to the user
+even when Claude is executing the rest (Section 5.8, "Tag pushes and ref
 deletions are the exceptions"), so this splits into two blocks:
 
 Claude runs (or presents, on a local session):
@@ -881,7 +881,7 @@ If any check fails, fix and re-verify — do not pass with failures outstanding.
 **Post-merge cleanup.** After the PR is merged and verified, clean up branches:
 1. Delete the local feature branch: `git branch -d <branch-name>`
 2. Prune stale remote-tracking refs: `git remote prune origin`
-3. Present cleanup commands formatted for the user's shell (Section 5.7)
+3. Present cleanup commands formatted for the user's shell (Section 5.8)
 
 This prevents stale branches from accumulating. `--delete-branch` on `gh pr merge`
 handles the remote branch; these steps handle the local side.

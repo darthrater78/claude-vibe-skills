@@ -1,7 +1,7 @@
 # Shell Command Reference
 
 This file is loaded on demand by the dev-skills skill when git commands need to
-be formatted for the user's shell environment (Section 5.7). It contains the
+be formatted for the user's shell environment (Section 5.8). It contains the
 environment rules in full: the `cd` format table, the rules every presented
 block follows, why tag pushes and ref deletions always go to the user,
 shell-specific syntax, the Termux clone flow, and example blocks for each
@@ -59,7 +59,7 @@ cannot copy as given, in the one block they must run by hand.
 
 ## Tag pushes and ref deletions — always the user's
 
-SKILL.md Section 5.7 states the rule: creating a tag ref and deleting any ref go
+SKILL.md Section 5.8 states the rule: creating a tag ref and deleting any ref go
 to the user in every environment, remote containers included. This is why.
 
 The credentials Claude runs under are routinely denied on two specific ref
