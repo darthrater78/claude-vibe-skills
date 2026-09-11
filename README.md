@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.17.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.18.0`
 
 ---
 
@@ -88,6 +88,13 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   the cheapest model tier that fits the task is used — Haiku for lookups, Sonnet
   for code work, expensive models only when the session is already approved
   above the Sonnet ceiling. *(2.17.0)*
+- **[Guided GitHub Actions workflows](#audit-mode).** New reference file with
+  audit and creation procedures: point it at an existing `.github/workflows/`
+  for a severity-graded review, or ask it to set one up and it detects your
+  project's environment, asks every config question in one turn, and
+  generates a template — Docker, Windows, Android, Linux, Home Assistant,
+  Python, Node.js, or scripts — with SHA-pinned actions, least-privilege
+  permissions, and dev/pre-release build support out of the box. *(2.18.0)*
 
 ---
 
@@ -98,7 +105,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.17.0 — all refs agree
+     🔢 VERSION    ✅ v2.18.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -113,9 +120,9 @@ Gate state lives in a file, not in Claude's memory:
 ```
 # .claude/dev-skills-gates.md
 Track: release sequence
-Version: 2.17.0
+Version: 2.18.0
 
-🔢 VERSION    ✅ all refs at 2.17.0; prev v2.16.1 tagged on remote
+🔢 VERSION    ✅ all refs at 2.18.0; prev v2.17.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -444,6 +451,15 @@ run a full scan outside the gate workflow. Outputs findings by severity
 (🚨 Critical, ⚠️ High, 📝 Medium, 💡 Low) with file:line, description, and fix
 for each.
 
+**"audit my workflows"** or **"review my CI"** runs the same severity-graded
+review against `.github/workflows/` specifically — pinning, permissions,
+credential hygiene, and drift between CI and the local dev workflow.
+
+**"create a workflow"**, **"set up CI"**, or **"add GitHub Actions"** walks
+you through generating one instead: it detects your project's environment,
+asks every configuration question in a single turn, and generates a
+template you review before anything is written.
+
 ---
 
 ## Shortcut detection
@@ -533,4 +549,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.17.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.18.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

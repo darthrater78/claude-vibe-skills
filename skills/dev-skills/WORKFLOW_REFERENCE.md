@@ -224,8 +224,12 @@ and match the patterns already used in this repo's own workflows.
   - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
   ```
   First-party GitHub actions (`actions/*`) should also be pinned to SHAs.
-  Third-party and community actions (`docker/*`, `hacs/*`, etc.) must always
-  be pinned.
+  Third-party and community actions (`docker/*`, etc.) must always be pinned.
+  **Exception: `hacs/action`.** HACS's own guidance is to run it unpinned at
+  `@main` — the action always validates against HACS's current rules, and a
+  pinned snapshot would silently validate against stale ones and pass
+  integrations that no longer meet the real requirements. This is the one
+  template action left unpinned, and it is intentional, not an oversight.
 - **`persist-credentials: false`** on checkout unless the job needs to push.
   Credentials sitting in `.git/config` are attack surface while scripts run.
 - **Least-privilege `permissions:`** — declare only what the job needs. Never
@@ -808,7 +812,7 @@ jobs:
           persist-credentials: false
 
       - name: HACS validation
-        uses: hacs/action@main
+        uses: hacs/action@main # intentionally unpinned — see Template best practices, Security
         with:
           category: integration
 

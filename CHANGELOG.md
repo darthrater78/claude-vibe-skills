@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.18.0] — 2026-09-11
+
+### Added
+- **`WORKFLOW_REFERENCE.md`.** New on-demand reference for GitHub Actions
+  workflows, loaded when a CI workflow is missing (Gate 6 detection) or the
+  user asks for workflow help. Two procedures:
+  - **Workflow audit (Section 9.1)** — a severity-graded review of existing
+    `.github/workflows/*.yml` against a 14-item checklist, plus CI/local-dev
+    drift detection.
+  - **Guided workflow creation (Section 9.2)** — detects the project's
+    environment, asks every configuration question in one turn, and
+    generates a template the user reviews before anything is written.
+  - Eight environment templates (each with CI + release workflow): Docker,
+    Windows, Android, Linux, Home Assistant, scripts, Python, and Node.js —
+    all with SHA-pinned actions, least-privilege `permissions:`,
+    `persist-credentials: false`, concurrency groups, and timeouts.
+  - Pre-release/dev builds (`v1.0.0-dev.1` tags from feature branches),
+    optional Cosign image signing, and a Dependabot config template for
+    keeping pinned action SHAs current.
+- New trigger phrases in `SKILL.md`'s frontmatter: "create a workflow",
+  "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
+  "review my CI".
+
 ## [2.17.0] — 2026-09-10
 
 ### Added
