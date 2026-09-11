@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 
 src="skills/dev-skills"
 out="skills/dev-skills.skill"
-files=(SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md)
+files=(SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md)
 
 for f in "${files[@]}"; do
   if [ ! -f "$src/$f" ]; then

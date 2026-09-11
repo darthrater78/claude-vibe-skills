@@ -23,9 +23,9 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 When the skill loads:
 
 **Self-check:** Verify that `GATE_REFERENCE.md`, `SECURITY_REFERENCE.md`,
-`QUALITY_REFERENCE.md`, and `SHELL_REFERENCE.md` exist in this skill's base
-directory (shown when the skill loaded, e.g. "Base directory for this
-skill: ..."). If any is missing, warn immediately:
+`QUALITY_REFERENCE.md`, `SHELL_REFERENCE.md`, and `WORKFLOW_REFERENCE.md`
+exist in this skill's base directory (shown when the skill loaded, e.g.
+"Base directory for this skill: ..."). If any is missing, warn immediately:
 
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
@@ -214,14 +214,16 @@ If yes:
    > inline, but `scripts/validate.sh` is what a developer runs. They can pass
    > and fail independently. CI should call the script.
 
-   If the user asks for a workflow to be created, ask what the project needs:
-   - Which platform does it target? (Linux / Windows / Android — see Gate 6)
-   - What's the build command for a release artifact?
-   - What should the artifact be named?
-   - What secrets does signing require? (keystore, certificate, GPG key, tokens)
+   If the user asks for a workflow to be created, or accepts the suggestion,
+   **load `WORKFLOW_REFERENCE.md`** from this skill's base directory. It holds
+   environment-detection rules, template workflows for Docker, Windows,
+   Android, Linux, Home Assistant, Python, Node.js, and script projects,
+   dev/pre-release builds, and the procedure for asking all configuration
+   questions in a single turn. Follow its workflow selection procedure
+   rather than asking questions piecemeal.
 
-   Then generate it from the project's actual build tooling. Do not paste a
-   template — a workflow that does not run the project's real build is worse
+   The generated workflow must be adapted from the project's actual build
+   tooling. A workflow that does not run the project's real build is worse
    than none, because it goes green without proving anything.
 
 7. **Unfinished release check — did the last release actually ship?** Gate 6 has
@@ -264,7 +266,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.17.0 active.
+Dev Skills v2.18.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -289,7 +291,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.17.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.18.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
