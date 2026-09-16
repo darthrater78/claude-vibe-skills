@@ -313,7 +313,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.21.1 active.
+Dev Skills v2.22.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -482,6 +482,41 @@ This means:
 
 If the app cannot be tested locally (e.g. requires external infrastructure),
 say so explicitly rather than skipping — the user decides whether to proceed.
+
+**Local artifact handoff — mandatory offer for compiled outputs, local Linux
+and Windows sessions only.** For any build that produces something a person
+installs or runs outside a terminal — a Docker image, a Windows `.exe`, an
+Android `.apk` — the smoke test above proves the code runs; it does not prove
+the artifact is something the user can actually pick up and try. This offer
+depends on the execution environment detected at session start (step 0) and
+the host shell (step 2):
+
+| Session | Offer |
+|---|---|
+| **Local, Linux host** (shell = Linux Terminal, or WSL) | Full offer — Docker images, Windows `.exe`, Android `.apk` |
+| **Local, Windows host** (shell = Windows PowerShell or Git Bash) | Narrowed — Windows `.exe` and Android `.apk` only; no Docker load/run instructions |
+| **Remote container (cloud) or Termux (mobile)** | Not offered — these environments already ship through the regular CI-driven path (Gate 6), which is the correct handoff there |
+
+Where the offer applies, after the smoke test passes and before this gate is
+marked passed, give the user a way to test the real build themselves:
+
+- **Windows `.exe` and Android `.apk`:** copy the built artifact into a local
+  folder (e.g. `dist/`, `build/output/`) and tell the user the exact path, so
+  they can download or copy it to a device and run it.
+- **Docker images (Linux host only):** give the exact commands to load and
+  run the image locally — `docker load -i <file>` (if built to a tarball) or
+  `docker build -t <tag> .`, then `docker run ...` with the ports/volumes the
+  project needs.
+
+This offer is mandatory **every time the build changes**, not only the first
+time in a session — a rebuild after a code change gets the same offer as the
+first build did. It is not mandatory to *accept*: if the user says they don't
+need to try this particular build by hand, skip it and move on. What can
+never be skipped silently is the offer itself.
+
+This step comes after the automated smoke test, not instead of it — the
+smoke test confirms the code runs; this confirms a human can actually get
+their hands on it.
 
 **Projects with CI release workflows.** If the project has a GitHub Actions
 workflow that builds release artifacts on tag push (check
