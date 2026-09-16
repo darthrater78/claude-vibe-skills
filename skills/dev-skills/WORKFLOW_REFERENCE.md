@@ -207,7 +207,8 @@ After the user answers the Step 3 questions:
 4. **Write the files** only after the user approves. Commit discipline
    (Section 1 of SKILL.md) applies — never auto-commit workflow files
 5. **Recommend Dependabot** if `.github/dependabot.yml` doesn't exist yet —
-   suggest it alongside the new workflows
+   suggest it alongside the new workflows, with an entry for **every ecosystem
+   in the repo**, not just `github-actions`
 
 ---
 
@@ -1689,17 +1690,24 @@ Action SHAs should be updated when new versions are released. Dependabot
 automates this — it opens small PRs that bump one action at a time, with the
 changelog linked. You review and merge; nothing else changes.
 
-**What it does:** Dependabot watches the action versions in your workflow
-files. When a new version is released, it opens a PR that updates the SHA
-pin and version comment. You review the PR, confirm CI passes, and merge.
+**What it does:** Dependabot watches the versions your repo depends on — both
+GitHub Action SHAs and application packages. When a new version is released it
+opens a PR with the changelog linked. You review the PR, confirm CI passes, and
+merge.
 
-**Recommend adding this file to every project with GitHub Actions workflows.**
+**Recommend adding this file to every project**, and **cover every ecosystem the
+repo actually uses, not just `github-actions`.** An actions-only config is the
+common mistake: the workflow pins stay current while the application's own
+packages drift for months, which is exactly the backlog SKILL.md Section 4.1
+exists to prevent. Each ecosystem needs its own `updates:` entry — Dependabot
+does not infer them.
 
 ### `.github/dependabot.yml`
 
 ```yaml
 version: 2
 updates:
+  # 1. GitHub Actions — keeps SHA pins and their version comments current
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -1709,15 +1717,40 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # 2. Application packages — one entry per ecosystem in the repo.
+  #    Replace "npm" with the real one: pip, cargo, gomod, nuget, maven,
+  #    gradle, bundler, composer, docker, terraform, ...
+  #    `directory` points at the folder holding the manifest/lockfile.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Patch and minor bumps ride together — low risk, one review.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    # Majors stay ungrouped: each is a breaking change with its own gates.
 ```
+
+**Security updates need no configuration.** Dependabot opens security PRs for
+known advisories on any ecosystem listed here, regardless of `schedule` — but
+only for ecosystems that have an entry. An ecosystem you left out is an
+ecosystem nobody is watching.
 
 **Adaptation notes:**
 - Change `interval` to `"monthly"` for less-active projects
-- Remove the `groups` section if you prefer one PR per action update (easier
-  to review individually but more PRs)
+- Remove the `groups` section if you prefer one PR per update (easier to review
+  individually but more PRs)
 - Add `reviewers:` to assign specific people to review these PRs
-- For monorepos with workflows in subdirectories, add multiple entries with
-  different `directory:` values
+- For monorepos, add one entry per manifest location with different `directory:`
+  values — a nested `package.json` or `requirements.txt` is invisible to a
+  root-only entry
+- `ignore:` a specific package only with a stated reason; it silences security
+  PRs for it too
 
 **What the PRs look like:**
 
@@ -1770,7 +1803,8 @@ every item:
 - [ ] Artifact verification after upload (release workflows)
 - [ ] Shell scripts checked with shellcheck (Linux/script projects)
 - [ ] `set -euo pipefail` in multi-line run blocks
-- [ ] Dependabot configured for action updates (`.github/dependabot.yml`)
+- [ ] Dependabot configured (`.github/dependabot.yml`) — with an entry for
+      GitHub Actions **and** for every package ecosystem the repo uses
 - [ ] OIDC trusted publishing used where supported (PyPI, cosign)
 
 ---

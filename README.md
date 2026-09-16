@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.18.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.19.0`
 
 ---
 
@@ -95,6 +95,13 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   generates a template — Docker, Windows, Android, Linux, Home Assistant,
   Python, Node.js, or scripts — with SHA-pinned actions, least-privilege
   permissions, and dev/pre-release build support out of the box. *(2.18.0)*
+- **[Dependencies must be current and CVE-free](#security-rules).** Every
+  package is pinned to a release that is looked up, never recalled from
+  training data, and the whole dependency tree — transitive included — is
+  re-audited on every security gate, not just when the manifest changes. A
+  Critical or High advisory now hard-stops Gate 3 the same way a hardcoded
+  secret does, and Dependabot config covers every ecosystem in the repo rather
+  than GitHub Actions alone. *(2.19.0)*
 
 ---
 
@@ -484,12 +491,12 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~39KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~42KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
-| `SECURITY_REFERENCE.md` | ~27KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
+| `SKILL.md` | ~43KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `GATE_REFERENCE.md` | ~45KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SECURITY_REFERENCE.md` | ~30KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~56KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, audit procedures, best practices, and review checklist |
+| `WORKFLOW_REFERENCE.md` | ~59KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, audit procedures, best practices, and review checklist |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -549,4 +556,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.18.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.19.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -266,7 +266,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.18.0 active.
+Dev Skills v2.19.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -291,7 +291,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.18.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.19.0
 **Updates:** Check for new versions at
 https://github.com/darthrater78/claude-vibe-skills/releases
 
@@ -470,24 +470,66 @@ Use these examples to pattern-match against the code being reviewed.
 
 Run a full scan of all source files. Check for every pattern category in
 Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` (loaded
-above). Also run the project's native audit tool (`npm audit`,
-`pip audit`, `cargo audit`, etc.) if available.
+above).
+
+**Then audit the dependencies — this part is not optional and not limited to
+packages the session touched.** Run the ecosystem's audit tool against the
+current lockfile:
+
+| Ecosystem | Command |
+|---|---|
+| Node | `npm audit` / `pnpm audit` / `yarn npm audit` (Berry; classic is `yarn audit`) |
+| Python | `pip-audit` (note the hyphen — there is no `pip audit` subcommand) |
+| Rust | `cargo audit` |
+| Go | `govulncheck ./...` |
+| .NET | `dotnet list package --vulnerable --include-transitive` |
+| Java | `mvn org.owasp:dependency-check-maven:check` / `gradle dependencyCheckAnalyse` |
+| Any | `osv-scanner scan source .` |
+
+If no audit tool is available for the ecosystem, say so explicitly rather than
+passing the step in silence — an unaudited dependency tree is an unknown, and
+unknown is never "passed" (Section 2).
+
+Report dependency findings with the advisory ID, the package, the installed
+version, and the fixed version:
+
+> 🚨 `lodash@4.17.15` — GHSA-35jh-r3h4-6jhm (Critical, prototype pollution)
+>    Fixed in 4.17.21 — bump the pin
+> ⚠️ `urllib3@1.26.5` — transitive via `requests` — CVE-2023-43804 (High)
+>    Fixed in 1.26.17 — bump `requests` to pull the fixed range
 
 **Hard stops (must fix before proceeding):**
 - 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
   disabled TLS, `pickle` on untrusted data, RCE vectors
 - ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
   passwords, `random` for tokens, no input validation on endpoints
+- 🚨⚠️ **Any dependency — direct or transitive — carrying a Critical or High
+  advisory** (Section 4.1). A pinned version is not a safe version; pinning
+  fixes *which* CVEs the project has, not *whether* it has any. Bump to the
+  fixed release and re-run the audit. Where no fixed release exists upstream,
+  the gate does not pass silently: surface the advisory and the options
+  (patch, vendor, replace, or accept with a documented reason) and let the
+  user decide on the record
 
 **Show and let user decide:**
 - 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
-  logging sensitive data, unpinned deps
+  logging sensitive data, unpinned deps, dependencies with a Medium/Low advisory,
+  dependencies several majors behind current with no advisory yet
 - 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
 
-Security step passes at zero Critical and zero High:
+Security step passes at zero Critical and zero High — **in the code and in the
+dependency tree**. Both halves are reported, so a clean scan of hand-written
+code can never stand in for an unaudited manifest:
 
 > ✅ **Security scan passed** — 0 Critical, 0 High
-> Medium: N (shown above, user accepted) | Low: N
+> Code: 0 Critical, 0 High | Medium: N (shown above, user accepted) | Low: N
+> Dependencies: `npm audit` clean — 0 Critical, 0 High | Medium: N | Low: N
+
+If the project has no dependency-update automation, add the recommendation once
+here rather than waiting for a Dependabot backlog to appear:
+
+> 💡 No `.github/dependabot.yml` — nothing watches these packages between
+> security gates. Want me to add one? (`WORKFLOW_REFERENCE.md`)
 
 #### Step 2 — Quality review
 
