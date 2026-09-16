@@ -45,6 +45,18 @@ These rules apply as code is written, not just during Gate 3 scans.
 - No `pickle`/`marshal`/`ObjectInputStream`/`unserialize()` on untrusted data
 - Use JSON with schema validation
 
+**Dependencies:**
+- Every package must be a current release with no known Critical/High CVE —
+  direct and transitive (SKILL.md Section 4.1)
+- Never write a version number from memory — look up the current release before
+  pinning; a remembered version is stale the day it is written
+- Pin exact versions, and keep the lockfile committed
+- A pinned version is not a safe version: pinning decides *which* CVEs you carry
+- Re-audit the whole tree on every security gate, not only when the manifest
+  changes — the version stands still, the advisories do not
+- Flag a dependency whose upstream is abandoned: it will never ship the fix for
+  its next advisory
+
 **JavaScript/Node-specific:**
 - Prototype pollution: check for `__proto__`, `constructor`, `prototype` in user-supplied keys
 - XSS: no `innerHTML` with user data — use `textContent` or DOMPurify
@@ -928,17 +940,67 @@ def add_item(item, collection: list | None = None) -> list:
 
 ---
 
-## Python — pinned dependencies
+## Dependencies — pinned, current, and CVE-free
+
+Three separate properties. A manifest can satisfy one and fail the others, and
+each failure has its own consequence.
 
 ```
-# bad
+# bad — unpinned: the build is not reproducible, and today's audit
+# says nothing about tomorrow's install
 requests>=2.28.0
 flask
 
-# good
+# bad — pinned, reproducible, and vulnerable. Pinning froze the CVEs in
+# place; this is the version a model writes from memory
+requests==2.28.0        # CVE-2023-32681, fixed in 2.31.0
+flask==2.0.1            # 3 majors behind current
+
+# good — pinned to the current release, audit clean
 requests==2.32.3
 flask==3.0.3
 ```
+
+**Look the version up; never recall it.** The check is one command per
+ecosystem, and it is the difference between a project that starts current and
+one that starts a year behind:
+
+```bash
+npm view <pkg> version                 # Node
+pip index versions <pkg>               # Python (pip marks this experimental)
+cargo search <pkg>                     # Rust
+go list -m -versions <module>          # Go
+dotnet package search <pkg>            # .NET (SDK 9+; else check nuget.org)
+```
+
+**Audit the tree, not the manifest.** Most advisories arrive through packages
+nobody chose directly — the manifest looks clean while the lockfile carries the
+vulnerability:
+
+```bash
+npm audit --audit-level=high           # Node
+pip-audit                              # Python
+cargo audit                            # Rust
+govulncheck ./...                      # Go
+dotnet list package --vulnerable --include-transitive
+osv-scanner scan source .              # any ecosystem, incl. lockfiles
+```
+
+**Fixing a transitive advisory** means moving the parent to a range that pulls
+the fixed child — not pinning the child behind its parent's back:
+
+```
+# bad — fights the resolver; the parent may still pull its own pinned copy,
+# and the next lockfile regeneration silently undoes this
+urllib3==1.26.17
+
+# good — move the parent forward so the fixed child comes with it
+requests==2.32.3        # pulls urllib3 >= 1.26.17
+```
+
+For an ecosystem that supports it, an override/resolution is the explicit form
+(`overrides` in npm, `[patch]` in Cargo) — use it deliberately, with a comment
+naming the advisory, and remove it once the parent ships the fix.
 
 ---
 

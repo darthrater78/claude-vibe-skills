@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.18.0
+version: 2.19.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -333,16 +333,52 @@ Prefer:
 
 ### 4.1 Package and dependency auditing
 
-Before suggesting or accepting any new package, check:
+**Every dependency must be a current release with no known CVEs — direct and
+transitive.** This is a requirement, not a preference: Gate 3 hard-stops on a
+Critical or High advisory in any dependency (`GATE_REFERENCE.md`, Gate 3).
 
-1. **Maintenance health**: actively maintained, issues addressed, recent commits
-2. **Popularity signal**: high downloads and dependents = real-world scrutiny
-3. **Scope creep**: does it request more access than the task needs?
-4. **Name integrity**: verify against typosquatting (`lodahs` vs `lodash`, `reqeusts` vs `requests`)
-5. **Known CVEs**: run `npm audit`, `pip audit`, `cargo audit`, or equivalent
-6. **Transitive risk**: safe direct code with dangerous transitive deps is still dangerous
+Dependencies are audited at two moments, and both are required. Auditing only
+at the first one is how a project ends up with a Dependabot PR queue: the
+version stands still while the CVEs accumulate against it.
 
-**Prefer built-ins** when functionality is achievable without a third-party package.
+**When adding a package:**
+
+1. **Current version** — pin the latest stable release. **Never write a version
+   number from memory.** A model pins what it saw in training, which is already
+   months or years stale on the day it is written, so a brand-new project is
+   born outdated. Look it up: `npm view <pkg> version`,
+   `pip index versions <pkg>`, `cargo search <pkg>`, `go list -m -versions <mod>`.
+2. **Known CVEs** — check before adopting, not after: `npm audit`, `pip-audit`,
+   `cargo audit`, `osv-scanner`, `dotnet list package --vulnerable`. A package
+   whose *current* release still carries an unfixed Critical or High advisory is
+   not a candidate; find another.
+3. **Maintenance health** — actively maintained, issues addressed, recent
+   commits. An abandoned package will never ship the fix for its next CVE.
+4. **Popularity signal** — high downloads and dependents = real-world scrutiny.
+5. **Scope creep** — does it request more access than the task needs?
+6. **Name integrity** — verify against typosquatting (`lodahs` vs `lodash`,
+   `reqeusts` vs `requests`).
+7. **Transitive risk** — safe direct code with dangerous transitive deps is
+   still dangerous. Audit tools report the whole tree; read the whole report.
+
+**For the life of the project** — the manifest is re-audited on every security
+gate, not just when it changes:
+
+- Run the ecosystem's audit tool against the **current** lockfile at Gate 3.
+  Critical/High blocks; Medium/Low is surfaced for the user to accept.
+- Treat a dependency with no upstream fix available as a finding to raise, not
+  to swallow: report the advisory, the affected path, and the options
+  (pin forward, patch, vendor, replace, or accept with a documented reason).
+- Upgrades are code changes. A security patch bump rides the current branch; a
+  major-version bump is its own change with its own gates, never folded silently
+  into an unrelated PR.
+- **Automate the watch.** If the project has no dependency-update automation,
+  recommend it once — `.github/dependabot.yml` covering every ecosystem the repo
+  uses (`WORKFLOW_REFERENCE.md`). A weekly PR is how a project stays current
+  between security gates instead of discovering a year of drift at once.
+
+**Prefer built-ins** when functionality is achievable without a third-party
+package. The most current, CVE-free dependency is the one that isn't there.
 
 ### 4.2 Dangerous patterns — always-on awareness
 

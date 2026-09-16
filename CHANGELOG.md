@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.19.0] — 2026-09-16
+
+### Added
+- **Dependency currency and CVE freedom is now a stated requirement.**
+  `SKILL.md` Section 4.1 opens with it: every dependency must be a current
+  release with no known CVEs, direct and transitive. Previously the section
+  only listed things to "check" when adopting a package, with no statement of
+  what the check had to conclude.
+- **Dependencies are audited for the life of the project, not only when added.**
+  Section 4.1 splits into "when adding a package" and "for the life of the
+  project". The manifest is re-audited on every security gate — the pinned
+  version stands still while advisories accumulate against it, which is how a
+  project that passed its gates still meets a wall of Dependabot PRs.
+- **"Never write a version number from memory."** A model pins the version it
+  saw in training, which is months or years stale the day it is written, so a
+  brand-new project is born outdated. Section 4.1 and `SECURITY_REFERENCE.md`
+  now require looking the current release up, with the one-line command per
+  ecosystem (`npm view`, `pip index versions`, `cargo search`, `go list
+  -m -versions`, `dotnet package search`).
+- **Gate 3 audits the dependency tree as a mandatory step.**
+  `GATE_REFERENCE.md` gains an audit-tool table covering Node, Python, Rust,
+  Go, .NET, Java and `osv-scanner`, a required finding format (advisory ID,
+  package, installed version, fixed version), and an explicit rule that a
+  missing audit tool is reported rather than passed in silence.
+- **`SECURITY_REFERENCE.md` dependency section**, replacing "Python — pinned
+  dependencies": pinned / current / CVE-free as three separate properties with
+  worked bad-and-good examples, the audit command per ecosystem, and how to fix
+  a transitive advisory by moving the parent forward rather than pinning the
+  child behind the resolver's back.
+- **Dependabot recommendation covers package ecosystems.**
+  `WORKFLOW_REFERENCE.md`'s config template previously watched only
+  `github-actions`, so a repo could follow it exactly and still have nothing
+  watching its application packages. It now carries a second `updates:` entry
+  with grouped minor/patch bumps, ungrouped majors, and a note that security
+  PRs only arrive for ecosystems that have an entry.
+
+### Changed
+- **A Critical or High advisory in any dependency is a Gate 3 hard stop**,
+  alongside hardcoded secrets and SQL injection. Dependency risk was previously
+  representable only as 📝 Medium "unpinned deps", so a pinned-but-vulnerable
+  package passed the security gate clean. Where no upstream fix exists, the gate
+  does not pass silently — the advisory and the options are surfaced for the
+  user to decide on the record.
+- **The security scan reports code and dependency findings separately**, so a
+  clean scan of hand-written code can no longer stand in for an unaudited
+  manifest.
+- Medium severity now also covers dependencies carrying a Medium/Low advisory,
+  and dependencies several majors behind current with no advisory yet.
+
 ## [2.18.0] — 2026-09-11
 
 ### Added
