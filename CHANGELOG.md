@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.20.0] — 2026-09-16
+
+### Added
+- **Session start now checks the skill's own currency.** `GATE_REFERENCE.md`
+  gains a mandatory version check, run every session before anything else:
+  the installed `SKILL.md` version is compared against the latest tag on
+  `darthrater78/claude-vibe-skills`, read directly via `git ls-remote`
+  (never a cached clone, never a number from memory). An outdated copy stops
+  the session with a warning above the banner and an explicit
+  "continue on the outdated copy, or update first?" — the session does not
+  proceed to "What are we building?" until that's answered. A network-check
+  failure (offline, sandboxed) is a single skip notice, not a hard block.
+  `SKILL.md` Section 6 and the session banner reference the new check.
+
 ## [2.19.0] — 2026-09-16
 
 ### Added
