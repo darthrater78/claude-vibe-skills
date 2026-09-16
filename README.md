@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.19.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.20.0`
 
 ---
 
@@ -102,6 +102,12 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   Critical or High advisory now hard-stops Gate 3 the same way a hardcoded
   secret does, and Dependabot config covers every ecosystem in the repo rather
   than GitHub Actions alone. *(2.19.0)*
+- **The skill checks its own currency, every session.** Session start now
+  compares this copy's version against the latest tag on
+  `darthrater78/claude-vibe-skills` directly — no cached clone, no number from
+  memory. Behind means a loud warning above the banner and an explicit
+  "continue or update first?" before any work starts; unreachable network
+  means one skip notice, not a silent guess. *(2.20.0)*
 
 ---
 
@@ -492,7 +498,7 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~43KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~45KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `GATE_REFERENCE.md` | ~47KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~30KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
@@ -556,4 +562,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.19.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.20.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -30,6 +30,51 @@ exist in this skill's base directory (shown when the skill loaded, e.g.
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
 
+**Version check — run every time the skill loads, before anything else.**
+Running an outdated copy means gates in this session can be missing fixes,
+tightened checks, or corrected mistakes that already shipped upstream — this
+is not optional and does not wait for the user to ask.
+
+1. **Installed version** — the `version:` field in this skill's own
+   `SKILL.md` frontmatter (e.g. `2.19.0`).
+2. **Latest published version** — read the upstream remote directly, the same
+   way every other ref check in this skill works (never a cached local
+   clone, never a number from memory):
+
+   ```
+   git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git \
+     | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1
+   ```
+
+   If this can't reach the network (offline, sandboxed, egress blocked), say
+   so once in the banner ("⚠️ version check skipped — no network access") and
+   continue. A session isn't blocked entirely by a check it has no way to make.
+3. **Compare** (strip the leading `v`, semver order).
+   - **Current:** fold a single confirmed line into the banner — no separate
+     callout needed.
+   - **Behind:** stop and surface it *above* the banner, not folded into it —
+     this must not be missable:
+
+     > 🚨 **dev-skills is out of date.** This copy is v2.17.0; the latest is
+     > v2.19.0 — https://github.com/darthrater78/claude-vibe-skills/releases/latest
+     >
+     > Gates run in this session may be missing fixes released since v2.17.0.
+     > To update: download the new `dev-skills.skill` from the link above and
+     > replace this copy (README → Install) — re-upload on claude.ai/Desktop if
+     > that's how it was installed, or re-run the manual CLI unzip into
+     > `~/.claude/skills/dev-skills/` (or the project's `.claude/skills/`).
+     >
+     > Continue this session on the outdated copy, or pause to update first?
+
+     Wait for an explicit answer before moving on to "What are we building?" —
+     same as any other session-start finding that changes what happens next
+     (branch check, unfinished release check). Don't just print the warning
+     and keep going.
+4. This check is unconditional — it runs even in sessions with no git repo
+   detected for the *host* project (step 0 below is about that project's own
+   repo; this check targets the skill's own upstream repo, which is unrelated
+   and always checked the same way).
+
 **Step 0 — Execution environment detection. Run this before anything else; it
 changes how git works for the rest of the session.**
 
@@ -266,7 +311,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.19.0 active.
+Dev Skills v2.20.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -274,6 +319,7 @@ Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced
 CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
 Local dev: <✅ build/test command / ❌ not found>
 Releases: <✅ all versions tagged / ⚠️ N unfinished: vX.Y.Z, ...>
+Skill version: <✅ current (vX.Y.Z) / ⚠️ check skipped, no network / 🚨 see warning above>
 
 🔢 VERSION    ⬜
 🔨 BUILD      ⬜
@@ -291,8 +337,9 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.19.0
-**Updates:** Check for new versions at
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.20.0
+**Updates:** checked automatically every session start (above) — this line is
+only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
 
 **MCP check — run at session start, every time.** Scan your context for active

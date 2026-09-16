@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.19.0
+version: 2.20.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -731,6 +731,10 @@ directory** (shown when the skill loaded, e.g. "Base directory for this
 skill: ...") and follow its session-start procedure. It covers, in order:
 
 - **Self-check** — the skill's reference files are all present
+- **Version check** — compares this copy's version against the latest tag on
+  `darthrater78/claude-vibe-skills`, unconditionally, every session. Behind
+  means a loud warning above the banner and an explicit "continue or update
+  first?" before proceeding — never silent
 - **Step 0 — execution environment detection** (local / remote container /
   Termux). This decides whether Claude executes git or presents it, whether to
   ask the shell question, whether `gh` or GitHub MCP tools are used, and where
