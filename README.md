@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.21.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.22.0`
 
 ---
 
@@ -194,6 +194,15 @@ commands, not CI. Build failure stops everything. A project that has a build
 system but no discoverable local build command *blocks* rather than passing as
 ➖ N/A: N/A is for projects with no build system, not for builds that couldn't
 be found.
+
+For compiled outputs — Docker images, Windows `.exe`, Android `.apk` — a
+passing smoke test isn't the end of the gate: Claude must also offer a way to
+try the real build by hand (a local download folder, or `docker load`/`docker
+run` instructions), every time the build changes. The offer can be declined,
+never skipped silently. Scope is environment-gated: full offer on a local
+Linux session, `.exe`/`.apk` only (no Docker) on a local Windows session,
+and not offered on remote container or Termux sessions, which already ship
+through Gate 6's CI-driven path. *(2.22.0)*
 
 ### Gate 3 — Security & Quality 🔒
 
@@ -499,7 +508,7 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~43KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~47KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `GATE_REFERENCE.md` | ~50KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -570,4 +579,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.21.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.22.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

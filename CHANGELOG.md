@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.22.0] — 2026-09-16
+
+### Added
+- **Gate 2 (BUILD) now requires a mandatory local-artifact-handoff offer for
+  compiled outputs, before the gate passes.** A green smoke test proves the
+  code runs; it never proved a human could actually get their hands on the
+  build. For Docker images, Windows `.exe`, and Android `.apk`, Claude must
+  now offer — every time the build changes, not just once per session — a
+  concrete way to try the real artifact: a local folder path for `.exe`/`.apk`
+  downloads, or `docker load`/`docker run` instructions for images. The offer
+  can be declined per build, but never skipped silently.
+  Scope is environment-gated: the full offer (including Docker) applies only
+  on a local session with a Linux host shell; a local Windows host gets the
+  narrowed `.exe`/`.apk` offer with no Docker instructions; remote container
+  (cloud) and Termux (mobile) sessions are unaffected — they already ship
+  through the existing CI-driven release path (Gate 6).
+
 ## [2.21.1] — 2026-09-16
 
 ### Fixed
