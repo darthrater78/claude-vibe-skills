@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.20.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.21.0`
 
 ---
 
@@ -197,13 +197,14 @@ be found.
 
 ### Gate 3 — Security & Quality 🔒
 
-Mandatory after every build. Loads both reference files and scans all source.
+Mandatory after every build. Loads the cross-platform reference files, plus
+whichever platform-specific files match the detected project environment.
 
 **Security:** hardcoded secrets · SQL injection · command injection · disabled
 TLS · path traversal · missing auth · weak crypto · unsafe deserialization ·
 dependency auditing (typosquatting, unpinned versions, known CVEs).
 
-Plus platform-specific rules:
+Plus platform-specific rules, loaded only when that platform is detected:
 
 - **Windows** — UAC elevation, PowerShell injection, UNC path attacks, DLL
   hijacking, registry ACLs, unquoted service paths, code signing
@@ -499,10 +500,14 @@ The skill uses tiered loading to keep token costs down:
 |---|---|---|
 | `SKILL.md` | ~43KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `GATE_REFERENCE.md` | ~47KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
-| `SECURITY_REFERENCE.md` | ~30KB | Gate 3 + audit mode — the security rules in full, each with a bad/good code example |
-| `QUALITY_REFERENCE.md` | ~20KB | Gate 3 + audit mode — the quality rules in full, each with a bad/good code example |
+| `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
+| `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
+| `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
+| `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
+| `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
+| `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~59KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, audit procedures, best practices, and review checklist |
+| `WORKFLOW_REFERENCE.md` | ~85KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -513,7 +518,10 @@ Security is the clearest case. *Knowing* that a `pickle.loads` on untrusted
 input is worth flagging has to be resident — nobody asks for it, and Gate 3 runs
 too late if the pattern was written an hour ago. The worked example of how to
 fix it does not: that loads with the gate. So the flag-on-sight categories stay
-in `SKILL.md` and the rules and examples live in `SECURITY_REFERENCE.md`.
+in `SKILL.md` and the rules and examples live in `SECURITY_REFERENCE.md` —
+split further into `SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, and
+`SECURITY_ANDROID.md` so a project only pays for the platform it's actually
+on.
 
 Sizes in this table are verified by `scripts/validate.sh`. `SKILL.md` is paid for
 on every request, so an understated figure hides a real per-turn cost.
@@ -562,4 +570,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.20.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.21.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

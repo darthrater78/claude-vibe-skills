@@ -23,9 +23,11 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 When the skill loads:
 
 **Self-check:** Verify that `GATE_REFERENCE.md`, `SECURITY_REFERENCE.md`,
-`QUALITY_REFERENCE.md`, `SHELL_REFERENCE.md`, and `WORKFLOW_REFERENCE.md`
-exist in this skill's base directory (shown when the skill loaded, e.g.
-"Base directory for this skill: ..."). If any is missing, warn immediately:
+`QUALITY_REFERENCE.md`, `SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`,
+`SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, and
+`QUALITY_ANDROID.md` exist in this skill's base directory (shown when the
+skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
+warn immediately:
 
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
@@ -311,7 +313,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.20.0 active.
+Dev Skills v2.21.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -337,7 +339,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.20.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.21.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -505,19 +507,28 @@ Do not silently skip — always show the N/A status on the tracker.
 **Mandatory after every build.** Two steps, both must pass: security scan and
 quality review.
 
-**Before scanning, load both reference files from this skill's base directory**
+**Before scanning, load reference files from this skill's base directory**
 (shown when the skill loaded, e.g. "Base directory for this skill: ..."):
-1. Read `SECURITY_REFERENCE.md` in the skill's base directory — bad/good code
-   examples for every security pattern.
-2. Read `QUALITY_REFERENCE.md` in the skill's base directory — bad/good code
-   examples for structure and performance anti-patterns.
+1. Read `SECURITY_REFERENCE.md` — bad/good code examples for cross-platform
+   and language-general security patterns.
+2. Read `QUALITY_REFERENCE.md` — bad/good code examples for cross-platform
+   structure and performance anti-patterns.
+3. Detect the project's platform(s) using the same signal table as
+   `WORKFLOW_REFERENCE.md` Step 1 (Docker/Windows/Linux/Android/etc). For each
+   match, also read that platform's file: `SECURITY_WINDOWS.md` for Windows,
+   `SECURITY_LINUX.md` for Linux or Docker/container projects,
+   `SECURITY_ANDROID.md` **and** `QUALITY_ANDROID.md` for Android. A project
+   can match more than one (e.g. a Dockerfile targeting a Windows base image)
+   — load every file that applies. If nothing matches confidently, skip the
+   platform files but say so in the scan output rather than silently omitting
+   the check.
 Use these examples to pattern-match against the code being reviewed.
 
 #### Step 1 — Security scan
 
 Run a full scan of all source files. Check for every pattern category in
-Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` (loaded
-above).
+Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` plus
+whichever platform file(s) matched (loaded above).
 
 **Then audit the dependencies — this part is not optional and not limited to
 packages the session touched.** Run the ecosystem's audit tool against the
@@ -580,8 +591,9 @@ here rather than waiting for a Dependabot backlog to appear:
 
 #### Step 2 — Quality review
 
-Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md` (loaded
-above) and the checklist below:
+Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md`, plus
+`QUALITY_ANDROID.md` if Android matched (loaded above), and the checklist
+below:
 
 **Structure issues (flag and fix):**
 - Deep nesting (>3 levels) — flatten with early returns
