@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.20.0
+version: 2.21.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -389,11 +389,14 @@ examples are in `SECURITY_REFERENCE.md` (loaded during Gate 3 and audit mode).
 **Categories to watch for:** secrets/credentials, dangerous execution
 (eval/exec/shell), input validation, SQL injection, network/TLS, filesystem/path
 traversal, serialization, JavaScript (XSS/prototype pollution/open redirect),
-Windows (UAC elevation/PowerShell/UNC/DLL/registry/services/signing/reserved
-names), Linux (SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages),
-Android (exported components/manifest hardening/WebView/Intents/storage/network
-security config/permissions/logging/ProGuard/APK signing), cross-platform
-(permissions/paths/credentials).
+cross-platform (permissions/paths/credentials) — all in `SECURITY_REFERENCE.md`.
+Platform-specific categories load conditionally, based on project environment
+detection (`WORKFLOW_REFERENCE.md`, Step 1): Windows (UAC elevation/PowerShell/
+UNC/DLL/registry/services/signing/reserved names) in `SECURITY_WINDOWS.md`,
+Linux (SUID/containers/symlinks/systemd/SSH/cron/SELinux/packages) in
+`SECURITY_LINUX.md`, Android (exported components/manifest hardening/WebView/
+Intents/storage/network security config/permissions/logging/ProGuard/APK
+signing) in `SECURITY_ANDROID.md`.
 
 ### 4.3 Language best practices
 
@@ -405,7 +408,10 @@ written.
 
 Quality rules (nesting limits, single responsibility, N+1 queries, data
 structures, caching, blocking I/O, etc.) with bad/good code examples are in
-`QUALITY_REFERENCE.md`. Apply as code is written, not just during Gate 3.
+`QUALITY_REFERENCE.md`. Android-specific quality patterns (main-thread
+blocking, Activity/Fragment lifecycle leaks) are in `QUALITY_ANDROID.md`,
+loaded when project environment detection matches Android. Apply as code is
+written, not just during Gate 3.
 
 ### 4.5 Attack surface checklist
 
@@ -830,10 +836,15 @@ versions, or incomplete gates. Surface the gap and let the user decide.
 
 On "audit my project", "scan this codebase", "security review", or "check my code":
 
-**First, load both reference files from this skill's base directory**
+**First, load reference files from this skill's base directory**
 (shown when the skill loaded, e.g. "Base directory for this skill: ..."):
 1. Read `SECURITY_REFERENCE.md` in the skill's base directory
 2. Read `QUALITY_REFERENCE.md` in the skill's base directory
+3. Detect the project's platform(s) (same signal table as
+   `WORKFLOW_REFERENCE.md` Step 1) and read the matching platform file(s):
+   `SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, `SECURITY_ANDROID.md` (+
+   `QUALITY_ANDROID.md` for Android). Load every file that matches — a project
+   can span more than one platform.
 
 Then:
 1. Discover source files via Glob

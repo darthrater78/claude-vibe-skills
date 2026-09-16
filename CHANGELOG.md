@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.21.0] — 2026-09-16
+
+### Added
+- **Platform-specific security and quality patterns split into their own
+  files.** `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md` previously
+  loaded every Windows, Linux, and Android pattern on every Gate 3 scan and
+  audit, regardless of the project's actual platform. Windows, Linux, and
+  Android content now lives in `SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`,
+  `SECURITY_ANDROID.md`, and `QUALITY_ANDROID.md` — loaded conditionally,
+  alongside the (now cross-platform-only) core files, once project
+  environment detection (`WORKFLOW_REFERENCE.md` Step 1) identifies the
+  platform. A Linux-only project now loads roughly 40% less of
+  `SECURITY_REFERENCE.md`'s former content. `SKILL.md`, `GATE_REFERENCE.md`,
+  `build-skill.sh`, and `validate.sh` all updated to know about the four new
+  files.
+- **Release workflows now gate on CI success, not just branch ancestry.**
+  Every generated release template (Docker, Windows, Linux, Home Assistant,
+  Scripts, Android, Python package, Node.js) previously only checked that the
+  tag was on the default branch — which proves the commit was merged, not
+  that CI ever ran against it or passed. Each template's `release` job now
+  `needs: gate`, a new job that checks both: the existing branch-ancestry
+  check, and a new poll of `ci.yml`'s run status for the exact commit SHA
+  (waiting up to 30 minutes for an in-flight run, since tagging right after
+  pushing is normal). A tag on a commit whose CI went red no longer publishes
+  the same way a green one does.
+- **`WORKFLOW_REFERENCE.md` gains a "Workflow linting" section** with a
+  ready-to-use `lint-workflows.yml` template (`actionlint` over
+  `.github/workflows/**`, binary pinned by version and verified by published
+  checksum since it isn't a GitHub Action). Offered alongside Dependabot
+  whenever a workflow is created or audited — it's what lets a CI build
+  check safely exclude `.github/workflows/**` from its own trigger paths.
+- **Script-injection guidance added to Template best practices.** Templates
+  and the workflow audit checklist now flag `${{ github.ref_name }}` (or any
+  branch name, PR title, or other attacker-influenceable value) interpolated
+  directly into a `run:` script instead of passed through `env:`.
+- **Reliability notes:** `branches: ['**']` instead of a bare `push:` on CI
+  triggers (a bare `push:` also matches the tag push that fires the release
+  workflow, running the suite twice), `paths-ignore` for docs-only changes
+  paired with a `workflow_dispatch` escape hatch for the release gate's edge
+  case, and `DEBIAN_FRONTEND=noninteractive` around `apt-get install` on
+  `ubuntu-latest` jobs.
+- **Docker workflow gains a floating-tag safety note** — how to guard a
+  hand-rolled `:dev`/`:latest`-style tag against ever moving backward
+  (compare against every existing tag of its own kind, not just the commit
+  being built), for projects that add a prerelease channel beyond this
+  template's default `docker/metadata-action` semver tagging.
+- **Workflow audit checklist** updated to flag all of the above during
+  `audit my workflows`.
+
 ## [2.20.0] — 2026-09-16
 
 ### Added
