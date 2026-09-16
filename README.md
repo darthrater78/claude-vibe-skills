@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.21.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.21.1`
 
 ---
 
@@ -570,4 +570,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.21.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.21.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
