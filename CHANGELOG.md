@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.21.1] — 2026-09-16
+
+### Fixed
+- **`release.yml`'s "Build artifact" step hand-rolled its own `zip` with a
+  hardcoded file list, independent of `scripts/build-skill.sh`.** Adding
+  `SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, and
+  `QUALITY_ANDROID.md` in 2.21.0 updated `build-skill.sh` and `validate.sh`
+  but missed this second, independent copy — so the v2.21.0 GitHub release
+  published a `dev-skills.skill` missing all four new files (6 of 10, caught
+  by post-ship verification, not before). The workflow now calls `bash
+  scripts/build-skill.sh` instead of reimplementing it — the exact "CI
+  reimplements the build instead of calling the project's own script"
+  antipattern this project's own Structure best practices warn against.
+  v2.21.0's release asset is superseded by this version; the source at that
+  tag was always correct, only the packaging step was broken.
+
 ## [2.21.0] — 2026-09-16
 
 ### Added
