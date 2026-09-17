@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.23.0
+version: 2.24.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -734,7 +734,10 @@ re-route, or act on a different ref.
 assumption that the user ran the block. Confirm it yourself with `git ls-remote
 --tags origin v<X.Y.Z>`, and a branch deletion with `git ls-remote --heads
 origin <branch>` returning nothing. Reading refs is not a write and is not
-restricted.
+restricted. **Existence alone is not enough** — a tag pushed before its
+release PR merged still exists and still passes an existence check, on the
+wrong commit. Confirm what it points at (`GATE_REFERENCE.md`, Gate 6)
+matches the commit that was actually merged.
 
 **The gates are identical either way.** Presenting a command is performing it
 (Section 1): the pre-flight runs, and the tracker goes in the same message,

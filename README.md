@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.23.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.24.0`
 
 ---
 
@@ -108,6 +108,14 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   memory. Behind means a loud warning above the banner and an explicit
   "continue or update first?" before any work starts; unreachable network
   means one skip notice, not a silent guess. *(2.20.0)*
+- **[Release workflows verify the tag matches the tagged commit's own
+  version](#gate-6--ship-)**, not just that the commit is merged and CI-green.
+  A tag pushed before its release PR merges lands on the previous version's
+  commit — already merged, already green — and passed both older checks
+  while publishing the old code under the new tag. Gate 6 no longer hands
+  over the tag-push block until the merge and its CI are confirmed, the
+  block itself carries a version guard, and a recovery runbook covers a tag
+  that got published on the wrong commit anyway. *(2.24.0)*
 
 ---
 
@@ -250,10 +258,12 @@ if the infrastructure isn't set up, it blocks and helps you fix it.
 
 ### Gate 6 — Ship 🚀
 
-Merges the PR, tags the merge commit, creates a GitHub release with artifacts,
-then verifies all four post-ship conditions (tag on remote, release exists, PR
-merged, assets attached). Shows the full ship summary and waits for explicit
-confirmation — "yeah" is not enough; type "ship" or "confirm ship".
+Merges the PR, confirms the merge and its CI landed before ever presenting the
+tag block, tags the merge commit, creates a GitHub release with artifacts,
+then verifies all four post-ship conditions (tag on remote — pointing at the
+merge commit, not just present by name — release exists, PR merged, assets
+attached). Shows the full ship summary and waits for explicit confirmation —
+"yeah" is not enough; type "ship" or "confirm ship".
 
 The tag push itself always comes back to you — see
 [Execution environments](#execution-environments).
@@ -396,8 +406,9 @@ commits all session can still return `403` on a branch delete.
 The tag side carries the worse blast radius: the tag push is what fires the
 release workflow, so a `403` there strands a merged, version-bumped default
 branch with no release behind it. **Gate 6 stays ⏳ until the tag is confirmed on
-the remote** with `git ls-remote` — never ✅ on the assumption that you ran the
-block. Deleting and re-pushing a tag follows the same rule, and there's a GitHub
+the remote and pointing at the merge commit** with `git ls-remote` — never ✅
+on the assumption that you ran the block; existence alone isn't enough, since
+a tag pushed too early still exists. Deleting and re-pushing a tag follows the same rule, and there's a GitHub
 UI fallback (**Releases → Draft a new release → Choose a tag**) if you have no
 local clone.
 
@@ -517,7 +528,7 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~46KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~53KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `GATE_REFERENCE.md` | ~60KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -525,7 +536,7 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~85KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
+| `WORKFLOW_REFERENCE.md` | ~96KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -588,4 +599,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.23.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.24.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

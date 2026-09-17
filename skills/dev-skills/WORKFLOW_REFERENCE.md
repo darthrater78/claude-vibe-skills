@@ -40,7 +40,9 @@ session start detects workflows that exist but may have issues — read every
    the same severity levels as the security scan:
    - 🚨 **Critical** — unpinned third-party actions (supply-chain risk),
      secrets echoed in `run:` blocks, `permissions: write-all`, missing
-     tag-on-default-branch check in release workflows, `${{ }}` expression
+     tag-on-default-branch check in release workflows, missing tag/version
+     match check in release workflows (same class of failure: something
+     gets published that was never the release), `${{ }}` expression
      interpolated directly into a `run:` script instead of passed through `env:`
    - ⚠️ **High** — `persist-credentials: true` (or missing, which defaults to
      true), no concurrency groups (race conditions), no timeouts (stuck builds
@@ -378,6 +380,47 @@ and match the patterns already used in this repo's own workflows.
   instead would re-prove what the branch push already proved, at the cost of
   the suite's full runtime on every release; asking the API what already
   happened is the cheaper and equally strict check.
+- **Verify the tag matches the version declared in the tagged commit.** The
+  two checks above prove the commit is *good* — merged, and CI passed for it.
+  Neither proves it is the *release*. A tag pushed before its release PR
+  merges lands on the previous version's commit, which is already on the
+  default branch with CI already green, and passes both checks while
+  publishing the old code under the new tag:
+  ```yaml
+  - name: Verify tag matches the version in the tagged commit
+    env:
+      TAG: ${{ github.ref_name }}
+    run: |
+      set -euo pipefail
+      version="<extractor for this ecosystem — see the release template below>"
+      if [ -z "$version" ]; then
+        echo "::error::No version found. Refusing to publish."
+        exit 1
+      fi
+      if [ "v${version}" != "$TAG" ]; then
+        echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+        exit 1
+      fi
+  ```
+  Each release template below has its own extractor for where that
+  ecosystem keeps its version — `package.json`, `pyproject.toml`, a manifest,
+  a `VERSION` file. Use tools already on the runner; don't add a dependency
+  just to read a version string.
+
+  **Tag-derived or computed versions are exempt.** Tools like
+  `setuptools-scm` compute the version *from* the tag, so it matches by
+  construction — and some Android/Flutter builds derive `versionName` from
+  `git describe` or a build variable rather than a literal string in
+  `build.gradle`. Don't generate a check that can't fail; say in the
+  workflow's comments that the project uses computed versioning instead.
+
+  **A job with no checkout** (a lean gate job that never runs
+  `actions/checkout`) can't read the file from disk — fetch it through the
+  API at the tagged commit instead:
+  ```yaml
+  version=$(gh api -H 'Accept: application/vnd.github.raw' \
+    "repos/${REPO}/contents/<file>?ref=${SHA}" | <extractor>)
+  ```
 - **Never interpolate an untrusted or attacker-influenceable value directly
   into a `run:` script.** `${{ github.ref_name }}`, `${{ github.head_ref }}`,
   a PR title, an issue title, or a commit message are template-expanded into
@@ -627,6 +670,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # ADAPT: only needed if the app has its own version file/constant
+      # separate from the git tag. If every version signal here (image
+      # tags, release notes) is derived from $GITHUB_REF_NAME as it already
+      # is above, there is nothing to compare against -- delete this step
+      # and say so in a comment instead of leaving a check that can't fail.
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION 2>/dev/null | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error::No VERSION file found. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
@@ -854,6 +917,23 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' *.csproj | head -1)"
+          if [ -z "$version" ]; then
+            echo "::error::No <Version> found in *.csproj. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+          # ADAPT: if the version is centralized in Directory.Build.props
+          # instead, point the sed at that file rather than *.csproj.
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -1088,6 +1168,21 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION 2>/dev/null | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error::No VERSION file found. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+
       - name: Check shell scripts
         run: |
           set -euo pipefail
@@ -1280,6 +1375,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version custom_components/*/manifest.json)"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::No version found in custom_components/*/manifest.json. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+          # ADAPT: a repo with more than one integration has more than one
+          # manifest.json -- name the specific one instead of globbing.
+
       - name: Extract release notes
         run: |
           set -euo pipefail
@@ -1459,6 +1571,21 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION 2>/dev/null | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error::No VERSION file found. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
 
       - name: Validate scripts before release
         run: |
@@ -1659,6 +1786,25 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      # ADAPT: if versionName is computed (e.g. from `git describe`, a
+      # Flutter `flutter.versionName`, or a CI-injected property) rather
+      # than a literal string here, this can't fail by construction --
+      # delete this step and say so in a comment instead.
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/.*versionName *=\? *"\([^"]*\)".*/\1/p' app/build.gradle* | head -1)"
+          if [ -z "$version" ]; then
+            echo "::error::No versionName found in app/build.gradle(.kts). Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
 
       - name: Set up JDK
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
@@ -1937,6 +2083,25 @@ jobs:
         with:
           python-version: '3.x'
 
+      # ADAPT: if the project uses setuptools-scm (or any tool that
+      # computes __version__ from the git tag itself), the version matches
+      # by construction -- delete this step and say so in a comment instead
+      # of generating a check that can't fail.
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(python3 -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          if [ -z "$version" ]; then
+            echo "::error::No [project.version] found in pyproject.toml. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+
       - name: Build package
         run: |
           set -euo pipefail
@@ -2126,6 +2291,21 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          if [ -z "$version" ]; then
+            echo "::error::No version found in package.json. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -2436,6 +2616,9 @@ and Gate 6 (Ship). When the skill detects a missing workflow:
    - Concurrency groups are present
    - Timeouts are set on every job
    - The tag-on-default-branch check is present in release workflows
+   - The tag/version match check is present in release workflows (or the
+     workflow's comments document why the version is tag-derived/computed
+     and exempt)
    - Release notes extraction is present
    - The generated workflow calls the project's own build scripts where they
      exist, rather than reimplementing the build inline
@@ -2459,6 +2642,9 @@ every item:
 - [ ] Concurrency groups (cancel-in-progress for CI, never for release)
 - [ ] Timeouts on all jobs
 - [ ] Tag-on-default-branch verification in release workflows
+- [ ] Tag/version match verification in release workflows — the tagged
+      commit's own declared version equals the tag, or the version is
+      tag-derived/computed and documented as exempt
 - [ ] Release notes extracted from CHANGELOG.md or PR body
 - [ ] CI calls project's own scripts, not inline reimplementations
 - [ ] Secrets used only in `env:` blocks, never in `run:` strings
