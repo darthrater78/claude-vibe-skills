@@ -171,6 +171,31 @@ for gate in $REQUIRED; do
   - $status"
 done
 
+# --- BUILD gate: local-artifact-handoff annotation ----------------------------
+# GATE_REFERENCE.md Gate 2 requires Claude to offer a way to try a compiled
+# artifact (Docker image, Windows .exe, Android .apk) by hand before BUILD
+# passes -- a conversational step this hook cannot observe directly. What it
+# can check, the same way every other gate here is checked, is whether the
+# tracker line says it happened. A BUILD line marked ✅ with no "handoff"
+# annotation, in a repo that plainly produces one of these artifact types, is
+# textual evidence the offer was skipped, not proof it was made.
+produces_compiled_artifact() {
+  find "$ROOT" -maxdepth 4 \
+    \( -path '*/.git' -o -path '*/node_modules' -o -path '*/.venv' -o -path '*/venv' -o -path '*/build' -o -path '*/dist' \) -prune -o \
+    \( -iname 'Dockerfile' -o -iname '*.csproj' -o -iname '*.sln' -o -iname 'AndroidManifest.xml' -o -iname 'build.gradle' -o -iname 'build.gradle.kts' \) -print \
+    2>/dev/null | head -1 | grep -q .
+}
+
+if printf '%s' "$REQUIRED" | grep -qw BUILD; then
+  build_line="$(grep -E "(^|[[:space:]])BUILD([[:space:]]|$)" "$STATE" 2>/dev/null | head -1)"
+  if printf '%s' "$build_line" | grep -qF '✅' \
+     && ! printf '%s' "$build_line" | grep -qiF 'handoff' \
+     && produces_compiled_artifact; then
+    BLOCKING="$BLOCKING
+  - BUILD — ✅ but no local-artifact-handoff annotation. This repo has a Docker/.exe/.apk build signal (Dockerfile, .csproj/.sln, or an Android Gradle project). GATE_REFERENCE.md Gate 2 requires offering the user a way to try the real artifact before this gate passes. Add \"handoff offered\", \"handoff declined\", or \"handoff n/a (remote container / Termux session)\" to the BUILD line, then retry."
+  fi
+fi
+
 [ -z "$BLOCKING" ] && allow
 
 TRACKER="$(sed 's/^/  /' "$STATE" 2>/dev/null)"

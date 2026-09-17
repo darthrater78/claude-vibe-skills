@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.23.0] — 2026-09-17
+
+### Fixed
+- **`WORKFLOW_REFERENCE.md` claimed Dependabot security updates "need no
+  configuration."** False: security updates (advisory-driven PRs) are a
+  repository setting — Settings → Code security → Dependabot alerts and
+  Dependabot security updates — completely separate from `dependabot.yml`,
+  which only controls scheduled version updates. A repo can run a correct
+  `dependabot.yml` for months with alerts disabled and get zero CVE coverage
+  while its "Bump X" PR queue looks like security maintenance. `SKILL.md`
+  §4.1's "Automate the watch" bullet had the same gap — it now names both
+  halves and requires Claude to check `GET /repos/{owner}/{repo}/dependabot/alerts`
+  and surface a `403` (alerts disabled) as a Gate 3 finding.
+
+### Added
+- **`hooks/gate-preflight.sh` now enforces the local-artifact-handoff offer,
+  not just the prose in Gate 2.** For a repo with a Docker/.exe/.apk build
+  signal (`Dockerfile`, `.csproj`/`.sln`, or an Android Gradle project), the
+  hook denies a BUILD gate marked ✅ unless the tracker line also carries a
+  `handoff` annotation (`handoff offered, user tried it` /
+  `... user declined to try it` / `handoff n/a (remote container / Termux
+  session)`). The hook cannot see the conversation where the offer happens,
+  only the tracker file, so this closes the gap where a build could be marked
+  passed while the mandatory offer from 2.22.0 was silently skipped.
+- **"Absence of a verdict is not a verdict."** The re-derivation table's BUILD
+  row, and a new paragraph in `SKILL.md` §2, call out that a check list with
+  zero runs (not red — *empty*) is ⬜, never a pass. An empty result reads
+  like success in a way a failure never does.
+- **Gate 2 (BUILD) gets a third state: CI-only.** Previously only ➖ N/A (no
+  build system) or a hard block existed, with no way to represent "a real
+  build system exists but this environment structurally cannot run it" (no
+  SDK, a blocked registry, wrong host OS). CI-only is permitted only when the
+  obstacle is stated concretely, the CI verdict covers the exact merged tree,
+  and everything checkable locally was checked.
+- **Workflow review checklist now verifies SHA pins resolve to their claimed
+  tag**, not just that a SHA is present. A pin matching no tag is silently
+  broken (the job never runs); a pin matching a *different* tag than its
+  comment is a suppressed upgrade, since Dependabot reads the comment, not
+  the SHA, to decide what to offer next.
+- **Note on driving Dependabot PRs from an agent.** `@dependabot rebase`
+  posted via the GitHub API or an MCP tool does not fire — the mention
+  arrives with separators inserted and Dependabot's listener never matches
+  it, silently. `update_pull_request_branch` ("Update branch") is the
+  working equivalent.
+- **The `minor-and-patch` Dependabot group's "low risk" comment is corrected**
+  to "one review, not one risk class" — a minor library bump can still
+  require a major toolchain change (observed: a minor `androidx` bump
+  demanding an AGP major bump and a `compileSdk` change). `SKILL.md` §4.1
+  gets the same clarification.
+- **"Default branch" is now defined as whatever the remote reports, never an
+  assumed `main`/`master`.** Both the release-sequence trigger in `SKILL.md`
+  §2 and the branch-check step in `GATE_REFERENCE.md` now say to confirm the
+  actual default branch (`git remote show origin`, or `gh repo view --json
+  defaultBranchRef`) rather than pattern-match a name — some repos use an
+  unconventional default, and some have no separate long-lived branch at all.
+
+All findings in this release trace to a single real session (clearing a
+Dependabot PR queue on an Android project) rather than being inferred from
+reading the skill.
+
 ## [2.22.0] — 2026-09-16
 
 ### Added

@@ -2358,7 +2358,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      # Patch and minor bumps ride together — low risk, one review.
+      # Patch and minor bumps ride together: one review, not one risk class.
+      # A minor bump can still demand a major toolchain change — only a build
+      # settles it. Group for review convenience, never as a risk judgement.
       minor-and-patch:
         update-types:
           - "minor"
@@ -2366,10 +2368,22 @@ updates:
     # Majors stay ungrouped: each is a breaking change with its own gates.
 ```
 
-**Security updates need no configuration.** Dependabot opens security PRs for
-known advisories on any ecosystem listed here, regardless of `schedule` — but
-only for ecosystems that have an entry. An ecosystem you left out is an
-ecosystem nobody is watching.
+**Security updates are a separate feature — this file does NOT configure
+them.** `dependabot.yml` controls *version updates*: the scheduled "Bump X
+from A to B" PRs above. Advisory-driven *security updates* are repository
+settings, not a file — **Settings → Code security → Dependabot alerts** and
+**Dependabot security updates**. Both must be turned on, and once they are,
+they work from the dependency graph for every ecosystem in the repo, whether
+or not that ecosystem has an `updates:` entry here.
+
+A repo with a perfect `dependabot.yml` and alerts left off is current but
+unwatched: it gets version churn and zero CVE coverage, which reads as
+security maintenance and is not — the "Bump X" PRs above never name a CVE or
+GHSA identifier, because they can't; nothing was ever watching for one.
+Claude cannot flip a repository setting, so when alerts are disabled
+(`GET /repos/{owner}/{repo}/dependabot/alerts` returning `403`) this is a
+Gate 3 finding to surface, not something to assume is handled because the
+file looks right.
 
 **Adaptation notes:**
 - Change `interval` to `"monthly"` for less-active projects
@@ -2393,6 +2407,16 @@ Dependabot will open PRs like:
 > - [Commits](link)
 
 The PR updates both the SHA and the version comment automatically.
+
+**Driving a Dependabot PR from an agent: comments don't work.** Posting
+`@dependabot rebase` (or `merge`, `squash`) through the GitHub API or an MCP
+tool does not trigger Dependabot — the `@` mention arrives with invisible
+separators inserted (`·@·d·ependabot`) and Dependabot's own listener never
+matches it. The comment posts successfully and nothing happens, which is the
+dangerous part: it looks like it worked. Use `update_pull_request_branch`
+(GitHub's own "Update branch" action) instead — it merges the base branch in
+and fires the push event CI responds to, the same mechanical effect a
+`@dependabot rebase` comment was trying to produce.
 
 ---
 
@@ -2422,6 +2446,14 @@ When reviewing an existing workflow (user request or drift detection), check
 every item:
 
 - [ ] Actions pinned to commit SHAs (not version tags)
+- [ ] Every pinned SHA **resolves to the tag its comment claims** — not just
+      present, matching: `git ls-remote <repo> refs/tags/vX.Y.Z` and compare.
+      An annotated tag returns two lines — the tag object and, with `^{}`,
+      the commit it points to; the pin must be the commit. A pin matching no
+      tag at all is broken (CI silently never runs for that job); a pin
+      matching a *different* tag than its comment claims is a suppressed
+      upgrade — Dependabot reads the comment, not the SHA, to decide what to
+      offer next, so a stale label can hide several real versions of drift
 - [ ] `persist-credentials: false` on all checkouts
 - [ ] Least-privilege `permissions:` block
 - [ ] Concurrency groups (cancel-in-progress for CI, never for release)
