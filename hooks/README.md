@@ -61,6 +61,20 @@ Required gates scale with the operation, matching the two tracks in Section 2:
 
 Read-only git (`status`, `diff`, `log`, `tag -l`, `fetch`) is never blocked.
 
+**Local-artifact-handoff annotation (BUILD only).** GATE_REFERENCE.md's Gate 2
+requires offering the user a way to try a compiled artifact (Docker image,
+Windows `.exe`, Android `.apk`) by hand before BUILD passes — a conversational
+step the hook cannot observe directly. Where BUILD is required for the
+operation, the hook additionally denies a BUILD line marked ✅ that contains no
+`handoff` annotation, in any repo with a Docker/.exe/.apk build signal
+(`Dockerfile`, `.csproj`/`.sln`, or an Android Gradle project — `build.gradle`,
+`build.gradle.kts`, or `AndroidManifest.xml`). Write the outcome onto the BUILD
+line itself, e.g. `✅ debug build verified; handoff offered, user declined to
+try it` or `✅ ...; handoff n/a (remote container / Termux session)` — see
+GATE_REFERENCE.md, Gate 2, for the full convention. A ✅ with no annotation in a
+matching repo reads as "the offer never happened," not "forgot to write it
+down."
+
 ## Failure modes
 
 **No gate state file** → denied. There is no evidence any gate ran, and per
@@ -82,5 +96,12 @@ printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git tag v1
 
 # expect: no output (allow)
 printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git status"}}' \
+  | .claude/hooks/gate-preflight.sh
+
+# handoff annotation check — run from a repo with a Dockerfile/.csproj/.sln/
+# Android Gradle project and a gate state file with a bare "BUILD ✅" line
+# (no "handoff" text):
+# expect: deny, naming the missing handoff annotation
+printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr create --title x --body y"}}' \
   | .claude/hooks/gate-preflight.sh
 ```

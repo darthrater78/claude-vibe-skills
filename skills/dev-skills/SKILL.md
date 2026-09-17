@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.22.0
+version: 2.23.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -164,6 +164,18 @@ A work commit never becomes a release by accident. If the operation tags, merges
 to the default branch, or publishes, it is a release sequence — regardless of
 the user calling it "just a quick push."
 
+**"Default branch" means whatever the remote reports as default, never an
+assumed name.** Not every repo calls it `main` or `master` — some have an
+unconventionally named default, and some have no separate long-lived branch
+at all, where the "default" and the working branch are the same ref. Confirm
+it (`git remote show origin` → `HEAD branch:`, or `gh repo view --json
+defaultBranchRef`) rather than pattern-matching the name. What actually
+triggers the release track is *publishing intent* — a version bump, an
+artifact, a tag, a publish — not which branch happens to hold it or what it
+is called. A repo with no conventional default should not have every
+ordinary merge treated as a release by default, nor silently exempted from
+gates because no branch looks like `main`.
+
 ### Gate state — must be durable
 
 The tracker is not a message you printed once; it is a file. Conversation history
@@ -227,7 +239,7 @@ like it did. Rebuild from evidence:
 | Gate | Evidence that it passed |
 |---|---|
 | 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git ls-remote --tags origin` shows the previous version tagged |
-| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A) |
+| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A). **A check list with zero runs is ⬜, never ✅** — see below |
 | 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
 | 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
 | 📦 RELEASE | a PR exists for this branch (`gh pr list`, or MCP `list_pull_requests`) |
@@ -235,6 +247,16 @@ like it did. Rebuild from evidence:
 
 Any gate you cannot prove from evidence is ⬜ pending and must be run.
 "It probably ran" is ⬜.
+
+**Absence of a verdict is not a verdict.** "No runs", "no findings", "no
+alerts", and "no output" are all ⬜ until you have established *why* they are
+empty. An empty result looks far more like success than a failure does, which
+is exactly what makes it dangerous — a red X gets noticed; an empty check list
+reads like nothing happened to review, and gets waved through as low risk.
+Confirm the mechanism actually ran before reading its silence as a pass. This
+generalizes past BUILD: an empty CI check list, a security scanner that found
+nothing because it never executed, and a Dependabot alerts feed that is
+disabled rather than clean are the same failure shape.
 
 **Marking a gate N/A:** Some gates don't apply to every project (e.g. no build
 step for a docs-only or config repo). When a gate genuinely doesn't apply:
@@ -372,10 +394,24 @@ gate, not just when it changes:
 - Upgrades are code changes. A security patch bump rides the current branch; a
   major-version bump is its own change with its own gates, never folded silently
   into an unrelated PR.
-- **Automate the watch.** If the project has no dependency-update automation,
-  recommend it once — `.github/dependabot.yml` covering every ecosystem the repo
-  uses (`WORKFLOW_REFERENCE.md`). A weekly PR is how a project stays current
-  between security gates instead of discovering a year of drift at once.
+- **Automate the watch — both halves of it.** Staying *current* and being
+  *watched for advisories* are different mechanisms, and a project can easily
+  have one without the other:
+  1. **Version updates** — `.github/dependabot.yml` covering every ecosystem
+     the repo uses (`WORKFLOW_REFERENCE.md`). A weekly PR is how a project
+     stays current between security gates instead of discovering a year of
+     drift at once.
+  2. **Alerts and security updates** — repository settings, not a file. Check
+     rather than assume: `GET /repos/{owner}/{repo}/dependabot/alerts`. A
+     `403 "Dependabot alerts are disabled for this repository"` is a
+     **Gate 3 finding**, not a pass. Claude cannot flip a repository setting,
+     so surface it with the path: Settings → Code security → enable
+     Dependabot alerts and Dependabot security updates.
+
+  Having only (1) is the trap: the queue of "Bump X" PRs *looks* like security
+  maintenance. Merging all of it fixes no vulnerability if nothing was ever
+  reported — a repo can run a perfect `dependabot.yml` for months with alerts
+  off and never see a single advisory.
 
 **Prefer built-ins** when functionality is achievable without a third-party
 package. The most current, CVE-free dependency is the one that isn't there.

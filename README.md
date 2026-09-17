@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.22.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.23.0`
 
 ---
 
@@ -193,7 +193,10 @@ Runs the project's **local development workflow** — its own build and test
 commands, not CI. Build failure stops everything. A project that has a build
 system but no discoverable local build command *blocks* rather than passing as
 ➖ N/A: N/A is for projects with no build system, not for builds that couldn't
-be found.
+be found. A third state, **CI-only**, covers a build system that exists and is
+correct but structurally can't run in this environment (no SDK, a blocked
+registry) — permitted only with the obstacle stated concretely and everything
+checkable locally actually checked. *(2.23.0)*
 
 For compiled outputs — Docker images, Windows `.exe`, Android `.apk` — a
 passing smoke test isn't the end of the gate: Claude must also offer a way to
@@ -202,7 +205,10 @@ run` instructions), every time the build changes. The offer can be declined,
 never skipped silently. Scope is environment-gated: full offer on a local
 Linux session, `.exe`/`.apk` only (no Docker) on a local Windows session,
 and not offered on remote container or Termux sessions, which already ship
-through Gate 6's CI-driven path. *(2.22.0)*
+through Gate 6's CI-driven path. *(2.22.0)* Where the [pre-flight
+hook](hooks/README.md) is installed, it enforces the offer deterministically:
+a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
+repo with a Docker/.exe/.apk build signal, is denied. *(2.23.0)*
 
 ### Gate 3 — Security & Quality 🔒
 
@@ -349,7 +355,10 @@ stops being advisory for anything Claude runs itself.
 | `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
 | `git tag`, `git push --tags`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
 
-Read-only git is never blocked. Install instructions, the settings snippet, and
+Read-only git is never blocked. For BUILD specifically, the hook also denies a
+✅ with no `handoff` annotation in any repo with a Docker/.exe/.apk build
+signal — the deterministic half of the [local-artifact-handoff
+offer](#gate-2--build-). Install instructions, the settings snippet, and
 failure modes are in [`hooks/README.md`](hooks/README.md). The hook ships in the
 repo, not in the `.skill` bundle — it's installed separately.
 
@@ -507,8 +516,8 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~43KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~50KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SKILL.md` | ~46KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `GATE_REFERENCE.md` | ~53KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -579,4 +588,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.22.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.23.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

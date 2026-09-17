@@ -206,7 +206,10 @@ If yes:
    If the user chooses to sync, present the fetch/pull commands formatted for
    their shell. Report any conflicts or divergence.
 
-4. **Check the branch.** If the user is on `main` or `master`, flag it:
+4. **Check the branch.** Determine the repo's actual default branch — don't
+   assume `main` or `master` by name (`git remote show origin` reports
+   `HEAD branch: <name>`, or `gh repo view --json defaultBranchRef -q
+   .defaultBranchRef.name`). If the user is on that branch, flag it:
 
    > ⚠️ **You're on `<branch>`.** This skill enforces branch-based development
    > — all work happens on feature/fix branches, then merges to the default
@@ -313,7 +316,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.22.0 active.
+Dev Skills v2.23.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -483,6 +486,32 @@ This means:
 If the app cannot be tested locally (e.g. requires external infrastructure),
 say so explicitly rather than skipping — the user decides whether to proceed.
 
+**When the obstacle is structural, not missing infrastructure — a third
+state.** The case above is a build that needs something normally available
+elsewhere. A different case: the build system exists and is correct, but
+*this specific environment* cannot run it — no Android SDK in the container,
+a network policy blocking the package registry, the wrong host OS for a
+native build. That is not ➖ N/A (a build system exists) and it is not a
+generic "can't test locally" either — it gets its own state, permitted only
+when all three hold, and stated on the tracker:
+
+1. The obstacle is structural, not a missing setup step — state it
+   concretely ("`dl.google.com` denied by network policy"), never "it didn't
+   work here."
+2. The CI verdict covers **the exact tree being merged**, not an ancestor of
+   it — for a PR, update the branch onto the target head first so the run
+   builds the merge result.
+3. Everything checkable locally *was* checked — config files parsed, pure
+   modules compiled and tested in isolation, linters run.
+
+> ✅ **BUILD GATE PASSED — CI-only** — Android SDK unavailable and
+> `dl.google.com` blocked in this container; config and lint checked locally;
+> CI build required before merge.
+
+This is weaker than the local gate and is recorded as such. It does not
+license "CI will catch it" on a project where a local build merely takes a
+while — that is still a straightforward BUILD GATE BLOCKED, not this state.
+
 **Local artifact handoff — mandatory offer for compiled outputs, local Linux
 and Windows sessions only.** For any build that produces something a person
 installs or runs outside a terminal — a Docker image, a Windows `.exe`, an
@@ -518,6 +547,25 @@ This step comes after the automated smoke test, not instead of it — the
 smoke test confirms the code runs; this confirms a human can actually get
 their hands on it.
 
+**Record the outcome on the tracker, not just in chat.** Where
+`hooks/gate-preflight.sh` is installed, it enforces this deterministically:
+for any repo with a Docker/.exe/.apk build signal (`Dockerfile`, `.csproj`/
+`.sln`, or an Android Gradle project), it denies a BUILD gate marked ✅ unless
+the tracker's BUILD line also says what happened to the offer. Write the
+BUILD line as one of:
+
+- `🔨 BUILD      ✅ <build description>; handoff offered, user tried it`
+- `🔨 BUILD      ✅ <build description>; handoff offered, user declined to try it`
+- `🔨 BUILD      ✅ <build description>; handoff n/a (remote container / Termux session)`
+
+Note the offer is always made where it applies — "declined" above describes
+the user's choice not to try the build by hand, never Claude skipping the
+offer itself. There is no valid annotation for "didn't offer."
+
+The hook can see whether the tracker says the offer happened; it cannot see
+the conversation, so a passed gate with no annotation reads as "skipped," not
+"forgot to write it down."
+
 **Projects with CI release workflows.** If the project has a GitHub Actions
 workflow that builds release artifacts on tag push (check
 `.github/workflows/` for `on: push: tags:`), the local build gate covers
@@ -525,7 +573,9 @@ only the **debug/test build**. The release artifact is built by CI during
 Gate 6 — do not build it locally. Gate 2 passes when the debug build
 compiles and the app is verified working.
 
-> ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred to CI)
+> ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred
+> to CI); handoff offered — Android `.apk` copied to `dist/`, user declined to
+> try it by hand this round
 
 **Projects with no build step** (config repos, skill repos, documentation-only
 repos, pure script collections): mark this gate ➖ N/A with an explanation:
