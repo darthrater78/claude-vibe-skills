@@ -316,7 +316,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.23.0 active.
+Dev Skills v2.24.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -342,7 +342,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.21.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.24.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -896,11 +896,43 @@ looks fine and is not:
    git checkout main && git pull origin main
    ```
 
-3. **Tag and push — the user runs this block.** Tag pushes are denied (`403`)
-   to Claude's credentials far more often than they succeed, and this is the
-   push that starts the release build (Section 5.8, "Tag pushes and ref
-   deletions are the exceptions"). Present it, in one block, with the sync in
-   front so the tag lands on the merged commit:
+   **Confirm the merge actually landed before doing anything else.** A
+   request to merge is not a merged commit — don't treat "I ran the command"
+   or "the user said it's done" as equivalent to verifying it:
+   ```
+   gh pr view <number> --json state -q '.state'    # must read "MERGED"
+   sha=$(gh pr view <number> --json mergeCommit -q '.mergeCommit.oid')
+   gh run list --commit "$sha" --json status,conclusion
+   ```
+   The second check matters as much as the first. Being on the default
+   branch proves the commit was merged; it says nothing about whether CI
+   ran against *that* commit or passed. **Do not proceed to step 3 until
+   both hold.** This is not optional caution — a tag pushed before the merge
+   lands on the *previous* commit, which is already on the default branch
+   with CI already green from an earlier point in time. It passes both of
+   these exact checks and publishes the old code under the new tag. The
+   release workflow's own gate job (`WORKFLOW_REFERENCE.md`, "Verify tag is
+   on default branch" / "Require a passing CI run") re-checks this on the
+   tagged commit, but that job runs *after* the tag is already pushed — the
+   check here is what stops the wrong tag from being pushed in the first
+   place.
+
+3. **Tag and push — the user runs this block, and not before step 2 is
+   confirmed.** Tag pushes are denied (`403`) to Claude's credentials far
+   more often than they succeed, and this is the push that starts the
+   release build (Section 5.8, "Tag pushes and ref deletions are the
+   exceptions"). Present it, in one block, with the sync in front so the tag
+   lands on the merged commit, **and the version declared in that commit
+   checked before the tag is created** — chained with `&&` so a mismatch
+   stops the block before `git tag` runs. Use `exit` only inside the sourced
+   extractor logic, never bare in the chain itself — a bare `exit` closes the
+   user's interactive shell, not just the command:
+
+   **Describe the step in words until both checks in step 2 have passed.**
+   Handing over runnable commands before the merge is confirmed is exactly
+   how a tag gets pushed against the wrong commit — say what will happen
+   ("once the merge and CI are confirmed, I'll give you the tag block"), not
+   the commands themselves.
 
    **If the clone path is not known yet — every remote session, by design
    (step 0, item 4) — ask for it before writing this block.** A `cd` the user
@@ -908,11 +940,20 @@ looks fine and is not:
 
    ```
    cd "<clone-path>"
-   git checkout main
-   git pull origin main
-   git tag v1.2.3
-   git push origin v1.2.3
+   git checkout main && git pull origin main \
+     && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
+     && git tag v1.2.3 && git push origin v1.2.3
    ```
+   The literal string to grep for is whatever this project's version lives
+   as — the same value and the same file the release workflow's own version
+   check reads (`WORKFLOW_REFERENCE.md`'s per-ecosystem extractors: a
+   `package.json` field, a `pyproject.toml` table, a `VERSION` file). Write
+   this line from that same source, not a second hand-rolled check — two
+   independently written version checks drift apart exactly the way CI and
+   local dev drift apart (`GATE_REFERENCE.md` session start, step 6). If the
+   project's versioning is tag-derived or computed (`setuptools-scm`, a
+   `git describe`-based Android `versionName`), there is nothing to grep for
+   — drop this clause and say so.
 
    > 📌 **Pushing that tag is what starts the release build.** Run the block
    > above and tell me when it's done — I'll watch the workflow from here.
@@ -921,11 +962,19 @@ looks fine and is not:
    Draft a new release → Choose a tag → create it on the default branch.** Same
    ref, same trigger.
 
-   🚀 SHIP stays ⏳ until the tag is confirmed on the remote. Confirm it
-   yourself — reading refs is not a write and is not restricted:
+   **Treat an unqualified "pushed" or "done" as unverified — confirm it
+   yourself before touching 🚀 SHIP.** Reading refs is not a write and is not
+   restricted. Existence alone is not enough: a tag can exist and still point
+   at the wrong commit if it was created before this session's merge, or by
+   a stale local branch. Check both the tag and what it points at, and
+   compare that SHA against the merge commit from step 2:
    ```
    git ls-remote --tags origin v1.2.3
+   git rev-parse v1.2.3^{}          # what the tag actually points at, locally after fetch
    ```
+   🚀 SHIP stays ⏳ until the tag is confirmed on the remote *and* its target
+   commit matches the one confirmed merged in step 2 — not just that some
+   tag named `v1.2.3` exists.
 
    **If the push instead reports `error: src refspec v1.2.3 does not match
    any`, that is not a `403` and not a permissions problem.** It means `git tag
@@ -978,6 +1027,48 @@ looks fine and is not:
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
+
+#### Recovery: a tag landed on the wrong commit
+
+A tag can slip past both the merge-confirmation checks above and the
+workflow's own gate job — pushed too early, or by hand outside this
+session — and still get built and published under the wrong content before
+anyone notices. If that happens:
+
+1. **Cancel the release run immediately.** `gh run cancel <run-id>`. Don't
+   wait to assess first — an image build with a warm cache can reach its
+   push step in well under a minute, faster than the assessment in step 2
+   below takes to do properly.
+2. **Record what already went out before touching anything.** Read the
+   cancelled (or completed) run's log for what it actually pushed —
+   registry tags, uploaded assets — and `gh release view <tag>` for what
+   GitHub shows as published. Cleanup decisions in the steps below depend on
+   knowing this first; guessing what shipped and skipping something is how
+   a bad artifact keeps circulating after the "fix."
+3. **Delete the GitHub release, with approval.** `gh release delete <tag>`
+   is a destructive action on a shared, visible artifact — get explicit
+   approval the same as any other destructive step, don't fold it into
+   "cleaning up."
+4. **The tag deletion goes to the user.** `git push origin :refs/tags/v1.2.3`
+   is a ref write, same as any other tag operation (Section 5.8) — present
+   it, never execute it, regardless of how the wrong tag got there.
+5. **Land the real release, then re-tag** — merge (or finish merging) the
+   correct commit, re-run the merge-confirmation checks in step 2 above, and
+   only then push the tag again. Two things this step does *not* cover:
+   - **Floating tags** (`:latest`, `:dev`) get overwritten automatically by
+     the correct build once it publishes — no separate action needed for
+     those.
+   - **Registry versions already pushed** under the wrong tag (a container
+     image, a package version) usually cannot be deleted with the
+     credentials this session has — deleting a package version needs
+     `delete:packages`, a scope session tokens typically lack. Don't plan
+     cleanup around removing it; plan around making sure nothing resolves
+     to it anymore (the corrected tag/version takes over, floating tags move
+     forward, the GitHub release pointing at it is gone per step 3).
+6. **Add the tag/version match check if the workflow doesn't have one yet**
+   (`WORKFLOW_REFERENCE.md`, "Verify tag matches the version in the tagged
+   commit") — the recovery above fixes this incident; the check is what
+   stops it from happening a second time.
 
 #### Manual path (no CI release workflow)
 
@@ -1036,19 +1127,36 @@ gh pr merge <number> --merge --delete-branch
 git checkout main && git pull origin main
 ```
 
+**Confirm the merge landed before handing over the tag block below** — same
+check as the CI-driven path (`gh pr view <number> --json state -q '.state'`
+must read `MERGED`). There is no gate job here to catch a premature tag the
+way a CI release workflow's own version check would (this path has no such
+workflow by definition), so this manual confirmation is the only thing
+standing between a tag and the wrong commit.
+
 The user runs — stop here until they confirm the tag is on the remote:
 ```
 cd "<clone-path>"
-git checkout main
-git pull origin main
-git tag v1.2.3
-git push origin v1.2.3
+git checkout main && git pull origin main \
+  && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
+  && git tag v1.2.3 && git push origin v1.2.3
+```
+As in the CI-driven path, the `grep` clause is the version guard — same
+literal value and file this project's version actually lives in, chained
+with `&&` so a mismatch stops the block before `git tag` runs. Drop it only
+if versioning is tag-derived/computed.
+
+Once pushed, don't take "done" at face value — confirm the tag exists *and*
+points at the merge commit, not just that some tag by that name exists:
+```
+git ls-remote --tags origin v1.2.3
+git rev-parse v1.2.3^{}
 ```
 
-If this reports `error: src refspec v1.2.3 does not match any` instead of a
-`403`, the tag was never created locally — see the troubleshooting note under
-the CI-driven path's tag step above. Re-run `git tag v1.2.3` from inside
-`<clone-path>` and push again.
+If the push instead reports `error: src refspec v1.2.3 does not match any`
+instead of a `403`, the tag was never created locally — see the
+troubleshooting note under the CI-driven path's tag step above. Re-run
+`git tag v1.2.3` from inside `<clone-path>` and push again.
 
 Then, once `git ls-remote --tags origin v1.2.3` shows the tag:
 ```

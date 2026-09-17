@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.24.0] — 2026-09-17
+
+### Added
+- **Every release workflow template now verifies the tag matches the version
+  declared in the tagged commit, not just that the commit is merged and
+  green.** Found when a stable tag pushed before its release PR merged
+  landed on the previous version's commit — already on the default branch,
+  already CI-green — and passed both existing checks while publishing the
+  old code under the new tag. `WORKFLOW_REFERENCE.md` gets the check (with a
+  per-ecosystem extractor: `package.json`, `pyproject.toml`, a manifest, a
+  `VERSION` file, a `.csproj`, `build.gradle*`) in all eight release
+  templates, an exemption note for tag-derived/computed versioning
+  (`setuptools-scm`, `git describe`-based `versionName`), and a
+  checkout-less API-fetch form for gate jobs that never check out the repo.
+  The workflow review checklist and audit's Critical severity list now flag
+  a release workflow with no tag/version match check the same way they
+  already flag a missing tag-on-default-branch check — it's the same class
+  of failure: something gets published that was never the release.
+- **Gate 6 no longer hands over the tag-push block on trust that the merge
+  landed.** `GATE_REFERENCE.md` now requires confirming the PR state reads
+  `MERGED` and that CI passed for that exact commit *before* describing or
+  presenting the tag commands — describing the step in words is the
+  correct behavior until both hold. The tag block itself now carries a
+  version guard chained with `&&` (never a bare `exit`, which would close
+  the user's interactive shell instead of just stopping the chain), reusing
+  the same extractor the release workflow uses rather than a second
+  hand-rolled check that can drift from it. An unqualified "pushed" is
+  no longer treated as verified: SHIP confirms the tag's target commit,
+  not just that a tag by that name exists on the remote.
+- **A recovery runbook for a tag published on the wrong commit**, under
+  Gate 6: cancel the run immediately (a warm-cache image build can reach
+  its push step in well under a minute), record what already went out
+  before cleaning anything up, delete the GitHub release with approval,
+  hand the tag deletion to the user (ref writes stay theirs), land the
+  real release and re-tag, and note that floating tags self-correct on the
+  next build while a registry version already pushed under the wrong tag
+  usually can't be deleted with the credentials a session has
+  (`delete:packages` is a scope session tokens typically lack).
+
 ## [2.23.0] — 2026-09-17
 
 ### Fixed
