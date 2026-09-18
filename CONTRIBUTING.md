@@ -19,6 +19,10 @@ This project follows the same 6-gate workflow the skill enforces. See the [READM
 5. **Release** — create a branch, commit, and open a PR
 6. **Ship** — merge, tag, and create a GitHub release
 
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+(`type(scope): summary` — see `SKILL.md` §1.1 for the type list and how it
+feeds the version bump).
+
 ## Validation
 
 Rebuild the packaged skill after changing anything under `skills/dev-skills/`,

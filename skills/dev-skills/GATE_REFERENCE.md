@@ -54,24 +54,56 @@ is not optional and does not wait for the user to ask.
 3. **Compare** (strip the leading `v`, semver order).
    - **Current:** fold a single confirmed line into the banner — no separate
      callout needed.
-   - **Behind:** stop and surface it *above* the banner, not folded into it —
-     this must not be missable:
+   - **Behind:** this cannot be quiet, easy to skim past, or foldable into
+     routine banner text. An outdated copy means every gate this session
+     runs may be silently missing a fix, a tightened check, or a corrected
+     mistake — treat it with the same severity as a failed security gate,
+     not an FYI:
 
-     > 🚨 **dev-skills is out of date.** This copy is v2.17.0; the latest is
-     > v2.19.0 — https://github.com/darthrater78/claude-vibe-skills/releases/latest
-     >
-     > Gates run in this session may be missing fixes released since v2.17.0.
-     > To update: download the new `dev-skills.skill` from the link above and
-     > replace this copy (README → Install) — re-upload on claude.ai/Desktop if
-     > that's how it was installed, or re-run the manual CLI unzip into
-     > `~/.claude/skills/dev-skills/` (or the project's `.claude/skills/`).
-     >
-     > Continue this session on the outdated copy, or pause to update first?
+     - **It is the first thing in the first message** — before a greeting,
+       before acknowledging what the user asked, before the session banner.
+       Nothing goes above it.
+     - **Bracket it with a full-width warning line** so it cannot be
+       mistaken for routine output, and repeat the version numbers at both
+       ends so they're visible even if the middle gets scrolled past:
+
+       > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+       > **STOP — dev-skills is out of date: running v2.17.0, latest is v2.19.0.**
+       >
+       > Gates run in this session may be missing fixes released since
+       > v2.17.0. This is not a routine notice — proceeding means every gate
+       > below runs on code this skill's own maintainers have already
+       > patched.
+       >
+       > Release notes for what changed since v2.17.0:
+       > https://github.com/darthrater78/claude-vibe-skills/releases
+       >
+       > **To update:** download the new `dev-skills.skill` from
+       > https://github.com/darthrater78/claude-vibe-skills/releases/latest
+       > and replace this copy (README → Install) — re-upload on
+       > claude.ai/Desktop if that's how it was installed, or re-run the
+       > manual CLI unzip into `~/.claude/skills/dev-skills/` (or the
+       > project's `.claude/skills/`).
+       >
+       > **Continue this session on v2.17.0 (outdated), or pause to update
+       > to v2.19.0 first?**
+       > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
 
      Wait for an explicit answer before moving on to "What are we building?" —
      same as any other session-start finding that changes what happens next
      (branch check, unfinished release check). Don't just print the warning
      and keep going.
+
+     **If the user chooses to continue anyway, the warning doesn't get to
+     disappear after this one message.** Carry a short, compact tag —
+     `⚠️ outdated (v2.17.0, latest v2.19.0)` — on every later display of the
+     gate tracker this session (gate transitions, Section 7 status checks,
+     the session banner, handoff summaries per Section 5.6/5.9). This is not
+     the loud bracketed warning repeated every time — that would be noise —
+     it's a one-line reminder that the condition is still true, the same
+     pattern already used for an unfinished release or uncommitted work
+     (Section 8): surfaced once loudly, then kept visibly present, never
+     silently dropped.
 4. This check is unconditional — it runs even in sessions with no git repo
    detected for the *host* project (step 0 below is about that project's own
    repo; this check targets the skill's own upstream repo, which is unrelated
@@ -155,8 +187,55 @@ If the signals are ambiguous, ask — do not assume local:
    that fires the release workflow. Present the tag block to the user even
    though everything else runs here — Section 5.8, "Tag pushes and ref
    deletions are the exceptions."
+8. **Docker-in-a-web-container — scoped to projects that actually need
+   Docker to build.** If the project has a Docker build signal (`Dockerfile`,
+   `docker-compose.yml`/`compose.yaml` — the same signal
+   `hooks/gate-preflight.sh`'s `produces_compiled_artifact` checks for),
+   don't assume the container can build or run it just because the `docker`
+   binary is on `PATH`. Measure the daemon, not the binary (see the
+   measurement rule below): `docker info` (or `docker version --format
+   '{{.Server.Version}}'`). `which docker` only proves the CLI exists — a
+   web container commonly ships the client with no daemon behind it, which
+   looks identical to "Docker available" until something tries to actually
+   build.
+
+   If `docker info` fails in this environment, say so plainly and offer a
+   choice — this is a real limitation, not something to route around
+   silently:
+
+   > ⚠️ **Docker isn't usable in this container** — the `docker` CLI is
+   > present but `docker info` can't reach a daemon, so I can't build or
+   > verify the image here. Two ways forward:
+   > 1. **Work commit now** — save this progress on the branch (no version
+   >    bump, no artifact) so you can pull it down on a machine with a
+   >    working Docker daemon and finish Gate 2 there.
+   > 2. **CI-only BUILD** — if this repo already has a release workflow that
+   >    builds and tests the image in CI, Gate 2 can pass on that basis
+   >    (Gate 2, "CI-only" below) instead of a local build.
+   >
+   > Which do you want?
+
+   This is a different step from the local-artifact-handoff offer below —
+   that offer is about letting a human try an already-built artifact by
+   hand; this is about whether the artifact can be built and verified in
+   this environment at all. Don't conflate marking BUILD "handoff n/a
+   (remote container)" with actually resolving this — a container that
+   can't build Docker still owes the user this choice before BUILD passes.
 
 Report the detected environment in the session banner.
+
+**Measure, don't infer — for every environment capability recorded anywhere
+(gate file, banner, handoff summary).** `which <tool>` proves a binary is on
+`PATH`; it proves nothing about whether the thing behind it actually works
+(the Docker case above is the concrete failure mode this caught: binary
+present, daemon unreachable). Record exactly what was checked and what it
+returned — "`docker info`: daemon unreachable", not "no docker"; "push to
+`fix/x` succeeded", not "push allowed" — and re-measure at the start of
+every session, or whenever the execution context changes (a handoff moves
+work from a container to a local clone, or vice versa). A capability noted
+in a prior session or a handoff summary is a claim about *that* context, not
+a fact about this one — never carry it forward as still true without
+re-checking.
 
 **Git repo detection — run at session start.** Check if the current working
 directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
@@ -316,7 +395,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.24.0 active.
+Dev Skills v2.25.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
@@ -342,7 +421,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.24.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.25.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -447,6 +526,14 @@ If any check fails:
 > Current version: [version or "none found"]
 > What version should this build be? (patch / minor / major)
 
+**Before asking, check the commit types since the last tag** (`SKILL.md`
+§1.1) — `git log <last-tag>..HEAD --oneline` — and use them as a signal:
+any `!`/`BREAKING CHANGE:` → suggest MAJOR; any `feat` with no breaking
+change → suggest MINOR; only `fix`/`chore`/`docs`/etc. → suggest PATCH.
+State which commits drove the suggestion and let the user confirm — commits
+that don't follow the convention (or a mixed history) just mean no signal,
+not a wrong answer; ask plainly in that case.
+
 Update ALL version files, add missing repo links and release notes links before marking passed.
 
 ### Gate 2 — Build 🔨
@@ -474,6 +561,17 @@ scripts". A stall there is a fork-emulation limit, not a script defect and not
 a gate failure; the script is run in split invocations and the gate passes
 normally. A stalled run is never a pass on its own, and it is never a reason
 to hand the check to CI.
+
+**A run only counts as evidence if the tree it ran against didn't move
+under it.** An edit landing mid-run — the session itself, or anything
+else touching the working tree — invalidates the result even when the run
+finishes green, because the pass no longer says anything about the code
+that's about to be committed. Capture `git status --porcelain` and `git
+rev-parse HEAD` immediately before starting the build/test run and again
+immediately after it finishes; if either differs, the run does not count —
+the gate is still pending, rerun against the now-settled tree. A project's
+own build/check script can make this cheap to verify by printing both
+snapshots itself rather than relying on Claude to remember to check.
 
 **A test build is mandatory before any commit.** When building an app, create a
 test/dev version and verify it runs correctly before staging or committing anything.
@@ -512,6 +610,22 @@ This is weaker than the local gate and is recorded as such. It does not
 license "CI will catch it" on a project where a local build merely takes a
 while — that is still a straightforward BUILD GATE BLOCKED, not this state.
 
+**Prove a never-run release step before a tag depends on it.** A release
+workflow's own steps aren't proven by ordinary CI — a Docker registry
+login, a signing step, a computed-version extractor, an ancestor-fallback
+path only exercised on tag push — until a tag actually goes through them for
+real once. Discovering a bug in one of those steps *during* a live release
+means cancelling a run, deleting a wrongly-published release, and re-tagging
+(the recovery runbook under Gate 6). Cheaper: before a tag push is about to
+exercise a step that has never actually run in this repo, copy it out of
+`release.yml` and dry-run it here if the tooling allows — against the local
+build, with real (or scoped test) credentials where that's safe, or by hand
+inspection where it isn't. Keep a short "unproven" note for anything that
+still can't be exercised this way (e.g. it genuinely needs the tag-push
+trigger's context) and carry it forward release to release until it's
+actually run once for real — don't let it quietly stop being tracked just
+because the release it was flagged on shipped anyway.
+
 **Local artifact handoff — mandatory offer for compiled outputs, local Linux
 and Windows sessions only.** For any build that produces something a person
 installs or runs outside a terminal — a Docker image, a Windows `.exe`, an
@@ -526,6 +640,11 @@ the host shell (step 2):
 | **Local, Windows host** (shell = Windows PowerShell or Git Bash) | Narrowed — Windows `.exe` and Android `.apk` only; no Docker load/run instructions |
 | **Remote container (cloud) or Termux (mobile)** | Not offered — these environments already ship through the regular CI-driven path (Gate 6), which is the correct handoff there |
 
+"Not offered" here is about this specific step — letting a human try an
+already-built artifact by hand. A web container that can't build Docker at
+all is a separate, earlier problem (session start, Step 0, item 8) and is
+not resolved by this row.
+
 Where the offer applies, after the smoke test passes and before this gate is
 marked passed, give the user a way to test the real build themselves:
 
@@ -537,11 +656,32 @@ marked passed, give the user a way to test the real build themselves:
   `docker build -t <tag> .`, then `docker run ...` with the ports/volumes the
   project needs.
 
+  **Tear it down once its purpose is served.** A container started here —
+  or for the "prove a never-run release step" check above, or for any other
+  Gate 2 testing — is a running resource, not a fire-and-forget check.
+  Stop and remove it after the commit it verified is submitted, or
+  immediately if the user declines to try it: `docker stop <name>` (or
+  `docker compose down` for a compose stack), then `docker rm <name>` if it
+  wasn't started with `--rm`. Before the session ends (Section 8) or this
+  gate closes, `docker ps` to confirm nothing test-related is still
+  running — an orphaned container left behind by a smoke test is a silent
+  resource leak, not a passed gate.
+
 This offer is mandatory **every time the build changes**, not only the first
 time in a session — a rebuild after a code change gets the same offer as the
 first build did. It is not mandatory to *accept*: if the user says they don't
 need to try this particular build by hand, skip it and move on. What can
 never be skipped silently is the offer itself.
+
+**Proceeding without acting on the offer counts as declining it — it is not
+an unanswered question that blocks the gate.** If the user responds to a
+commit/ship prompt with "commit" or "go ahead" without having run the image
+or exe, that is the decline; don't hold BUILD open waiting for an explicit
+"no thanks." Record it with the user's own words:
+`handoff offered, user said "Commit" without running the image — recorded
+as declined`. This is different from silently marking the annotation
+"declined" on Claude's own initiative — the record should make clear the
+user moved on, not that Claude assumed on their behalf.
 
 This step comes after the automated smoke test, not instead of it — the
 smoke test confirms the code runs; this confirms a human can actually get
@@ -653,6 +793,24 @@ version, and the fixed version:
   the gate does not pass silently: surface the advisory and the options
   (patch, vendor, replace, or accept with a documented reason) and let the
   user decide on the record
+
+**Fixing a Critical or High — three checks, every time, not just "patch and
+move on":**
+1. **Reproduce before writing the fix.** A fix written from reading the code
+   is a guess about the bug shape; a fix written after triggering the actual
+   failure is a fix for the actual bug. Once it's fixed, look for sibling
+   paths into the same bad state — the same class of bug rarely has exactly
+   one entry point, and a fix that closes only the one you found leaves the
+   others live.
+2. **Flag any existing test whose assertions encode the insecure behavior as
+   correct.** A test isn't proof of correctness just because it's green — a
+   test that asserts "a locked resource returns 'no key found'" instead of
+   "access denied" is a bug wearing a passing test as camouflage. Read what
+   the test actually asserts, not just whether it passes.
+3. **Confirm every new regression test fails without the fix.** Revert the
+   fix (or comment it out) and re-run the new test — if it still passes, the
+   test isn't testing the vulnerability, and shipping it as "covered" is
+   false confidence. Put the fix back before committing.
 
 **Show and let user decide:**
 - 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
@@ -1025,6 +1183,17 @@ looks fine and is not:
    > git push origin v1.2.3
    > ```
 
+7. **Commit and push the gate-state file's SHIP ✅ record — the last action
+   of this gate, not an afterthought.** This only applies when
+   `.claude/dev-skills-gates.md` is tracked in this repo (the remote-container
+   convention, Section 2 — or a local repo that force-adds it despite
+   gitignoring it, the way this one does). A tracker that says SHIP ✅ only
+   in the local working tree does not close the sequence: the next session's
+   re-derivation (Section 2) reads the remote and the committed history, sees
+   RELEASE/SHIP still ⬜ there, and has no way to know the release actually
+   finished. Commit it on its own (a tracker-only commit, same as any other
+   work commit) and push before telling the user the sequence is done.
+
 > ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
 
@@ -1168,6 +1337,12 @@ gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 2. **Release exists:** visible via `gh release view v1.2.3`
 3. **PR merged:** state is "merged", not just "closed"
 4. **Assets match:** expected artifacts are attached per detection above
+
+**Then commit and push the gate-state file's SHIP ✅ record — the last
+action of this gate, not an afterthought.** Same rule as the CI-driven path
+above: applies whenever `.claude/dev-skills-gates.md` is tracked in this
+repo. A SHIP ✅ that only exists in the local working tree hasn't actually
+closed the sequence.
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | assets ✅

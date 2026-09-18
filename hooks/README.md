@@ -48,8 +48,12 @@ with neither available it denies rather than allows, per SKILL.md Section 4
 ## What it checks
 
 Source of truth is `.claude/dev-skills-gates.md` (SKILL.md Section 2). A gate
-counts as satisfied when its line carries ✅ (passed) or ➖ (N/A). Anything else
-— ⬜ pending, ⏳ in progress, 🚫 blocked, or a gate missing from the file — blocks.
+counts as satisfied when its **row** — the line naming the gate, plus any
+continuation lines below it up to the next gate or a blank line — carries
+✅ (passed) or ➖ (N/A). Anything else — ⬜ pending, ⏳ in progress, 🚫 blocked,
+or a gate missing from the file — blocks. (Reading only the first line used
+to miss a status or `handoff` annotation that wrapped onto a continuation
+line; the hook now reads the whole row.)
 
 Required gates scale with the operation, matching the two tracks in Section 2:
 

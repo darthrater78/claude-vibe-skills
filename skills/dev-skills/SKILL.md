@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.24.0
+version: 2.25.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -68,11 +68,48 @@ merge, tag, release):**
    to skip them.
 2. If building an app: confirm a test build has been created and verified working.
 3. Run `git status` and `git diff` to show what will be committed.
-4. Draft a commit message and show it.
+4. Draft a commit message per Section 1.1 and show it.
 5. Wait for explicit approval.
 6. **Present commands per Section 5.8.** Always present the git commands formatted
    for the user's shell environment so they can run them manually. Only execute
    directly via tool calls if the user explicitly asks Claude to run them.
+
+### 1.1 Commit message format — Conventional Commits
+
+Every commit message follows [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>[optional scope]: <summary in imperative mood, lowercase, no trailing period>
+
+[optional body — the WHY, not a restatement of the diff]
+
+[optional footer(s)]
+```
+
+**Types:** `feat` (new capability), `fix` (bug fix), `docs`, `chore`
+(tooling/config, no source behavior change), `refactor`, `perf`, `test`,
+`ci`, `build`, `style`, `revert`. Pick the one that best describes the
+*primary* effect of the commit — a fix that also updates a doc is still
+`fix:`, not `docs:`.
+
+**Breaking changes** get `!` right after the type/scope (`feat!:`,
+`fix(api)!:`) and a `BREAKING CHANGE:` footer explaining what breaks and how
+to adapt. This is not decorative — Gate 1 (VERSION) uses it as the strongest
+available signal for the semver bump (below).
+
+**This governs commit message text only.** It's a different convention from
+`CHANGELOG.md`'s Keep a Changelog format (Section 4 / Gate 4's `## [X.Y.Z]` /
+`### Added` structure) — that file stays hand-written prose grouped by
+change type for a human reading the release, not generated from commit
+messages. The two coexist; neither replaces the other.
+
+**Feeding Gate 1 (VERSION).** When drafting the version bump, use the
+commit types since the last tag as a signal, not a silent decision: any
+`!` or `BREAKING CHANGE:` footer → MAJOR; any `feat` with no breaking change
+→ MINOR; only `fix`/`chore`/`docs`/etc. → PATCH — the same mapping
+semver.org itself describes. State which commits drove the call and confirm
+the bump with the user (`GATE_REFERENCE.md`, Gate 1) — this narrows the
+question, it doesn't answer it for them.
 
 **When do gates apply?** By default, to every session that modified a tracked
 file. There is no "this change is too small" exemption — that judgment call is
@@ -176,6 +213,26 @@ is called. A repo with no conventional default should not have every
 ordinary merge treated as a release by default, nor silently exempted from
 gates because no branch looks like `main`.
 
+**A merge to the default branch with no publishing intent behind it is a
+work commit, not a release — say so explicitly, don't default to
+release-track because the branch it lands on happens to be `main`.** A
+tracker-bookkeeping commit, a docs typo fix, a chore that bumps nothing and
+tags nothing: merging it to the default branch is still governed by
+*publishing intent*, the same test as everywhere else in this section — no
+version bump, no artifact, no tag, no publish means work-commit track, with
+RELEASE and SHIP marked ➖ N/A and the reason stated ("no version/artifact/
+tag involved — bookkeeping only"). Treating every default-branch merge as
+release-track by default is what turns a five-line tracker update into a
+six-gate ceremony — that friction is exactly what makes a real ambiguous
+case get silently waved through instead of asked about.
+
+**When it's genuinely unclear whether this repo's convention treats a given
+kind of default-branch merge as release-track, ask once, at session start,
+with `AskUserQuestion` — not as a mid-gate aside discovered while a PR is
+already blocked.** A convention like this is a property of the repo, not of
+one session; asking early means the next session doesn't hit the same
+ambiguity cold.
+
 ### Gate state — must be durable
 
 The tracker is not a message you printed once; it is a file. Conversation history
@@ -210,6 +267,37 @@ Updated: 2026-09-07
 📦 RELEASE    ⬜
 🚀 SHIP       ⬜
 ```
+
+**Row format — the status symbol and every word the hook checks belong on
+the row's first line; narrative detail goes on the lines below it.** The
+hook (`hooks/gate-preflight.sh`) and Claude's own re-derivation both look
+for specific things — the ✅/➖/⏳/🚫/⬜ symbol, and annotations like
+`handoff` — and both are line-oriented: a check that lands on a row's
+second or third line because the first line ran long is a check that gets
+missed, not a check that failed loudly. This has actually happened — an
+annotation wrapped past the first line read as absent and blocked a PR over
+formatting, not over missing work. Keep the first line to the symbol plus a
+short label; put the "why", the evidence, and any long reasoning on
+indented continuation lines below it.
+
+**Keep the file small — link out to the long version instead of
+duplicating it.** The gate file is read in full on every gate check and by
+the hook on every git write; a multi-paragraph security write-up or a full
+diagnosis belongs in the commit message or `CHANGELOG.md`, which already
+persist that detail, not copied into the tracker as well. A row that's
+grown past a few lines is a sign the long version needs to move out, not a
+sign it needs its own section.
+
+**Close a section as part of the step that absorbs it — not in a separate
+cleanup pass.** A section still marked "IN PROGRESS" for work that shipped
+in a later release is a false lead for the next session that reads the
+file cold — it looks like open work. When a VERSION or SHIP step folds
+earlier work-commit entries into a release (a beta increment that's now
+part of the shipped version, a chore commit now covered by the release
+notes), close or delete those entries as part of that same step, the same
+turn the gate passes — not a "prune the tracker" pass that may or may not
+happen later. Pruning-later is how the file above grew back from 399 lines
+to 681 in four hours.
 
 **Never read ref state from local copies — tags or branches.** `git tag -l`
 lists *local* tags, and a fresh clone — every remote container, and any
@@ -778,8 +866,12 @@ skill: ...") and follow its session-start procedure. It covers, in order:
 - **Self-check** — the skill's reference files are all present
 - **Version check** — compares this copy's version against the latest tag on
   `darthrater78/claude-vibe-skills`, unconditionally, every session. Behind
-  means a loud warning above the banner and an explicit "continue or update
-  first?" before proceeding — never silent
+  means the loudest treatment this skill has: a bracketed warning as the
+  literal first thing in the first message, above everything else, and an
+  explicit "continue or update first?" before proceeding — never silent, and
+  never folded quietly into the banner. If the user continues anyway, a
+  compact `⚠️ outdated` tag stays on every later tracker display for the
+  rest of the session rather than disappearing after the first warning
 - **Step 0 — execution environment detection** (local / remote container /
   Termux). This decides whether Claude executes git or presents it, whether to
   ask the shell question, whether `gh` or GitHub MCP tools are used, and where
@@ -839,10 +931,17 @@ Before wrapping up, check:
    to be half-finished. The check that always runs is at session *start*
    (`GATE_REFERENCE.md`, step 7).
 
-5. **If no source files were modified**, skip the gate check *and* the token
+5. **Check for orphaned test containers.** If this session started any Docker
+   container for Gate 2 testing (`GATE_REFERENCE.md`, Gate 2 — the local
+   artifact handoff or the never-run-CI-step check), confirm it was torn down:
+   `docker ps` should show nothing left over from this session's testing. If
+   something is still running, stop and remove it now rather than leaving it
+   behind.
+
+6. **If no source files were modified**, skip the gate check *and* the token
    estimate — the session was exploratory or advisory.
 
-6. **Surface the token impact estimate** (Section 5.7). This checkpoint is that
+7. **Surface the token impact estimate** (Section 5.7). This checkpoint is that
    section's firm trigger: if source files were modified, the estimate is part
    of winding down, not an optional extra. Three to five lines, and never longer
    than the savings it describes.
