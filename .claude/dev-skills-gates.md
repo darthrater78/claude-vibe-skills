@@ -1,19 +1,19 @@
 # Dev Skills gate state
 Track: release sequence
-Version: 2.24.0
-Updated: 2026-09-17
+Version: 2.25.0
+Updated: 2026-09-18
 
-Env: local | Branch: master | Default: master
+Env: local | Branch: feature/dev-skills-2.25.0 | Default: master
 
-🔢 VERSION    ✅ 2.24.0 — all refs consistent, v2.23.0 previous tag confirmed on remote
-🔨 BUILD      ✅ scripts/build-skill.sh + scripts/validate.sh — all checks passed
-🔒 SECURITY   ✅ 0 Critical, 0 High — new YAML step examples use env: for tag
-              interpolation, set -euo pipefail, runner-native tools only
-📄 DOCS       ✅ CHANGELOG 2.24.0 entry; README What's-new, Gate 6 description,
-              ref-check wording, size table all updated
-📦 RELEASE    ✅ PR #44 merged (user-driven); merge state + CI on merge commit
-              (bc37ae3) confirmed before the tag was handed over
-🚀 SHIP       ✅ tag v2.24.0 confirmed on bc37ae3 (matches merge commit exactly);
-              "Publish release" workflow succeeded; dev-skills.skill asset
-              (90973 bytes) matches local rebuild byte-for-byte; release
-              notes auto-extracted from CHANGELOG and correct
+🔢 VERSION    ✅ 2.25.0 — validate.sh confirms all refs agree; v2.24.0 tag
+              confirmed on remote at bc37ae3
+🔨 BUILD      ✅ build-skill.sh + validate.sh passed; handoff n/a (no
+              Docker/.exe/.apk signal in this repo)
+🔒 SECURITY   ✅ 0 Critical, 0 High — only code change is the hook's new
+              awk block-parser (no eval/exec/network/secrets, fixed gate
+              names only, fails closed); reproduced the reported bug and
+              confirmed the fix, no regression on the genuine-denial case
+📄 DOCS       ✅ CHANGELOG 2.25.0 entry; README/CONTRIBUTING/hooks-README
+              all updated; validate.sh clean
+📦 RELEASE    ⬜
+🚀 SHIP       ⬜

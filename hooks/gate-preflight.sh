@@ -7,7 +7,11 @@
 # Claude executes itself.
 #
 # Source of truth is .claude/dev-skills-gates.md (SKILL.md Section 2). A gate
-# counts as satisfied when its line carries ✅ (passed) or ➖ (N/A).
+# counts as satisfied when its ROW -- the line naming the gate, plus any
+# continuation lines below it up to the next gate or a blank line -- carries
+# ✅ (passed) or ➖ (N/A). Checking only the first line missed a status or
+# annotation that wrapped past it, which blocked real work over formatting,
+# not over missing work -- see gate_block() below.
 #
 # Install: see hooks/README.md
 # Bypass:  DEV_SKILLS_GATE_HOOK=off
@@ -153,20 +157,41 @@ Do not work around this by editing the state file to say a gate passed when it d
 fi
 
 # --- evaluate the required gates ----------------------------------------------
-# A gate is satisfied when its line carries ✅ (passed) or ➖ (N/A).
-# Byte-literal matching via grep -F, so locale settings can't break it.
+# A gate is satisfied when its ROW carries ✅ (passed) or ➖ (N/A) -- not just
+# its first line. Byte-literal matching via grep -F, so locale settings can't
+# break it.
+
+GATE_NAMES='VERSION|BUILD|SECURITY|DOCS|RELEASE|SHIP'
+
+# gate_block <gate> -- print the gate's full row: the line naming it, plus
+# every line after it up to (not including) the next gate's line or a blank
+# line. A `head -1` here is what let a status symbol or a "handoff"
+# annotation wrapped onto a continuation line read as absent.
+gate_block() {
+  awk -v gate="$1" -v names="$GATE_NAMES" '
+    BEGIN {
+      start_pat = "(^|[[:space:]])" gate "([[:space:]]|$)"
+      any_pat   = "(^|[[:space:]])(" names ")([[:space:]]|$)"
+    }
+    {
+      if (found && ($0 ~ any_pat || NF == 0)) { exit }
+      if (!found && $0 ~ start_pat) { found = 1 }
+      if (found) print
+    }
+  ' "$STATE" 2>/dev/null
+}
 
 BLOCKING=""
 for gate in $REQUIRED; do
-  line="$(grep -E "(^|[[:space:]])${gate}([[:space:]]|$)" "$STATE" 2>/dev/null | head -1)"
-  if [ -z "$line" ]; then
+  block="$(gate_block "$gate")"
+  if [ -z "$block" ]; then
     BLOCKING="$BLOCKING
   - $gate — not present in $STATE_REL (treated as pending)"
     continue
   fi
-  if printf '%s' "$line" | grep -qF '✅'; then continue; fi
-  if printf '%s' "$line" | grep -qF '➖'; then continue; fi
-  status="$(printf '%s' "$line" | sed "s/^[[:space:]]*//")"
+  if printf '%s' "$block" | grep -qF '✅'; then continue; fi
+  if printf '%s' "$block" | grep -qF '➖'; then continue; fi
+  status="$(printf '%s' "$block" | head -1 | sed "s/^[[:space:]]*//")"
   BLOCKING="$BLOCKING
   - $status"
 done
@@ -187,9 +212,9 @@ produces_compiled_artifact() {
 }
 
 if printf '%s' "$REQUIRED" | grep -qw BUILD; then
-  build_line="$(grep -E "(^|[[:space:]])BUILD([[:space:]]|$)" "$STATE" 2>/dev/null | head -1)"
-  if printf '%s' "$build_line" | grep -qF '✅' \
-     && ! printf '%s' "$build_line" | grep -qiF 'handoff' \
+  build_block="$(gate_block BUILD)"
+  if printf '%s' "$build_block" | grep -qF '✅' \
+     && ! printf '%s' "$build_block" | grep -qiF 'handoff' \
      && produces_compiled_artifact; then
     BLOCKING="$BLOCKING
   - BUILD — ✅ but no local-artifact-handoff annotation. This repo has a Docker/.exe/.apk build signal (Dockerfile, .csproj/.sln, or an Android Gradle project). GATE_REFERENCE.md Gate 2 requires offering the user a way to try the real artifact before this gate passes. Add \"handoff offered\", \"handoff declined\", or \"handoff n/a (remote container / Termux session)\" to the BUILD line, then retry."

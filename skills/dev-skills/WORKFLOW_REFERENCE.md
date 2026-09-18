@@ -54,7 +54,9 @@ session start detects workflows that exist but may have issues — read every
      scripts, no `set -euo pipefail` in multi-line run blocks, no artifact
      verification after upload, CI trigger is a bare `push:` (also matches tag
      pushes — runs the suite twice on release) instead of `branches: ['**']`,
-     no `lint-workflows.yml` for a repo with multiple workflow files
+     no `lint-workflows.yml` for a repo with multiple workflow files, a
+     release job re-running a check (lint, shellcheck, full suite) the gate
+     job already required CI to have passed for that exact commit
    - 💡 **Low** — missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
@@ -1183,13 +1185,10 @@ jobs:
             exit 1
           fi
 
-      - name: Check shell scripts
-        run: |
-          set -euo pipefail
-          scripts=$(find . -name '*.sh' -o -name '*.bash' | grep -v node_modules | grep -v .git || true)
-          if [ -n "$scripts" ]; then
-            echo "$scripts" | xargs shellcheck --severity=warning
-          fi
+      # No shellcheck step here: ci.yml's lint job already ran it, and the
+      # gate job above requires that exact run to have passed for this
+      # commit before this job starts. Re-running it would only re-prove
+      # what the gate already checked (see "Require a passing CI run", above).
 
       # ADAPT: uncomment and adjust if artifacts should be attached
       # - name: Build release artifact
@@ -1587,13 +1586,10 @@ jobs:
             exit 1
           fi
 
-      - name: Validate scripts before release
-        run: |
-          set -euo pipefail
-          scripts=$(find . -name '*.sh' -o -name '*.bash' | grep -v node_modules | grep -v .git || true)
-          if [ -n "$scripts" ]; then
-            echo "$scripts" | xargs shellcheck --severity=warning
-          fi
+      # No shellcheck step here: ci.yml's lint job already ran it, and the
+      # gate job above requires that exact run to have passed for this
+      # commit before this job starts. Re-running it would only re-prove
+      # what the gate already checked (see "Require a passing CI run", above).
 
       - name: Extract release notes
         run: |
@@ -2197,9 +2193,18 @@ jobs:
 
 ### Release workflow — `.github/workflows/release.yml`
 
-Publishes to npm. Unlike PyPI, npm does not support OIDC trusted publishing
-yet, so an `NPM_TOKEN` secret is required. Generate one at npmjs.com →
-Access Tokens → Generate New Token (Automation type).
+Uses OIDC trusted publishing (GA since July 2025) — the npm package must
+have this repository configured as a trusted publisher. No `NPM_TOKEN`
+secret to generate or rotate. Requires npm CLI 11.5.1+ and Node 22.14.0+;
+the pinned `node-version` below clears both.
+
+**Setting up trusted publishing (one-time):**
+1. On npmjs.com, go to the package → Settings → Trusted Publisher
+2. Add a GitHub Actions publisher: organization/user, repository, workflow
+   filename `release.yml` (environment name is optional — only needed if
+   you also want GitHub deployment protection rules on the `npm`
+   environment below)
+3. That's it — no secret to manage
 
 ```yaml
 name: Release
@@ -2211,6 +2216,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -2286,6 +2292,8 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: npm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -2310,7 +2318,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 'lts/*'
+          node-version: '22.14.0'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install and build
@@ -2319,9 +2327,10 @@ jobs:
           npm ci
           npm run build --if-present
 
+      # npm CLI auto-detects the OIDC environment (id-token: write, above)
+      # and authenticates with it before falling back to a token — no
+      # NODE_AUTH_TOKEN needed when trusted publishing is configured.
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish
 
       - name: Extract release notes
@@ -2352,9 +2361,13 @@ jobs:
 - For scoped packages: add `--access public` to `npm publish` if the package
   is under an org scope and should be public
 - For GitHub Packages: change `registry-url` to `https://npm.pkg.github.com`
-  and use `GITHUB_TOKEN` instead of `NPM_TOKEN`
+  and use `GITHUB_TOKEN` instead — trusted publishing is npmjs.com-specific
 - For pnpm or yarn: replace `npm ci` with the equivalent install command and
   adjust the cache setting in `setup-node`
+- **No trusted-publisher access, or a registry without OIDC support:** fall
+  back to an `NPM_TOKEN` secret (npmjs.com → Access Tokens → Generate New
+  Token, Automation type), pass it as `NODE_AUTH_TOKEN` in the publish
+  step's `env:`, and drop `id-token: write` from `permissions`.
 
 ---
 
@@ -2646,6 +2659,10 @@ every item:
       commit's own declared version equals the tag, or the version is
       tag-derived/computed and documented as exempt
 - [ ] Release notes extracted from CHANGELOG.md or PR body
+- [ ] Release job doesn't re-run a check the gate job already required to
+      pass on this exact commit (lint, shellcheck, the full test suite) —
+      the gate's job is proof it already ran and passed; redoing it in the
+      release job burns runner time re-proving what's already known
 - [ ] CI calls project's own scripts, not inline reimplementations
 - [ ] Secrets used only in `env:` blocks, never in `run:` strings
 - [ ] Artifact verification after upload (release workflows)

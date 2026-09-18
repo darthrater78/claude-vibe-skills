@@ -4,6 +4,107 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.25.0] — 2026-09-18
+
+Distilled from a postmortem on a real dev-skills session: ten specific
+failure modes the gate workflow itself produced, plus new handling for
+building Docker in a web container and a pass over release-workflow
+efficiency. No breaking changes.
+
+### Added
+- **A web/remote container that can't actually build Docker gets a real
+  choice, not a silent guess.** Scoped to projects with a Docker build
+  signal. Session start now measures `docker info` (daemon reachability)
+  instead of `which docker` (binary presence only) — the two look identical
+  until something tries to build, which is exactly how this was found: the
+  CLI was present, the daemon wasn't. When the daemon isn't reachable in a
+  web container, Claude now says so plainly and offers either a work commit
+  now (finish Gate 2 later on a machine with a working daemon) or the
+  existing CI-only BUILD path. Any Docker container started for Gate 2
+  testing — the handoff offer or the new never-run-step check below — must
+  be stopped and removed once its purpose is served; Section 8's session-end
+  checklist now checks for orphaned test containers as a backstop.
+- **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).**
+  `SKILL.md` §1.1 has the type list (`feat`/`fix`/`docs`/`chore`/etc.) and the
+  breaking-change (`!`, `BREAKING CHANGE:`) convention. Gate 1 (VERSION) now
+  reads the commit types since the last tag as a signal for the bump —
+  `feat`→MINOR, `fix`-only→PATCH, any breaking-change marker→MAJOR — and
+  confirms with the user rather than asking cold. This is a different axis
+  from `CHANGELOG.md`'s Keep a Changelog format, which stays hand-written.
+- **The out-of-date-skill warning is now the loudest thing this skill does.**
+  A behind copy gets a bracketed, warning-lined block as the literal first
+  line of the first message — nothing above it, never folded into the
+  banner. If the user continues anyway, a compact `⚠️ outdated` tag now
+  stays on every later gate-tracker display for the rest of the session
+  instead of disappearing after the first warning.
+- **A release-workflow step that's never actually run gets proven before a
+  tag depends on it.** New Gate 2 rule: before a tag push is about to
+  exercise a release step with no track record in this repo (first registry
+  login, first signing step, an ancestor-fallback path), copy it out of
+  `release.yml` and dry-run it locally against the built artifact if the
+  tooling allows. Keep a short "unproven" note for anything that can't be
+  exercised this way and carry it forward release to release until it
+  actually runs once for real.
+- **Three standing checks when fixing a Critical or High in Gate 3:**
+  reproduce the failure before writing the fix and look for sibling paths
+  into the same bad state once it's fixed; flag any existing test whose
+  assertions encode the insecure behavior as correct (a green test isn't
+  proof — one was found treating a locked resource as "no key," not "access
+  denied"); confirm every new regression test actually fails with the fix
+  reverted before trusting it as coverage.
+- **A build/test run only counts as Gate 2 evidence if the tree didn't move
+  under it.** `git status --porcelain` and `git rev-parse HEAD` are now
+  captured before and after the run; a mismatch means the gate is still
+  pending, not a pass to keep. Two ~9-minute suite runs were previously
+  thrown away this way in one session with nothing enforcing the check.
+- **The release-track rule moved from a one-off gate-file note into
+  `SKILL.md` itself.** A merge to the default branch with no version bump,
+  artifact, tag, or publish behind it is a work commit, explicitly, with
+  RELEASE/SHIP marked ➖ N/A and the reason stated — not release-track by
+  default because it touched `main`. When a repo's own convention here is
+  genuinely unclear, the skill now asks once at session start with
+  `AskUserQuestion` instead of surfacing it as a mid-PR aside.
+- **Workflow review checklist gained an item** for a release job re-running a
+  check (lint, shellcheck, the full suite) its own gate job already required
+  CI to have passed for that exact commit — the redundant-check pattern this
+  release found and fixed in two templates (below).
+
+### Fixed
+- **`hooks/gate-preflight.sh` read only a gate row's first line**, for both
+  the ✅/➖ status check and the BUILD `handoff` annotation check. A status
+  symbol or annotation that wrapped onto a continuation line — which happens
+  routinely, since gate rows carry explanatory text — read as absent and
+  blocked real work over formatting, not missing work. The hook now reads
+  the full row (the gate's line plus every continuation line up to the next
+  gate or a blank line) for both checks. Reproduced against a synthetic gate
+  file: the old `grep | head -1` logic missed a `handoff` annotation on a
+  wrapped line; the fixed `gate_block()` awk helper finds it, and still
+  correctly denies when the annotation is genuinely absent.
+- **Proceeding without acting on the local-artifact-handoff offer now
+  counts as declining it**, recorded with the user's own words, instead of
+  leaving BUILD waiting on an explicit decline that was never going to come.
+- **The SHIP gate's own record can no longer stay uncommitted.** Both the
+  CI-driven and manual Gate 6 paths now end with committing and pushing the
+  gate-state file's SHIP ✅ update — found happening live in this repo: the
+  v2.24.0 record sat uncommitted in the working tree while the release had
+  actually shipped.
+- **Gate-file rows stay short and stay current.** New `SKILL.md` §2 rules:
+  keep a row to a few lines (the long write-up belongs in the commit message
+  or `CHANGELOG.md`, which already persist it — not duplicated in the
+  tracker), and close or delete a section as part of the VERSION/SHIP step
+  that absorbs its work, not a separate cleanup pass. One session's tracker
+  went from 399 lines back to 681 in four hours without this.
+- **Two release templates (Linux, script-collection) re-ran shellcheck in
+  the release job** even though their own gate job already required CI's
+  identical check to have passed for that commit — pure re-proof, removed.
+- **The Node.js release template was stale**: it said npm didn't support
+  OIDC trusted publishing and required an `NPM_TOKEN` secret. npm trusted
+  publishing has been GA since July 2025 (verified against npm's current
+  docs, not recalled). The template now uses OIDC by default (`id-token:
+  write`, no token to manage) with the token approach as an explicit
+  fallback for registries or configurations without trusted-publisher
+  access.
+
 ## [2.24.0] — 2026-09-17
 
 ### Added

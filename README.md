@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.24.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.25.0`
 
 ---
 
@@ -116,6 +116,40 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   over the tag-push block until the merge and its CI are confirmed, the
   block itself carries a version guard, and a recovery runbook covers a tag
   that got published on the wrong commit anyway. *(2.24.0)*
+- **[Docker-in-a-web-container gets its own decision point](#gate-2--build-).**
+  A container with the `docker` CLI but no reachable daemon used to look
+  identical to "Docker available." Session start now measures with `docker
+  info`, not `which docker`, and when a Docker-build project hits this in a
+  remote/web session, offers a real choice — commit as work-in-progress to
+  finish on a machine with a working daemon, or fall back to the existing
+  CI-only BUILD path. Any container started for Gate 2 testing must be torn
+  down once it's served its purpose. *(2.25.0)*
+- **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).**
+  `SKILL.md` §1.1 has the type list; Gate 1 now reads the commit types since
+  the last tag as a signal for the version bump (`feat`→MINOR, `fix`→PATCH,
+  `!`/`BREAKING CHANGE:`→MAJOR) instead of asking cold. *(2.25.0)*
+- **The out-of-date warning got a lot louder.** A behind skill copy now gets
+  a bracketed, impossible-to-skim-past warning as the literal first line of
+  the first message — not folded into the banner — and if you continue
+  anyway, a compact `⚠️ outdated` tag stays on every later tracker display
+  for the rest of the session instead of vanishing after one message.
+  *(2.25.0)*
+- **Gate-file discipline, from a real postmortem.** The pre-flight hook now
+  reads a gate row's full text instead of just its first line — a status or
+  `handoff` annotation wrapped onto a continuation line used to read as
+  absent and block real work over formatting. Plus: rows stay short (link to
+  the commit/changelog instead of duplicating detail), a section closes when
+  the release step that absorbs it runs rather than in a separate cleanup
+  pass, and the SHIP record itself must be committed and pushed as Gate 6's
+  last action — a tracker that says SHIP ✅ only locally hasn't actually
+  shipped. *(2.25.0)*
+- **Three release-workflow templates stopped re-proving what CI already
+  proved.** The Linux and script-collection release jobs were re-running
+  shellcheck even though their own gate job already required it to have
+  passed for that commit — removed, with a new checklist item so an audit
+  catches this pattern automatically. The Node.js template moved to npm's
+  OIDC trusted publishing (GA since July 2025) instead of a long-lived
+  `NPM_TOKEN`. *(2.25.0)*
 
 ---
 
@@ -216,7 +250,18 @@ and not offered on remote container or Termux sessions, which already ship
 through Gate 6's CI-driven path. *(2.22.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
 a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
-repo with a Docker/.exe/.apk build signal, is denied. *(2.23.0)*
+repo with a Docker/.exe/.apk build signal, is denied — reading the tracker
+row's full text, not just its first line, so a wrapped annotation isn't
+misread as missing. *(2.23.0, 2.25.0)*
+
+A web/remote container with the Docker CLI but no reachable daemon is a
+separate, earlier problem than the handoff offer: session start measures
+`docker info`, not just `which docker`, and offers a real choice for a
+Docker-build project — commit as work-in-progress to finish on a machine
+with a working daemon, or the CI-only path above. Any container started for
+testing must be torn down once it's served its purpose. A build/test run
+only counts as this gate's evidence if the working tree was unchanged for
+its full duration. *(2.25.0)*
 
 ### Gate 3 — Security & Quality 🔒
 
@@ -268,6 +313,15 @@ attached). Shows the full ship summary and waits for explicit confirmation —
 The tag push itself always comes back to you — see
 [Execution environments](#execution-environments).
 
+Before a tag exercises a release-workflow step that's never actually run in
+this repo (a first registry login, a first signing step), it's worth
+dry-running that step locally against the built artifact first — cheaper
+than discovering it fails during a live release. And the gate's own record
+isn't done at "tag pushed" — committing and pushing the gate-state file's
+SHIP ✅ update is the last action, when that file is tracked in the repo
+(remote-container convention, or a local repo that force-adds it, like this
+one). *(2.25.0)*
+
 <details>
 <summary><b>The git flow is identical across platforms — only the CI build differs</b></summary>
 
@@ -301,6 +355,15 @@ entirely — and a dropped checklist is a leak.
 A work commit never becomes a release by accident. If the operation tags, merges
 to the default branch, or publishes, it's a release sequence — regardless of it
 being called "just a quick push".
+
+The test is *publishing intent*, not the branch a commit lands on. A merge
+to the default branch that bumps nothing, tags nothing, and publishes
+nothing — a tracker-bookkeeping commit, a docs typo fix — is still a work
+commit, with RELEASE/SHIP marked ➖ N/A and the reason stated. Treating every
+default-branch merge as release-track by default is what turns a five-line
+housekeeping commit into a six-gate ceremony. When a repo's own convention
+here is genuinely unclear, the skill asks once at session start rather than
+discovering it mid-PR.
 
 Gates apply by default to any session that modified a tracked file. There is no
 "too small to bother" exemption. A gate leaves the workflow exactly one way: by
@@ -368,9 +431,12 @@ stops being advisory for anything Claude runs itself.
 Read-only git is never blocked. For BUILD specifically, the hook also denies a
 ✅ with no `handoff` annotation in any repo with a Docker/.exe/.apk build
 signal — the deterministic half of the [local-artifact-handoff
-offer](#gate-2--build-). Install instructions, the settings snippet, and
-failure modes are in [`hooks/README.md`](hooks/README.md). The hook ships in the
-repo, not in the `.skill` bundle — it's installed separately.
+offer](#gate-2--build-). It reads a gate row's full text (the status line
+plus any continuation lines below it), not just the first line, so an
+annotation that wraps doesn't read as missing. Install instructions, the
+settings snippet, and failure modes are in [`hooks/README.md`](hooks/README.md).
+The hook ships in the repo, not in the `.skill` bundle — it's installed
+separately.
 
 **It covers what Claude executes — not commands presented for you to paste, and
 not git you run yourself.** So it's strongest on remote container sessions,
@@ -390,6 +456,15 @@ Claude's working tree and your terminal are the same clone:
 | **Local** (Claude Code CLI) | Same clone — commands are **presented** for you to run, at no tool-call token cost |
 | **Remote container** (web/mobile) | A clone your terminal never sees — Claude **executes** git directly. A pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Presented, plus a clone flow — the repo may not be on the device |
+
+Every environment capability the skill records — Docker daemon reachable,
+push allowed, tag push allowed — is measured, not inferred, and re-measured
+every session rather than carried forward from a prior one or a handoff
+summary. `which docker` only proves the CLI is on `PATH`; a container can
+have the binary with no daemon behind it, which looks identical to "Docker
+available" until a build actually tries it. The skill checks `docker info`
+instead, and treats a capability noted in an earlier context as a claim
+about *that* context, not a fact about this one.
 
 ### Tag pushes and ref deletions always come back to you
 
@@ -527,8 +602,8 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~46KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~60KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SKILL.md` | ~52KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `GATE_REFERENCE.md` | ~70KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -599,4 +674,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.24.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.25.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
