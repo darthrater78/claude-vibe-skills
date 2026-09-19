@@ -20,6 +20,6 @@ Env: remote container | Branch: claude/skill-automatic-mode-i371w2 | Default: ma
 📄 DOCS       ✅ CHANGELOG 2.26.0; README modes + Remote Control sections,
               size table, shortcut table; hooks/README. All anchors resolve
               (fixed pre-existing #security-rules → #gate-3--security--quality-)
-📦 RELEASE    ⏳ branch synced (4 ahead, 0 behind master), all work committed,
-              PR being opened
+📦 RELEASE    ⏳ PR #49 open, CI running; release notes awaiting user
+              approval. Branch synced, all work committed
 🚀 SHIP       ⬜ tag push is the user's (§5.8)
