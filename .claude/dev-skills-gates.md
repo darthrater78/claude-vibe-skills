@@ -6,44 +6,46 @@ Updated: 2026-09-19
 
 Env: remote container | Branch: claude/cost-optimization-review-1oesyw | Default: master
 
-Release sequence for v2.28.0 — BLOCKED at Gate 3 by its own new rule:
+Release sequence for v2.28.0 — BLOCKED at Gate 3, 1 finding open:
 
 🔢 VERSION    ✅ 2.28.0 across VERSION, SKILL.md frontmatter, the banner in
-              SESSION_START.md, and README; v2.27.0 tagged at dc1bbea.
-              MINOR — behavior-tightening, same call as 2.24.0's version guard
-🔨 BUILD      ✅ validate.sh green including the 2.27.0 ceilings. Hook verified
-              against all three states: the exact 2.26.0 tracker text now
-              denies `git tag`, a "0 open" row allows it, a work commit with an
-              open Medium is unaffected
-🔒 SECURITY   🚫 2 open — release track blocked until each is fixed, waived by
-              the user with a reason, or withdrawn (GATE_REFERENCE.md →
-              SECURITY_GATE.md)
-              📝 Medium, OPEN: shellcheck unavailable in this container, so
-              scripts/validate.sh, build-skill.sh and gate-preflight.sh are
-              unlinted. bash -n clean on all three; that is not the same check
-              📝 Medium, OPEN: Dependabot alerts and security updates are
-              repository settings, and no tool in this session can read
-              GET /repos/.../dependabot/alerts to confirm their state.
-              Settings → Code security. Claude cannot flip a repo setting
-              ✅ fixed 2026-09-19: no .github/dependabot.yml → added
-              (github-actions, weekly, grouped)
-📄 DOCS       ✅ CHANGELOG 2.28.0; README shortcut table and size table;
-              hooks/README.md documents the new check
-📦 RELEASE    ⬜ blocked by SECURITY — PR #52 must not merge while 2 are open.
-              When it unblocks, THIS FILE ships inside that PR (Gate 5 step 3),
-              gates 1–5 ✅ and SHIP ⏳ — not a bookkeeping PR afterwards
-🚀 SHIP       ⬜ blocked by SECURITY. The post-tag ✅ line folds into the next
-              release's PR, not its own (SHIP_REFERENCE.md step 7)
+              SESSION_START.md, and README; v2.27.0 tagged on the remote at
+              dc1bbea. MINOR — behavior-tightening, same call as 2.24.0
+🔨 BUILD      ✅ validate.sh green. Bundle verified reproducible: two builds
+              one second apart produced identical sha256. Hook verified on 5
+              paths — release op with an open finding DENY, with 0 open
+              ALLOW, work commit with an open finding ALLOW, missing cwd DENY,
+              un-enterable cwd DENY
+              handoff n/a — no Docker/.exe/.apk artifact in this repo
+🔒 SECURITY   🚫 1 open — release track blocked (SECURITY_GATE.md)
+              📝 Medium, OPEN, needs the repo owner: Dependabot alerts and
+              security updates are repository settings. Verified unverifiable
+              from here — no MCP tool exposes the endpoint and `git credential
+              fill` yields nothing, so the session holds no token to query
+              GET /repos/.../dependabot/alerts. Settings → Code security
+              ✅ fixed: no .github/dependabot.yml → added (github-actions,
+              weekly, grouped); only ecosystem, no package manifests exist
+              ✅ fixed: shellcheck unavailable → installed and run. 3 findings,
+              all fixed. SC2164 was a real fail-open path in gate-preflight.sh:
+              an unchecked cd left it reading the wrong state file. Now denies
+              ✅ fixed: bundle was not a reproducible build — zipfile stamped
+              build time, so v2.27.0's asset and its committed copy hashed
+              differently with all 21 entries identical. Entry metadata pinned
+              to the zip epoch; archive comparison is now a real check
+              Scan on this diff: 0 Critical, 0 High. Secrets scan clean (two
+              matches are the skill's own documentation of what a Critical
+              looks like). No eval, no piped-curl, no destructive commands in
+              changed shell. File modes correct. shellcheck 0.9.0: 0 findings
+              across all three scripts
+📄 DOCS       ✅ CHANGELOG 2.28.0 complete; README shortcut and size tables;
+              hooks/README.md documents the new check; 0 broken anchors; every
+              file the README names exists
+📦 RELEASE    ⬜ blocked by SECURITY. PR #52 exists but opened as bookkeeping
+              and is now mis-titled; retitle as the 2.28.0 release PR. When
+              SECURITY clears, THIS FILE ships inside that PR (Gate 5 step 3)
+              with gates 1–5 ✅ and SHIP ⏳
+🚀 SHIP       ⬜ blocked by SECURITY. Post-tag ✅ folds into the next release's
+              PR, not its own (SHIP_REFERENCE.md step 7)
 
-Why this is the correct state, not a problem to route around: 2.28.0 is the
-release that made an open finding of any severity block the release track. Both
-findings above are real, neither is fixable from this session, and marking
-SECURITY ✅ to let its own release through would be the precise failure the
-release exists to stop. They are the user's to fix or waive.
-
-This commit's own gates (work-commit track — commits and pushes stay allowed
-with findings open, which is how a finding gets recorded at all):
-🔒 SECURITY   ✅ 0 open for the commit itself — no Critical or High anywhere;
-              Markdown, two Bash scripts and one YAML config
-🔢 🔨 📄       ✅ covered by the release rows above
-📦 🚀          ⬜ not attempted
+The one open finding is not fixable from this session and is not Claude's to
+waive. It is the user's: fix it in repo settings, or waive it with a reason.

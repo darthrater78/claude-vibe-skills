@@ -47,11 +47,22 @@ fi
 "$python" - "$out" "$src" "${files[@]}" <<'PY'
 import sys, zipfile
 
+# Fixed entry metadata makes the bundle reproducible: identical sources produce
+# a byte-identical archive, so comparing the released asset against the
+# committed one is a real check. zipfile's default stamps each entry with the
+# build time, which made every rebuild differ and every such comparison
+# meaningless -- v2.27.0's asset and its own committed copy hashed differently
+# with all 21 entries identical. 1980-01-01 is the zip epoch.
+EPOCH = (1980, 1, 1, 0, 0, 0)
+
 out, src, *names = sys.argv[1:]
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for name in names:
         with open(f"{src}/{name}", "rb") as fh:
-            z.writestr(name, fh.read().replace(b"\r\n", b"\n"))
+            info = zipfile.ZipInfo(name, date_time=EPOCH)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            z.writestr(info, fh.read().replace(b"\r\n", b"\n"))
 PY
 
 echo "built $out"

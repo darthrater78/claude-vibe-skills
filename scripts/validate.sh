@@ -9,10 +9,9 @@ errors=0
 files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md)
 
 # Extract versions from each source
-version_file=$(cat VERSION | tr -d '[:space:]')
+version_file=$(tr -d '[:space:]' < VERSION)
 skill_frontmatter=$(grep -m1 '^version:' skills/dev-skills/SKILL.md | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
 skill_banner=$(grep -rhoP 'Dev Skills v\K[0-9]+\.[0-9]+\.[0-9]+' skills/dev-skills/*.md | head -1)
-readme_version=$(grep -A0 '## Version' README.md | head -1)
 readme_version_code=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1)
 
 echo "=== Version sources ==="

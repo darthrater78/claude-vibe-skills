@@ -99,6 +99,27 @@ let it happen anyway, twice.
   `WORKFLOW_REFERENCE.md` warns about is correct here; the file says so and
   says to add an entry the moment that stops being true.
 
+### Fixed
+- **A fail-open path in the enforcement hook** (`hooks/gate-preflight.sh`),
+  found by shellcheck (SC2164). `cd "$CWD" 2>/dev/null` was unchecked, so a
+  directory that exists but cannot be entered left the hook resolving `ROOT`
+  from wherever it happened to be — reading the wrong gate state file, or
+  none, and then evaluating gates against it. The hook's header has always
+  said it fails closed; this path did not. It now denies, with the directory
+  named. Note the fix SC2164 suggests, `|| exit`, would exit 0 — which in this
+  hook means **allow** — so the denial is written explicitly.
+- **The bundle is now a reproducible build** (`scripts/build-skill.sh`).
+  `zipfile.writestr` stamped every entry with the build time, so two builds of
+  identical sources produced different archive bytes: v2.27.0's released asset
+  and its own committed copy hashed differently with all 21 entries identical.
+  Entry metadata is now fixed at the zip epoch, so comparing a released asset
+  against the committed one is a real check rather than a meaningless one. This
+  also retires an inaccurate claim — the v2.26.0 tracker recorded that the
+  asset's "sha256 matches the API digest", which it could not have.
+- **Dead code in `scripts/validate.sh`** (SC2034): `readme_version` was
+  assigned and never read. Also a useless `cat` (SC2002). All three scripts now
+  pass shellcheck 0.9.0 with zero findings.
+
 ### Notes
 - Behavior-tightening, released as MINOR in line with 2.24.0's version guard.
   It is worth knowing that a repo carrying open findings will find its next

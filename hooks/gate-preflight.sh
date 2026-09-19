@@ -132,7 +132,20 @@ esac
 # --- locate the gate state file -----------------------------------------------
 
 CWD="$(json_get '.cwd')"
-[ -n "$CWD" ] && [ -d "$CWD" ] && cd "$CWD" 2>/dev/null
+# A cd that fails here would leave the hook resolving ROOT from whatever
+# directory it happens to be in, and so reading the wrong gate state file --
+# or none. This hook fails closed, so that is a denial, not a shrug. Note the
+# fix SC2164 suggests (`|| exit`) would exit 0, which here means ALLOW.
+if [ -n "$CWD" ] && [ -d "$CWD" ]; then
+  cd "$CWD" 2>/dev/null || deny "🚫 GATE PRE-FLIGHT — cannot enter the session's working directory.
+
+Blocked: $OP_LABEL
+Directory: $CWD
+
+The hook could not cd into the directory the tool call reported, so it cannot locate $STATE_REL and has no evidence any gate has run. Per SKILL.md Section 4, unexpected means deny, not proceed.
+
+Check the directory's permissions, then retry."
+fi
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [ -z "$ROOT" ]; then
