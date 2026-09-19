@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # GitHub Actions — keeps SHA pins and their version comments current.
+  #
+  # This is the repo's ONLY ecosystem, and that is a deliberate statement, not
+  # an oversight. WORKFLOW_REFERENCE.md warns that an actions-only config is
+  # the common mistake, because workflow pins stay current while application
+  # packages drift. This repo has no application packages to drift: no
+  # package.json, pyproject.toml, Cargo.toml, go.mod or lockfile of any kind.
+  # It ships Markdown, two Bash scripts, and a zip built by whatever Python 3
+  # the runner already has. Add an entry here the moment that stops being true.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # One PR for all action bumps rather than one per action — this repo uses
+    # a single action (actions/checkout, pinned by SHA in both workflows), so
+    # grouping keeps a quiet repo quiet.
+    groups:
+      actions:
+        patterns:
+          - "*"

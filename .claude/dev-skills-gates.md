@@ -20,9 +20,18 @@ Release sequence for v2.27.0 — CLOSED, all six gates passed:
               on both; hooks/gate-preflight.sh unmodified
               📝 Medium, open: shellcheck unavailable in this container, so
               scripts/validate.sh and build-skill.sh were not linted
-              📝 Medium, open, pre-existing (2 releases old): no
-              .github/dependabot.yml — nothing keeps the SHA-pinned
-              actions/checkout current
+              📝 Medium, RESOLVED after the fact: .github/dependabot.yml
+              added (github-actions, weekly). It was carried as "open,
+              pre-existing" across 2.26.0 and 2.27.0 and should have been
+              surfaced for acceptance at Gate 3 of 2.26.0, not after the
+              release. See the process note below
+              📝 Medium, open, needs the repo owner: Dependabot alerts and
+              security updates are repository settings, not this file, and
+              no tool in this session can read
+              GET /repos/.../dependabot/alerts to confirm their state.
+              Settings → Code security → enable both. Low impact here (no
+              package manifests, so nothing to raise an advisory against)
+              but unverified is unverified
 📄 DOCS       ✅ CHANGELOG 2.27.0; README size table rebuilt to 21 rows and
               the second tiering rule added; all cross-references repointed
 📦 RELEASE    ✅ PR #51 merged as dc1bbea; validate.yml run 59 green on the
@@ -51,3 +60,12 @@ This commit's own gates (work-commit track):
 🔒 SECURITY   ✅ tracker text only
 🔢 🔨 📄       ➖ N/A — no version bump, no build, no doc claims changed
 📦 🚀          ➖ N/A — no version/artifact/tag involved, bookkeeping only
+
+📝 Process finding — a Medium with no expiry rides forever. Gate 3's output
+format claims "Medium: N (shown above, user accepted)", but nothing records
+that acceptance, so the next session re-derives the finding as "open,
+pre-existing" and carries it again. "Pre-existing" then reads as permanently
+excused. That is the exact shape Section 4.1 exists to catch, and the skill
+let it happen to its own repo for two releases. A Medium needs either a
+recorded acceptance with a date, or an escalation once it survives a release
+it was present for. Proposed, not yet implemented.
