@@ -128,6 +128,36 @@ If the signals are ambiguous, ask — do not assume local:
 > 2. Remote container (web or mobile session)
 > 3. Termux (Android)
 
+**Native Linux local sessions — offer Remote Control (`--rc`) once, in either
+mode.** When step 0 resolves to **local** and the host is native Linux, say so
+once and offer it. "Native Linux" is narrower than `uname -s` reporting `Linux`,
+which Termux and WSL both do — confirm it is neither (no `com.termux` in
+`$PREFIX`, no `microsoft` in `/proc/version`) and that this is not a remote
+container.
+
+The suggestion is the **interactive** form, `--rc` / `/rc`, not server mode:
+
+> 💡 **This is a local Linux session.** Starting Claude Code with
+> `claude --rc` (or running `/rc` in this one) keeps your terminal session
+> exactly as it is *and* publishes it to claude.ai/code and the Claude desktop
+> and mobile apps, so you can pick the same session up from either surface.
+> Everything still executes here on your machine.
+
+Which invocation matters, so do not offer them interchangeably:
+
+| Command | What it gives | Offer it? |
+|---|---|---|
+| `claude --rc` / `claude --remote-control` | a normal interactive terminal session that is *also* reachable from the web and desktop apps — you can type in either place | **yes, this one** |
+| `/rc` / `/remote-control` | the same, for a session already open | yes — the in-session form |
+| `claude remote-control` | server mode: serves sessions to the apps with no local interactive prompt | no — it takes the terminal away, which is the opposite of the point |
+
+It is one line, once per session (Section 5, cost discipline): if the user
+declines or ignores it, drop it. It changes nothing about gates, tracks, or the
+mode — a session is reachable from more places, not governed differently. Two
+failure cases worth naming rather than debugging blind: Remote Control needs an
+eligible login (`/login`), and on Team and Enterprise plans it stays off until
+an Owner enables it in Claude Code admin settings.
+
 **Remote container specifics:**
 
 1. **Nothing needs cloning — the repo is already there.** The container is
@@ -186,8 +216,8 @@ If the signals are ambiguous, ask — do not assume local:
    are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
    that fires the release workflow. Present the tag block to the user even
    though everything else runs here — Section 5.8, "Tag pushes and ref
-   deletions are the exceptions." In automatic mode Claude attempts the tag
-   push itself and hands this block over only if it `403`s ("Automatic mode —
+   deletions are the exceptions." In semi-autonomous mode Claude attempts the tag
+   push itself and hands this block over only if it `403`s ("Semi-autonomous mode —
    execution", below); the denial risk is the same, the response to it is what
    differs.
 8. **Docker-in-a-web-container — scoped to projects that actually need
@@ -456,7 +486,7 @@ Then: "What are we building?"
 
 ---
 
-## Automatic mode — execution
+## Semi-autonomous mode — execution
 
 The contract is in `SKILL.md` (Operating modes): the user opts in explicitly,
 Claude runs the commands instead of presenting them, the tag push and its
@@ -468,13 +498,15 @@ section is how that runs.
 The user asks for it. Confirm in one short message — not a lecture — what
 changes and what does not, then record it:
 
-> **Automatic mode on.** I'll run the git commands myself from here, including
-> the tag push and the release follow-through, and I won't hand you command
-> blocks unless something fails. Two things stay the same: **every commit still
-> needs your explicit yes**, and anything that needs a decision still comes to
-> you. Say "manual mode" to switch back.
+> **Semi-autonomous mode on.** I'll run the git commands myself from here,
+> including the tag push and the release follow-through, and I won't hand you
+> command blocks unless something fails. What stays yours: **every commit still
+> needs your explicit yes**, **the tag needs your authorization after a full
+> report of everything I did**, and anything that needs a decision still comes
+> to you. Say "manual mode" to switch back.
 
-Write `Mode: automatic (approved <date>) — commits still require approval` into
+Write `Mode: semi-autonomous (approved <date>) — commits and the tag still
+require the user's approval` into
 `.claude/dev-skills-gates.md` in the same turn. A mode that is agreed to in
 conversation and not written down is a mode that disappears at the next
 compaction.
@@ -483,25 +515,27 @@ If the session is on a remote container, add one line: the clone-path question
 (session start, step 0, item 4) is no longer coming, because there is no tag
 block to hand over.
 
-### The single checkpoint
+### Checkpoint 1 — the commit approval
 
 Manual mode asks in three places during a release sequence — Gate 1's version
-bump, Gate 5's release-notes approval, Gate 6's pre-ship confirmation. Automatic
-mode asks once, at the commit, and carries all three:
+bump, Gate 5's release-notes approval, Gate 6's pre-ship confirmation.
+Semi-autonomous mode carries the first two into one approval at the commit; the
+third becomes the pre-tag authorization below.
 
 > **Ready to commit — this is the one approval for the release.**
 >
 > **Version:** 2.25.0 → 2.26.0 (MINOR — one `feat`, no breaking change)
-> **Commit:** `feat(skill): add automatic mode`
+> **Commit:** `feat(skill): add semi-autonomous mode`
 > **Changes:** [files, line counts, what each does]
 > **Gates:** 🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ⬜ · 🚀 ⬜
 > **Release notes (v2.26.0):**
 > - [entry]
 > - [entry]
 >
-> On your yes: commit, push the branch, open the PR, merge it once CI is green,
-> tag v2.26.0, let the release workflow publish, then verify and report back.
-> I'll stop and come back if anything fails or needs a decision.
+> On your yes: commit, push the branch, open the PR, and merge it once CI is
+> green. Then I'll come back with a full report of everything that happened and
+> ask you to authorize the tag. I'll stop sooner if anything fails or needs a
+> decision.
 
 Three rules about that message:
 
@@ -514,22 +548,80 @@ Three rules about that message:
 3. **A work commit gets the short form.** No version, no notes, no ship plan —
    the diff, the message, and what Claude will do with it (commit and push to
    the branch). Most commits are work commits; do not run a release checkpoint
-   for one.
+   for one, and a work commit has no second checkpoint because it never tags.
+
+### Checkpoint 2 — the pre-tag report and authorization
+
+**The tag is the one action in this sequence that publishes, and it is the one
+the user has not seen coming since the commit.** Between the two checkpoints
+Claude has been running unattended: commits, pushes, a PR, CI runs, a merge.
+Semi-autonomous mode pays for that autonomy here, with a full accounting before
+the tag is authorized — not a summary, and not a request to confirm something
+the user cannot check.
+
+**Nothing is pushed to `refs/tags/*` until the user answers this message.** Run
+Gate 6 step 2's merge confirmation first, then report:
+
+> **Ready to tag v2.26.0 — full report of everything since your commit
+> approval.**
+>
+> **Commits** (3)
+> - `257b224` feat(skill): add semi-autonomous mode — 6 files, +412/−38
+> - `4c1a88e` fix(hook): … — 1 file, +4/−2
+> - `9ab0e12` chore: tracker — 1 file
+>
+> **Pushes:** `feature/x` → origin, 3 times (no force, no rewrite)
+> **PR:** #48 "…" — opened, 2 review comments addressed, merged as `c3a49f7`
+> **CI:** `validate` ✅ on 257b224 · ✅ on 9ab0e12 · ✅ on merge commit c3a49f7
+>   (one earlier ❌ on 4c1a88e — shellcheck SC2086, fixed in 9ab0e12)
+> **Gates:** 🔢 ✅ all refs 2.26.0, v2.25.0 tagged on remote · 🔨 ✅ validate.sh
+>   green, bundle rebuilt · 🔒 ✅ 0 Critical / 0 High, docs-only diff ·
+>   📄 ✅ CHANGELOG + README · 📦 ✅ PR #48 merged
+> **Version guard:** `VERSION` in merged commit c3a49f7 reads `2.26.0`, matches
+>   the tag about to be created ✅
+> **Deviations from what you approved:** the CI failure above added one commit
+>   that was not in the original diff; nothing else changed.
+>
+> **What the tag does:** pushing `v2.26.0` fires `.github/workflows/release.yml`,
+> which builds the bundle and publishes the GitHub release with the notes you
+> approved.
+>
+> **Authorize the tag?** ("tag it" / "ship it" / "go" — and I'll push it, watch
+> the run, add the notes, verify, and clean up.)
+
+**Rules for this report:**
+
+1. **Every action, not the highlights.** Commits with SHAs and messages, every
+   push and whether any rewrote history, the PR and what happened on it, every
+   CI run with its conclusion, the merge commit, each gate with the evidence
+   that passed it, the version guard result.
+2. **Failures, retries, and deviations are the part that matters most.** A run
+   that failed and was fixed, a gate that had to be re-run, anything that
+   differs from what the user approved at the commit — state it plainly. A
+   report that only lists successes is the report nobody needed.
+3. **Reconstruct it from evidence, not memory** (`git log`, `gh pr view`,
+   `gh run list`, `git ls-remote`, the gate file). If the session was compacted,
+   re-derive; a gap you cannot close is something to say, not something to omit.
+4. **Explicit authorization, same bar as Section 1.** "Yeah", "ok", or silence
+   is not it. If the user asks for changes instead, the tag does not move —
+   handle the request and report again.
+5. **It runs for pre-release tags too.** A `-dev`/`-rc` tag publishes an
+   artifact; that is the trigger for this checkpoint, not the version's shape.
 
 ### Running the sequence
 
 After the yes, the gates run in the normal order with the normal pass criteria.
 What changes is only the execution:
 
-| Step | Manual mode | Automatic mode |
+| Step | Manual mode | Semi-autonomous mode |
 |---|---|---|
 | Commit | presented | Claude runs it |
 | Branch push | presented (executed in a container) | Claude runs it |
 | PR create | presented | Claude runs it |
-| Release notes approval | separate ask (Gate 5, step 6) | folded into the checkpoint |
-| Pre-ship confirmation | separate "type ship" (Gate 6) | folded into the checkpoint |
+| Release notes approval | separate ask (Gate 5, step 6) | folded into checkpoint 1 |
 | PR merge | presented | Claude runs it, after the merge-confirmation checks |
-| Tag + tag push | **the user's, in every environment** | **Claude runs it** |
+| Pre-ship confirmation | separate "type ship" (Gate 6) | **checkpoint 2 — the full pre-tag report, then authorization** |
+| Tag + tag push | **the user's, in every environment** | **Claude runs it — only after that authorization** |
 | Watch CI, add notes, verify | Claude, either way | Claude, either way |
 | Branch cleanup | presented | Claude runs it (`--delete-branch` + local `git branch -d`) |
 | Tracker SHIP ✅ commit | presented | Claude runs it |
@@ -545,20 +637,22 @@ to the tag being created, and stop if they differ.
 
 **Pre-release tags are covered by the same grant.** A dev, alpha, beta, or rc
 tag (`v1.2.3-dev.1` — `WORKFLOW_REFERENCE.md`, "Dev releases") is a tag push, so
-manual mode hands it over and automatic mode runs it. What it is *not* is a
+manual mode hands it over and semi-autonomous mode runs it. What it is *not* is a
 shortcut around the track rules: a pre-release tag still publishes an artifact,
 so it is a release sequence with all six gates, not a work commit. The one thing
 it relaxes is the branch — a pre-release tag is expected on a feature branch,
 and the workflow's tag-on-default-branch check skips it by design.
 
 **Report progress as a running line, not a narration.** One message when the
-sequence starts, one when it finishes, and one whenever it stops. Between those,
-the tracker file is the record.
+sequence starts, one at the pre-tag report, one when it finishes, and one
+whenever it stops. Between those, the tracker file is the record — and it is
+also where the pre-tag report is reconstructed from, which is another reason to
+keep it current as each gate transitions rather than at the end.
 
 ### When it stops
 
-Automatic mode falls back to manual behavior for the operation that failed. The
-session stays automatic; the tracker is updated before Claude reports.
+Semi-autonomous mode falls back to manual behavior for the operation that failed. The
+session stays semi-autonomous; the tracker is updated before Claude reports.
 
 | What happened | What Claude does |
 |---|---|
@@ -569,7 +663,7 @@ session stays automatic; the tracker is updated before Claude reports.
 | CI fails on the PR | Stop before merging. Report the failing job and its output, propose a fix, wait |
 | The release workflow fails after the tag | Stop. Recovery needs a tag deletion, which needs its own approval (`SKILL.md`, Operating modes) |
 | A Critical or High security finding | Hard stop, same as manual |
-| A decision with more than one defensible answer | Ask. Automatic mode is not permission to pick for the user |
+| A decision with more than one defensible answer | Ask. Semi-autonomous mode is not permission to pick for the user |
 
 ---
 
@@ -1076,8 +1170,8 @@ Execution (merge, tag, publish) happens in Gate 6.
    has not been set" error.
 5. **Present commands per Section 5.8** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
-   Claude to execute directly. **In automatic mode, Claude runs all three itself**
-   ("Automatic mode — execution", above); no block is presented unless one fails.
+   Claude to execute directly. **In semi-autonomous mode, Claude runs all three itself**
+   ("Semi-autonomous mode — execution", above); no block is presented unless one fails.
 6. After the branch is pushed and PR created, draft release notes and show the
    PR + notes to the user:
 
@@ -1093,7 +1187,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    > or tell me what to change.
 
 7. Wait for explicit approval of the PR content and release notes. **In
-   automatic mode this approval already happened** — the release notes were part
+   semi-autonomous mode this approval already happened** — the release notes were part
    of the single commit checkpoint. Post the PR and the notes for the record and
    continue to Gate 6. Re-ask only if the notes changed since that checkpoint.
 
@@ -1109,10 +1203,11 @@ is reached, create a branch first.
 Merge, tag, and publish. All three happen here, not in Gate 5.
 
 **Pre-ship summary — explicit confirmation required.** "Yeah" or "ok" is not
-enough — the user must say "ship", "yes push", or "go ahead." **In automatic
-mode this confirmation was folded into the commit checkpoint** ("Automatic mode
-— execution", above): show the summary as a status line and proceed, rather than
-stopping for a second yes on a sequence the user already approved.
+enough — the user must say "ship", "yes push", or "go ahead." **In
+semi-autonomous mode this confirmation becomes checkpoint 2: the full pre-tag
+report, then an explicit authorization** ("Semi-autonomous mode — execution",
+above). It is a longer stop than this one, not a shorter one — the user is
+seeing an account of work they did not watch happen.
 
 > **Ready to ship:**
 > Branch: `release/v1.2.3` → `main` | PR: [url]
@@ -1209,15 +1304,17 @@ looks fine and is not:
    release build (Section 5.8, "Tag pushes and ref deletions are the
    exceptions").
 
-   **In automatic mode Claude runs this step itself** ("Automatic mode —
-   execution", above) — but only after step 2's merge confirmation, and with
-   the version guard performed as a check rather than chained into a block:
-   read the version out of the merged commit, confirm it matches the tag about
-   to be created, and stop if it does not. If the push returns `403`, that is
-   where automatic mode hands over: present the block below, ask for the clone
-   path if it is not known, and do not retry or re-route. The rest of this step
-   — the verification, the `src refspec` case, the UI fallback — applies in both
-   modes.
+   **In semi-autonomous mode Claude runs this step itself** ("Semi-autonomous
+   mode — execution", above) — but only after three things, in order: step 2's
+   merge confirmation; the version guard performed as a check rather than
+   chained into a block (read the version out of the merged commit, confirm it
+   matches the tag about to be created, stop if it does not); and the user's
+   explicit authorization on the full pre-tag report (checkpoint 2). No tag ref
+   is created or pushed before that answer arrives. If the push then returns
+   `403`, that is where semi-autonomous mode hands over: present the block
+   below, ask for the clone path if it is not known, and do not retry or
+   re-route. The rest of this step — the verification, the `src refspec` case,
+   the UI fallback — applies in both modes.
 
    In manual mode: Present it, in one block, with the sync in front so the tag
    lands on the merged commit, **and the version declared in that commit
@@ -1429,7 +1526,7 @@ row before publishing.
 **Execution — present commands per Section 5.8.** In manual mode the tag push
 goes to the user even when Claude is executing the rest (Section 5.8, "Tag
 pushes and ref deletions are the exceptions"), so this splits into two blocks.
-In automatic mode Claude runs both, with the merge confirmation between them:
+In semi-autonomous mode Claude runs both, with the merge confirmation between them:
 
 Claude runs (or presents, on a local session):
 ```
@@ -1445,9 +1542,10 @@ workflow by definition), so this manual confirmation is the only thing
 standing between a tag and the wrong commit.
 
 The user runs — stop here until they confirm the tag is on the remote. **In
-automatic mode Claude runs these steps itself instead**, with the same merge
-confirmation first and the version guard as a check ("Automatic mode —
-execution", above), falling back to this block only on a `403`:
+semi-autonomous mode Claude runs these steps itself instead**, after the merge
+confirmation, the version guard as a check, and the user's authorization on the
+full pre-tag report ("Semi-autonomous mode — execution", above), falling back to
+this block only on a `403`:
 ```
 cd "<clone-path>"
 git checkout main && git pull origin main \

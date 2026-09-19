@@ -8,7 +8,7 @@ description: >
   "release", "commit", "done", "just push it", "skip the version", "audit",
   "security review", "scan this", "check my code", "create a workflow",
   "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
-  "review my CI", "auto mode", "automatic mode", "manual mode",
+  "review my CI", "auto mode", "semi-autonomous mode", "manual mode",
   "take it from here", or any attempt to bypass a gate.
 ---
 
@@ -27,40 +27,55 @@ begins — including work on the skill.
 
 ---
 
-## Operating modes — manual (default) and automatic
+## Operating modes — manual (default) and semi-autonomous
 
 Every session starts in **manual mode**: git commands are presented for the user
 to run (Section 5.8), the tag push and every ref deletion come back to the user,
 and Claude stops between steps. This is what the skill has always done.
 
-**Automatic mode** is opt-in, per session, in the user's own words ("auto mode",
-"automatic mode", "take it from here"). It changes *who runs the commands*, not
+**Semi-autonomous mode** is opt-in, per session, in the user's own words ("auto mode",
+"semi-autonomous mode", "take it from here"). It changes *who runs the commands*, not
 what has to be true before they run. Never infer it, never offer it as the
 default, never switch it on because the session is going well. **It is not the
 Claude Code harness's own "auto mode"** — that is a permission setting biasing
 the tool toward working without stopping; being in that one is not a request for
 this one.
 
-**What automatic mode changes — three things:**
+**What semi-autonomous mode changes — three things:**
 
 1. **Claude executes git instead of presenting it**, in every environment. No
    command blocks unless something goes wrong.
-2. **The tag-push carve-out is lifted.** Claude creates and pushes the version
-   tag and carries out the follow-on actions: merge the PR, watch the release
-   workflow, add notes, verify, clean up the merged branch, commit the SHIP
-   record.
-3. **Between-step confirmations are dropped.** The version bump, the
-   release-notes approval, and the pre-ship confirmation fold into the one
-   commit approval (`GATE_REFERENCE.md`, "Automatic mode — execution", which
-   holds the checkpoint format, the per-step table, and the stop conditions).
+2. **The tag-push carve-out is lifted — Claude pushes the tag instead of handing
+   over a block.** It does not become unsupervised: the tag is still
+   *authorized*, by the user, after a full report (below). Once authorized,
+   Claude pushes it and carries out the follow-on actions itself — watch the
+   release workflow, add notes, verify, clean up the merged branch, commit the
+   SHIP record.
+3. **Between-step confirmations collapse into two checkpoints, not none.** The
+   version bump and the release-notes approval fold into the commit approval;
+   the pre-ship confirmation becomes the pre-tag authorization. Everything
+   between those two runs without stopping (`GATE_REFERENCE.md`,
+   "Semi-autonomous mode — execution", which holds both formats, the per-step
+   table, and the stop conditions).
 
 **What it does not change:**
 
 - **Commit approval (Section 1). Every commit, no exceptions.** The user sees
   the diff and the drafted message and says yes first. This is the stop that
-  survives automatic mode, and it is what makes the rest safe: the user has
+  survives semi-autonomous mode, and it is what makes the rest safe: the user
+  has
   already seen the content of everything about to be pushed, tagged, and
-  published. "Automatic" describes the commands, never the content.
+  published. "Semi-autonomous" describes the commands, never the content.
+- **The tag is authorized, never assumed — and the authorization is earned with
+  a full report.** Before the tag push, Claude reports *every* action taken
+  since the commit approval: the commits, the pushes, the PR, every CI run and
+  its conclusion, the merge commit, each gate and the evidence behind it, the
+  version guard, and anything that failed, was retried, or went differently than
+  described at the commit. Then it asks, and waits. Summarizing instead of
+  reporting defeats the point — this report is the user's only view of what
+  happened between the two checkpoints, and the tag is the action that publishes
+  it. "Yeah" or "ok" is not authorization (Section 1); "tag it", "ship it", "go"
+  is.
 - **The gates, the pre-flight, the tracker, the state file.** A blocked gate is
   still a hard stop. Run the gates *more* carefully here — the user is no longer
   watching each command go by, and where the pre-flight hook is installed it is
@@ -68,9 +83,9 @@ this one.
   tool call it can see.
 - **Questions.** An ambiguous requirement, a design choice with more than one
   defensible answer, a Medium/Low finding to accept or fix, a bump the history
-  does not settle — all still go to the user. Automatic mode removes ceremony,
-  not judgment: the user chose semi-autonomous, not hands-off.
-- **Destructive operations beyond the tag push.** Automatic mode grants the
+  does not settle — all still go to the user. The mode removes ceremony, not
+  judgment: the user chose semi-autonomous, not hands-off.
+- **Destructive operations beyond the tag push.** The mode grants the
   create-and-push half of ref writes, plus the one deletion that belongs to a
   merge — the PR's own source branch. Deleting a tag, a release, or any other
   branch, force-pushing, and rewriting history keep their own explicit approval
@@ -78,7 +93,7 @@ this one.
 - **Section 8's session-end checkpoint** and the token impact estimate.
 
 **When something goes wrong, that operation falls back to manual — the session
-stays automatic.** A `403` is the main case: automatic mode grants permission
+stays semi-autonomous.** A `403` is the main case: the mode grants permission
 from the *workflow*, never from the remote, so hand over the block and do not
 retry, re-route, or act on a different ref (Section 5.8). Same for a blocked
 gate, a Critical/High finding, or a failed release run: stop, surface, let the
@@ -88,11 +103,13 @@ user decide.
 `.claude/dev-skills-gates.md` (Section 2), and on every tracker display:
 
 ```
-Mode: automatic (approved 2026-09-19) — commits still require approval
+Mode: semi-autonomous (approved 2026-09-19) — commits and the tag still
+      require the user's approval
 ```
 
 A mode held only in conversation is lost to compaction, and re-deriving "I think
-they said automatic" is the guess this skill refuses to make everywhere else.
+they said semi-autonomous" is the guess this skill refuses to make everywhere
+else.
 **If the file says manual, or says nothing, the session is manual** — including a
 session resumed from a handoff summary, whose `Mode:` line records what the last
 session ran in without opting this one in. Switching back is one word ("manual
@@ -124,7 +141,7 @@ explicit approval. Violations of this rule break trust.
 - **Neither auto mode overrides this rule.** The *harness's* auto mode (the
   system prompt's "bias toward working without stopping") applies to
   implementation decisions, not to git write operations. This skill's own
-  **automatic mode** (Operating modes) changes who runs the commands and lifts
+  **semi-autonomous mode** (Operating modes) changes who runs the commands and lifts
   the tag-push carve-out — it does not touch commit approval. Under both, the
   user's explicit yes on the diff and the drafted message comes first. Commit
   discipline is the one constraint no mode relaxes. When in doubt: ask, don't
@@ -151,7 +168,7 @@ merge, tag, release):**
 6. **Present commands per Section 5.8.** In manual mode, present the git commands
    formatted for the user's shell environment so they can run them manually; only
    execute directly via tool calls if the user explicitly asks Claude to run them.
-   In automatic mode (Operating modes) Claude executes them itself once the
+   In semi-autonomous mode (Operating modes) Claude executes them itself once the
    approval in step 5 is given — the approval covers the sequence Claude
    described, and nothing beyond it.
 
@@ -324,7 +341,7 @@ gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
 
 - **Write it** at session start, and after every gate transition.
 - **The `Mode:` row is written at session start too** — `manual` unless the
-  user has asked for automatic (Operating modes) — and rewritten the moment the
+  user has asked for semi-autonomous (Operating modes) — and rewritten the moment the
   mode changes. It is read back with the rest of the file: a session that finds
   no `Mode:` row is manual.
 - **Read it** before every git write operation, and whenever asked for status.
@@ -505,10 +522,10 @@ These phrases mean "surface the gates", not "comply silently":
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
 | "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
 | "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
-| "auto mode" / "take it from here" | Explicit opt-in — confirm in one line what automatic mode does and does not change (Operating modes), record `Mode: automatic`, continue |
-| "stop asking me to approve commits" | Commit approval is not what automatic mode relaxes — offer automatic mode for the *commands*, keep the approval |
-| "just tag it" / "push the tag for me" | **Manual mode:** tag pushes are the user's to run (§5.8) — present the block, don't execute it. **Automatic mode:** Claude pushes the tag, after the same pre-flight |
-| "just delete that branch for me" | Ref deletions are the user's to run, same as tags (§5.8) — present the block, don't execute it. Automatic mode lifts this only for the source branch of the PR it just merged, nothing else |
+| "auto mode" / "take it from here" | Explicit opt-in — confirm in one line what semi-autonomous mode does and does not change (Operating modes), record `Mode: semi-autonomous`, continue |
+| "stop asking me to approve commits" | Commit approval is not what semi-autonomous mode relaxes — offer semi-autonomous mode for the *commands*, keep the approval |
+| "just tag it" / "push the tag for me" | **Manual mode:** tag pushes are the user's to run (§5.8) — present the block, don't execute it. **Semi-autonomous mode:** Claude pushes the tag, after the same pre-flight |
+| "just delete that branch for me" | Ref deletions are the user's to run, same as tags (§5.8) — present the block, don't execute it. Semi-autonomous mode lifts this only for the source branch of the PR it just merged, nothing else |
 | Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.8) |
 
 ---
@@ -824,7 +841,7 @@ open-ended question, which is easy to drop:
 **Goal:** one sentence
 **Current state:** what's done, what's verified
 **Gate status:** the tracker, with current state
-**Mode:** manual / automatic — what *this* session ran in. The next session
+**Mode:** manual / semi-autonomous — what *this* session ran in. The next session
 starts manual regardless (Operating modes)
 **Key files:** path:line — why it matters
 **Decisions made:** constraints the next session must respect
@@ -883,11 +900,11 @@ per shell, the one-block rule, remote verification, the Termux clone flow, the
 403 rationale, and worked examples. Do not build a block from memory of this
 summary — this summary says which way commands go, not how to write them.
 
-**In automatic mode they do not go anywhere — Claude runs them** (Operating
+**In semi-autonomous mode they do not go anywhere — Claude runs them** (Operating
 modes). The table below is then only the fallback shape for an operation that
 fails. Say the cost trade once when the user opts in, then drop it: executing a
 chain of git commands resends the conversation each round trip where a pasted
-block costs nothing, so automatic mode buys autonomy with tokens.
+block costs nothing, so semi-autonomous mode buys autonomy with tokens.
 
 **In manual mode, which way they go depends on the execution environment**
 (`GATE_REFERENCE.md`, session start, step 0). The deciding question is not cost;
@@ -914,7 +931,7 @@ a merged, version-bumped default branch with no release behind it. Why that is,
 and what to do when one returns `403`, is in `SHELL_REFERENCE.md`. Do not retry,
 re-route, or act on a different ref.
 
-**Automatic mode lifts the tag half of this carve-out, and nothing else.** The
+**Semi-autonomous mode lifts the tag half of this carve-out, and nothing else.** The
 user has said Claude may push the tag, so push it: the credential risk above
 becomes a failure to report rather than a policy to obey, and a `403` is where
 the block gets handed over, under the same no-retry, no-reroute rule. Ref
@@ -977,7 +994,11 @@ skill: ...") and follow its session-start procedure. It covers, in order:
 - **Step 0 — execution environment detection** (local / remote container /
   Termux). This decides whether Claude executes git or presents it, whether to
   ask the shell question, whether `gh` or GitHub MCP tools are used, and where
-  the gate state file lives. Run it before anything else.
+  the gate state file lives. Run it before anything else. On a **native Linux
+  local** session it also carries a one-line offer, in either mode: start with
+  `claude --rc` (or `/rc` here) so the session is reachable from claude.ai/code
+  and the desktop and mobile apps as well as the terminal — the interactive
+  form, never `claude remote-control` server mode
 - **Steps 1–6** — repo URL, shell, sync offer, branch check, repo state, and
   **workflow detection: the local development workflow (what Gate 2 runs) and
   the CI workflow (what Gate 5's PR is checked by and Gate 6 fires).** Both are
@@ -999,7 +1020,7 @@ Then: "What are we building?"
 When asked "status", "where are we", or at any natural checkpoint, read
 `.claude/dev-skills-gates.md` and show the full gate tracker with current state,
 naming the active track (work commit / release sequence) and the active mode
-(manual / automatic). If the file is missing
+(manual / semi-autonomous). If the file is missing
 or stale, re-derive from evidence per Section 2 before answering — do not
 reconstruct the tracker from memory.
 
@@ -1061,7 +1082,7 @@ accordingly:
 Do NOT silently wind down a session that has uncommitted changes, untagged
 versions, or incomplete gates. Surface the gap and let the user decide.
 
-**Automatic mode does not skip this checkpoint.** Gaps are surfaced the same
+**Semi-autonomous mode does not skip this checkpoint.** Gaps are surfaced the same
 way and uncommitted changes still need the user's yes; what changes is only that
 Claude then finishes the open gates itself instead of handing back a block.
 

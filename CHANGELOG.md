@@ -6,75 +6,100 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [2.26.0] — 2026-09-19
 
-Adds an opt-in **automatic mode**: Claude runs the git commands itself,
+Adds an opt-in **semi-autonomous mode**: Claude runs the git commands itself,
 including the tag push and the release follow-through, instead of handing
-over command blocks. Commit approval is unchanged and still required for
-every commit. Manual mode is untouched and remains the default. No breaking
-changes.
+over command blocks. It keeps two checkpoints — commit approval, unchanged
+and required for every commit, and a new full pre-tag report the user
+authorizes before any tag is pushed. Manual mode is untouched and remains
+the default. Also: native Linux sessions now get offered Remote Control.
+No breaking changes.
 
 ### Added
-- **Automatic mode (`SKILL.md`, "Operating modes").** Opt-in per session, in
-  the user's own words ("auto mode", "automatic mode", "take it from here").
+- **Semi-autonomous mode (`SKILL.md`, "Operating modes").** Opt-in per session, in
+  the user's own words ("auto mode", "semi-autonomous mode", "take it from here").
   It changes who runs the commands, not what has to be true before they run:
   Claude executes git in every environment, the tag-push carve-out is lifted
   so Claude creates and pushes the version tag and carries out the follow-on
-  actions (merge, watch CI, add notes, verify, clean up the merged branch,
-  commit the SHIP record), and the between-step confirmations collapse into
-  one approval. Manual mode's behavior is unchanged in every particular.
-- **One checkpoint instead of three, at the commit.** In a release sequence
-  automatic mode folds Gate 1's version-bump confirmation, Gate 5's
-  release-notes approval, and Gate 6's pre-ship "type ship" into the single
-  commit approval, presented together with the diff summary, the bump and its
-  reasoning, the gate line, and the full release notes. That approval covers
-  the sequence it describes and nothing else — if more commits land or the
-  notes change, it is presented again. Work commits get a short form with no
-  version, notes, or ship plan. Format and per-step routing are in
-  `GATE_REFERENCE.md`, "Automatic mode — execution".
+  actions (watch CI, add notes, verify, clean up the merged branch, commit
+  the SHIP record), and the between-step confirmations collapse into two
+  checkpoints. Manual mode's behavior is unchanged in every particular.
+- **Checkpoint 1 — the commit approval, now carrying the release.** Gate 1's
+  version-bump confirmation and Gate 5's release-notes approval fold into it,
+  presented together with the diff summary, the bump and its reasoning, the
+  gate line, and the full release notes. That approval covers the sequence it
+  describes and nothing else — if more commits land or the notes change, it is
+  presented again. Work commits get a short form with no version, notes, or
+  ship plan, and no second checkpoint, because they never tag.
+- **Checkpoint 2 — a full pre-tag report, and the tag is authorized against
+  it.** Nothing reaches `refs/tags/*` in semi-autonomous mode until the user
+  answers this. Claude reports *every* action taken since the commit approval:
+  commits with SHAs and messages, every push and whether any rewrote history,
+  the PR and what happened on it, every CI run with its conclusion, the merge
+  commit, each gate with the evidence that passed it, the version guard's
+  result, and — the part that matters most — anything that failed, was
+  retried, or went differently than what the user approved at the commit. It
+  is reconstructed from evidence (`git log`, `gh pr view`, `gh run list`, the
+  gate file), not from memory, and a gap that cannot be closed is stated
+  rather than omitted. "Yeah" or "ok" is not authorization; the same bar as
+  Section 1 applies. This replaces Gate 6's pre-ship "type ship" — it is a
+  longer stop than that one was, not a shorter one, because the user is seeing
+  an account of work they did not watch happen. Formats for both checkpoints
+  are in `GATE_REFERENCE.md`, "Semi-autonomous mode — execution".
+- **Native Linux local sessions get offered Remote Control, in either mode**
+  (`GATE_REFERENCE.md`, session start, step 0). One line, once per session:
+  `claude --rc` (or `/rc` in an open session) keeps the terminal session as it
+  is while also publishing it to claude.ai/code and the Claude desktop and
+  mobile apps, so the same session is reachable from either surface with
+  execution still local. The interactive form is offered deliberately —
+  `claude remote-control` is server mode and leaves no local prompt, which is
+  the opposite of the point. "Native Linux" is checked, not assumed: Termux
+  and WSL both report `Linux` from `uname -s`, and neither qualifies. It
+  changes nothing about gates, tracks, or the mode.
 - **A `Mode:` row in `.claude/dev-skills-gates.md`.** The mode is session
   state, so it lives where session state lives rather than in conversation
   history that compaction can drop. Written at session start as `manual`,
   rewritten when the mode changes, read back with the rest of the file: a
-  session that finds no `Mode:` row is manual. Automatic mode never carries
+  session that finds no `Mode:` row is manual. Semi-autonomous mode never carries
   into a new session — a handoff summary's `Mode:` line records what the last
   session ran in without opting the next one in.
 - **Stop conditions, written down as a table** (`GATE_REFERENCE.md`). A
   failed operation falls back to manual behavior for that operation while the
-  session stays automatic: a blocked gate, a `403` on a push or tag push, a
+  session stays semi-autonomous: a blocked gate, a `403` on a push or tag push, a
   `src refspec` failure, CI failing on the PR, a failed release run, a
   Critical or High finding, or any decision with more than one defensible
-  answer. Automatic mode is semi-autonomous by design — it removes ceremony,
-  not judgment.
+  answer. The mode is semi-autonomous by design — it removes ceremony, not
+  judgment.
 
 ### Changed
 - **Section 1 now names both "auto modes" and refuses both.** The existing
   rule covered the Claude Code harness's auto mode; the skill now has one of
   its own, and the bullet distinguishes them and states that neither relaxes
-  commit approval. Section 1's step 6 gained the automatic-mode branch: the
+  commit approval. Section 1's step 6 gained the semi-autonomous branch: the
   approval in step 5 is what licenses Claude to execute the sequence it just
   described, and nothing beyond it.
-- **Ref-write rules are now mode-aware, and narrowly so.** Automatic mode
+- **Ref-write rules are now mode-aware, and narrowly so.** Semi-autonomous mode
   lifts the tag half of the §5.8 carve-out and grants exactly one deletion —
   the source branch of the PR it just merged, via `--delete-branch` and the
   local `git branch -d`. Deleting a tag, a release, or any other branch,
   force-pushing, and rewriting history keep their own explicit approval in
   both modes; re-pushing a tag is a delete plus a create, so it needs one
   too. `SHELL_REFERENCE.md`'s tag section says the same thing from the other
-  side: the credential risk does not go away in automatic mode, it becomes a
+  side: the credential risk does not go away in semi-autonomous mode, it becomes a
   failure to report rather than a rule to obey, and a `403` is exactly where
   the block gets handed back — still no retry, no re-route, no different ref.
 - **Gate 6's safety checks are explicitly not ceremony.** The merge
   confirmation (state reads `MERGED`, CI green *on the merge commit*) and the
-  version guard run in automatic mode too — the guard as a check Claude
+  version guard run in semi-autonomous mode too — the guard as a check Claude
   performs before `git tag` rather than a `grep` chained into a block the
   user pastes. They existed to stop a tag landing on the previous commit, not
   because a human was about to paste something.
 - **Pre-release tags follow the same rule** (`WORKFLOW_REFERENCE.md`, "Dev
   releases"): the user pushes them in manual mode, Claude pushes them in
-  automatic mode, and either way a `-dev`/`-alpha`/`-beta`/`-rc` tag is a
+  semi-autonomous mode after the same pre-tag report, and either way a `-dev`/`-alpha`/`-beta`/`-rc` tag is a
   release sequence with all six gates, because it still publishes an
   artifact. The only thing it relaxes is the branch.
-- **The enforcement hook needs no change and matters more.** In automatic
-  mode every git write — `git tag` and `git push origin v1.2.3` included,
+- **The enforcement hook needs no change and matters more.** In
+  semi-autonomous mode every git write — `git tag` and `git push origin v1.2.3` included,
   which manual mode never routes through a tool call — arrives as a tool call
   `hooks/gate-preflight.sh` inspects. `hooks/README.md` says so; the covered
   /uncovered table above it was written for manual mode.
@@ -83,9 +108,9 @@ changes.
   Handoff summaries (§5.6/§5.9) carry a `Mode:` line for the same reason.
 - **The cost trade is stated once, not repeatedly** (§5.8): a pasted block
   costs nothing while a chain of executed git commands resends the
-  conversation each round trip, so automatic mode buys autonomy with tokens.
-  Mention it when the user opts in, then drop it. `SKILL.md` grew ~5KB for
-  the mode contract, which is a real per-turn cost and is reflected in the
+  conversation each round trip, so semi-autonomous mode buys autonomy with
+  tokens. Mention it when the user opts in, then drop it. `SKILL.md` grew
+  ~7KB for the mode contract, which is a real per-turn cost and is reflected in the
   README's size table; the execution detail went into `GATE_REFERENCE.md`,
   which loads on demand.
 

@@ -10,9 +10,9 @@ supported shell.
 **This file applies only when Claude is presenting commands for the user to run
 in their own terminal** — that is, local and Termux sessions in manual mode.
 Remote container sessions do not use it; see below. Neither does a session in
-**automatic mode** (`SKILL.md`, Operating modes), where Claude runs the commands
+**semi-autonomous mode** (`SKILL.md`, Operating modes), where Claude runs the commands
 itself — with one exception that keeps this file relevant in every mode: when an
-operation fails in automatic mode, the block Claude hands over is built exactly
+operation fails in semi-autonomous mode, the block Claude hands over is built exactly
 as this file describes.
 
 ---
@@ -61,7 +61,7 @@ cannot copy as given, in the one block they must run by hand.
 
 ---
 
-## Tag pushes and ref deletions — the user's, unless automatic mode says otherwise
+## Tag pushes and ref deletions — the user's, unless semi-autonomous mode says otherwise
 
 SKILL.md Section 5.8 states the rule: in manual mode, creating a tag ref and
 deleting any ref go to the user in every environment, remote containers
@@ -89,11 +89,11 @@ mid-cleanup.
 not re-route through another tool, and do not act on a different ref. Report it
 and hand over the block.
 
-**Automatic mode is one of the ways you get told to attempt it.** The user has
+**Semi-autonomous mode is one of the ways you get told to attempt it.** The user has
 granted the tag push there (`SKILL.md`, Operating modes) — so push it, and treat
 everything above as a description of the failure to expect rather than a reason
 not to try. Nothing in this section is softened by that grant: a `403` is still
-handled exactly as the paragraph above says, and it is the moment automatic mode
+handled exactly as the paragraph above says, and it is the moment semi-autonomous mode
 hands the block back. Deleting a ref stays the user's in both modes, with the
 single exception of the source branch of a PR Claude just merged.
 
