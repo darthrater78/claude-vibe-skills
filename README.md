@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.27.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.28.0`
 
 ---
 
@@ -747,6 +747,9 @@ template you review before anything is written.
 | "just tag it for me" | Manual mode: tag pushes are yours to run — the block is presented, not executed. Semi-autonomous mode: Claude pushes it, after the same gates |
 | "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands and the tag push. Commit approval stays |
 | "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
+| "that finding is pre-existing" | Provenance, not a verdict — it stays open and blocks the release until fixed, waived or withdrawn |
+| "ignore the Mediums" | Category suppression isn't a waiver — you're asked which specific finding, and the waiver is recorded with your reason |
+| "we'll fix it next release" | You're offered the waiver explicitly, so the decision is on the record rather than carried silently |
 
 ---
 
@@ -758,7 +761,8 @@ The skill uses tiered loading to keep token costs down:
 |---|---|---|
 | `SKILL.md` | ~61KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~25KB | Once, at session start — self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `GATE_REFERENCE.md` | ~29KB | When gates 1–5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
+| `GATE_REFERENCE.md` | ~22KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
+| `SECURITY_GATE.md` | ~12KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~22KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, round-trip rules, stop conditions |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
@@ -847,4 +851,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.27.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.28.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

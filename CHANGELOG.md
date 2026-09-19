@@ -4,6 +4,94 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.28.0] — 2026-09-19
+
+**Nothing reaches the release track with an open finding.** Severity used to
+decide whether a finding could be carried: Critical and High blocked, Medium
+and Low were "surfaced for the user to accept" and, in practice, written onto
+the tracker and carried. Severity now decides only how urgent the conversation
+is. A finding of any severity blocks Gate 5 and Gate 6 until it reaches a
+terminal state.
+
+This came out of the skill failing on its own repo. A Medium — no
+`.github/dependabot.yml`, so nothing keeping the SHA-pinned `actions/checkout`
+current — was recorded at 2.26.0, carried into 2.27.0 marked "open,
+pre-existing", and was not put to the user as a decision until after v2.27.0
+had been tagged and published. Every gate read ✅ the whole way. Section 4.1
+exists to prevent exactly that dependency-drift pattern, and the gate machinery
+let it happen anyway, twice.
+
+### Changed
+- **Gate 3 finding lifecycle (`GATE_REFERENCE.md`, `SKILL.md` §4.7).** A finding
+  leaves the open state in exactly three ways and no others:
+  - **fixed** — the code changed and the fix was re-verified against the
+    *current* diff
+  - **waived** — the user explicitly waived *that specific finding*, with a
+    reason and date recorded on the tracker
+  - **withdrawn** — the finding was wrong, and why it was wrong is stated
+
+  Anything else is open. "Pre-existing", "unrelated to this change", "only a
+  Medium", "we'll get it next release" are not terminal states — they are the
+  sentences that carried the finding above across two releases.
+- **"Pre-existing" is demoted to a provenance note.** It records where a finding
+  came from; it says nothing about what has to happen before the next tag.
+  A finding that predates the change is still a finding.
+- **Only the user waives, one finding at a time.** Claude never waives its own
+  finding, and a blanket "ignore Mediums" or "stop flagging that" is category
+  suppression, not a waiver — the skill asks which specific finding instead. A
+  waiver covers the finding as it stands and re-opens if its context changes:
+  the code is edited, the severity rises, the named dependency gets an advisory.
+- **Findings are surfaced when discovered, not in the ship summary.** A finding
+  raised after the tag is raised past every point where the user could have
+  acted on it.
+- **Quality findings follow the same lifecycle.** "Known technical debt" is a
+  description, not a terminal state; if it is genuinely accepted, it is a
+  waiver and the user records it.
+- **Gate 3's pass line and the combined output report `0 open`**, and the
+  Dependabot recommendation is now raised as the Medium finding it always was
+  rather than an optional suggestion.
+- `SKILL.md` §4.7 is the new lifecycle section; the former §4.7 security summary
+  is now §4.8.
+- **Gate 3 moved into its own `SECURITY_GATE.md` (~12KB)**, leaving
+  `GATE_REFERENCE.md` at ~22KB for gates 1, 2, 4 and 5. This was not planned:
+  the lifecycle rules pushed `GATE_REFERENCE.md` to 33KB and the per-file
+  ceiling added in 2.27.0 failed the build. Its message offers two responses —
+  extract a section that has its own load trigger, or raise the ceiling on the
+  record — and Gate 3 has the clearest trigger of the five and already pulled
+  two further references of its own. Gates 1, 2, 4 and 5 no longer carry it.
+  The ceiling working on the release that added it is the intended behavior.
+
+### Added
+- **The hook enforces it** (`hooks/gate-preflight.sh`). The tracker's SECURITY
+  row carries the open count on its **first line** — `✅ 0 open — 0 Critical,
+  0 High` — because that is the line the hook reads, per the row-format rule
+  from 2.25.0. A ✅ whose first line does not say `0 open` is an illegal state
+  and release operations are denied: it asserts the gate passed while the row
+  itself still counts findings nobody resolved.
+
+  Scoped to the release track on purpose. Work commits stay possible with
+  findings open, because a finding has to be recordable before it can be
+  resolved. Verified against all three states: the exact 2.26.0 tracker text
+  now denies `git tag`, a `0 open` row allows it, and a work commit with an
+  open Medium is unaffected.
+- Three shortcut-detection rows (`SKILL.md` §3) for "that finding is
+  pre-existing", "ignore the Mediums", and "we'll fix it next release" — each
+  routes to the lifecycle rather than to compliance.
+- `.github/dependabot.yml` (github-actions, weekly, grouped). This repo has no
+  package manifests of any kind, so the actions-only shape
+  `WORKFLOW_REFERENCE.md` warns about is correct here; the file says so and
+  says to add an entry the moment that stops being true.
+
+### Notes
+- Behavior-tightening, released as MINOR in line with 2.24.0's version guard.
+  It is worth knowing that a repo carrying open findings will find its next
+  release blocked where 2.27.0 would have let it through. That is the point.
+- `SKILL.md` is now 63KB against its 64KB ceiling. The lifecycle rule has to be
+  resident — it fires unprompted or not at all — but this release spends most
+  of the headroom 2.27.0's ceiling allowed, and the next addition to the
+  per-turn tier will have to extract something first. Which is what the ceiling
+  is for.
+
 ## [2.27.0] — 2026-09-19
 
 A cost release. No rule changes, no gate changes, no behavior removed: the

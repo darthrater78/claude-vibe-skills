@@ -15,9 +15,10 @@ the pre-flight says one is owed.
 | File | Load when |
 |---|---|
 | `SESSION_START.md` | the session starts — once, before anything else |
+| `SECURITY_GATE.md` | Gate 3 runs, passes, or is marked ➖ N/A, or a finding needs resolving |
 | `SHIP_REFERENCE.md` | Gate 6 runs, passes, or is marked ➖ N/A |
 | `AUTO_MODE.md` | the user has opted into semi-autonomous mode |
-| `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md` | Gate 3, and audit mode |
+| `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md` | Gate 3 (via `SECURITY_GATE.md`), and audit mode |
 | `SHELL_REFERENCE.md` | before composing any command block |
 | `WORKFLOW_REFERENCE.md` | a CI workflow is missing, or the user asks for workflow help |
 
@@ -33,7 +34,8 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 The pre-flight, the two tracks, the gate state file, and the re-derivation
 table live in `SKILL.md` Section 2. What follows is how each of gates 1 through
-5 is actually run and what makes it pass. **Gate 6 is in `SHIP_REFERENCE.md`**
+5 is actually run and what makes it pass. **Gate 3 is in `SECURITY_GATE.md`**
+and **Gate 6 is in `SHIP_REFERENCE.md`**
 — read that file when the ship gate is the one that is owed, not before.
 
 ### Gate 1 — Version 🔢
@@ -307,167 +309,13 @@ Do not silently skip — always show the N/A status on the tracker.
 
 ### Gate 3 — Security & Quality 🔒
 
-**Mandatory after every build.** Two steps, both must pass: security scan and
-quality review.
+**Gate 3 is in `SECURITY_GATE.md`** — read that file when the security gate is
+the one that is owed. It holds the scan, the quality review, the finding
+lifecycle, and the combined output, and it is where the rule lives that no
+finding of any severity may be open when the release track runs.
 
-**Before scanning, load reference files from this skill's base directory**
-(shown when the skill loaded, e.g. "Base directory for this skill: ..."):
-1. Read `SECURITY_REFERENCE.md` — bad/good code examples for cross-platform
-   and language-general security patterns.
-2. Read `QUALITY_REFERENCE.md` — bad/good code examples for cross-platform
-   structure and performance anti-patterns.
-3. Detect the project's platform(s) using the same signal table as
-   `WORKFLOW_REFERENCE.md` Step 1 (Docker/Windows/Linux/Android/etc). For each
-   match, also read that platform's file: `SECURITY_WINDOWS.md` for Windows,
-   `SECURITY_LINUX.md` for Linux or Docker/container projects,
-   `SECURITY_ANDROID.md` **and** `QUALITY_ANDROID.md` for Android. A project
-   can match more than one (e.g. a Dockerfile targeting a Windows base image)
-   — load every file that applies. If nothing matches confidently, skip the
-   platform files but say so in the scan output rather than silently omitting
-   the check.
-Use these examples to pattern-match against the code being reviewed.
-
-#### Step 1 — Security scan
-
-Run a full scan of all source files. Check for every pattern category in
-Sections 4.1–4.3 and the full rule checklists in `SECURITY_REFERENCE.md` plus
-whichever platform file(s) matched (loaded above).
-
-**Then audit the dependencies — this part is not optional and not limited to
-packages the session touched.** Run the ecosystem's audit tool against the
-current lockfile:
-
-| Ecosystem | Command |
-|---|---|
-| Node | `npm audit` / `pnpm audit` / `yarn npm audit` (Berry; classic is `yarn audit`) |
-| Python | `pip-audit` (note the hyphen — there is no `pip audit` subcommand) |
-| Rust | `cargo audit` |
-| Go | `govulncheck ./...` |
-| .NET | `dotnet list package --vulnerable --include-transitive` |
-| Java | `mvn org.owasp:dependency-check-maven:check` / `gradle dependencyCheckAnalyse` |
-| Any | `osv-scanner scan source .` |
-
-If no audit tool is available for the ecosystem, say so explicitly rather than
-passing the step in silence — an unaudited dependency tree is an unknown, and
-unknown is never "passed" (Section 2).
-
-Report dependency findings with the advisory ID, the package, the installed
-version, and the fixed version:
-
-> 🚨 `lodash@4.17.15` — GHSA-35jh-r3h4-6jhm (Critical, prototype pollution)
->    Fixed in 4.17.21 — bump the pin
-> ⚠️ `urllib3@1.26.5` — transitive via `requests` — CVE-2023-43804 (High)
->    Fixed in 1.26.17 — bump `requests` to pull the fixed range
-
-**Hard stops (must fix before proceeding):**
-- 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
-  disabled TLS, `pickle` on untrusted data, RCE vectors
-- ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
-  passwords, `random` for tokens, no input validation on endpoints
-- 🚨⚠️ **Any dependency — direct or transitive — carrying a Critical or High
-  advisory** (Section 4.1). A pinned version is not a safe version; pinning
-  fixes *which* CVEs the project has, not *whether* it has any. Bump to the
-  fixed release and re-run the audit. Where no fixed release exists upstream,
-  the gate does not pass silently: surface the advisory and the options
-  (patch, vendor, replace, or accept with a documented reason) and let the
-  user decide on the record
-
-**Fixing a Critical or High — three checks, every time, not just "patch and
-move on":**
-1. **Reproduce before writing the fix.** A fix written from reading the code
-   is a guess about the bug shape; a fix written after triggering the actual
-   failure is a fix for the actual bug. Once it's fixed, look for sibling
-   paths into the same bad state — the same class of bug rarely has exactly
-   one entry point, and a fix that closes only the one you found leaves the
-   others live.
-2. **Flag any existing test whose assertions encode the insecure behavior as
-   correct.** A test isn't proof of correctness just because it's green — a
-   test that asserts "a locked resource returns 'no key found'" instead of
-   "access denied" is a bug wearing a passing test as camouflage. Read what
-   the test actually asserts, not just whether it passes.
-3. **Confirm every new regression test fails without the fix.** Revert the
-   fix (or comment it out) and re-run the new test — if it still passes, the
-   test isn't testing the vulnerability, and shipping it as "covered" is
-   false confidence. Put the fix back before committing.
-
-**Show and let user decide:**
-- 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
-  logging sensitive data, unpinned deps, dependencies with a Medium/Low advisory,
-  dependencies several majors behind current with no advisory yet
-- 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
-
-Security step passes at zero Critical and zero High — **in the code and in the
-dependency tree**. Both halves are reported, so a clean scan of hand-written
-code can never stand in for an unaudited manifest:
-
-> ✅ **Security scan passed** — 0 Critical, 0 High
-> Code: 0 Critical, 0 High | Medium: N (shown above, user accepted) | Low: N
-> Dependencies: `npm audit` clean — 0 Critical, 0 High | Medium: N | Low: N
-
-If the project has no dependency-update automation, add the recommendation once
-here rather than waiting for a Dependabot backlog to appear:
-
-> 💡 No `.github/dependabot.yml` — nothing watches these packages between
-> security gates. Want me to add one? (`WORKFLOW_REFERENCE.md`)
-
-#### Step 2 — Quality review
-
-Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md`, plus
-`QUALITY_ANDROID.md` if Android matched (loaded above), and the checklist
-below:
-
-**Structure issues (flag and fix):**
-- Deep nesting (>3 levels) — flatten with early returns
-- God functions (>~40 lines or multiple responsibilities) — split
-- Circular dependencies — restructure
-- Hidden side effects in getters or utility functions — rename or separate
-- Copy-pasted logic that should be shared — extract
-
-**Performance issues (flag and fix):**
-- N+1 queries — batch with IN/ANY or joins
-- Wrong data structures (lists for lookups instead of sets/dicts)
-- String concatenation in loops — use join/builders
-- Recomputation in loops (regex, config, API calls) — compute once
-- Allocations in hot paths — move constants to module level
-- Loading everything when a subset is needed — SELECT specific columns, paginate
-- Blocking I/O on async event loops — use async alternatives
-- Unbounded caches — use lru_cache with maxsize
-- Missing database indexes on queried columns
-- Event listeners never cleaned up — add teardown
-
-**Container / build issues (flag and fix):**
-- Dockerfile hardcodes package names instead of installing from dependency file — switch to `pip install -r requirements.txt` / `npm ci`
-- New import added but package missing from dependency file — add it
-- Dockerfile and dependency file list different packages — reconcile to one source of truth
-
-Report quality findings separately from security:
-
-> **Quality review — changed code:**
-> ⚠️ `app.py:45` — N+1 query inside loop (fetches orders per user)
->    Fix: batch with `WHERE user_id = ANY(%s)`
-> ⚠️ `utils.py:120` — function is 80 lines with 5 responsibilities
->    Fix: split into validate_input, transform_data, save_result
-> ✅ No deep nesting issues
-> ✅ No circular dependencies
-
-Quality issues don't hard-block the gate (they're not security vulnerabilities),
-but they must be surfaced and the user must acknowledge them. Fix what's
-reasonable within the current scope — flag the rest as known technical debt.
-
-#### Gate 3 combined output
-
-Both steps must complete before the gate passes:
-
-> ✅ **SECURITY & QUALITY GATE PASSED**
-> Security: 0 Critical, 0 High | Medium: N | Low: N
-> Quality: N structure issues, N performance issues (shown above, user accepted)
-
-If the user says "skip security" or "we can do security later":
-
-> 🚫 **SECURITY GATE BLOCKED**
-> Security scan is mandatory after every build. Running now.
-
-Then run it. Do not ask again.
+It also loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`, so do not
+open it for gates 1, 2, 4 or 5.
 
 ### Gate 4 — Docs 📄
 
