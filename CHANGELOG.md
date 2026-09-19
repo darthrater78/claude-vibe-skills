@@ -99,6 +99,23 @@ let it happen anyway, twice.
   `WORKFLOW_REFERENCE.md` warns about is correct here; the file says so and
   says to add an entry the moment that stops being true.
 
+- **Dependabot enablement is now a procedure, not a menu path**
+  (`SECURITY_GATE.md`, "Enabling Dependabot alerts"). Alerts and security
+  updates are repository settings Claude cannot flip, and since this release an
+  open finding blocks the release track — so the user needs steps they can
+  follow, not "Settings → Code security". The skill now hands over the direct
+  `settings/security_analysis` URL, the order the toggles must go in
+  (dependency graph first — mandatory on private repos), how to verify from the
+  Security tab, and the three cases that make it fail: an org-owned repo whose
+  toggle is greyed out and needs an org owner, a private repo with no
+  dependency graph, and "we have no dependencies".
+
+  That last one was wrong in this repo's own notes. **The dependency graph
+  covers GitHub Actions workflows**, so a repo with no package manifest still
+  gets real advisory coverage for the actions it pins. A `.github/workflows/`
+  directory is something to watch. Claude must also re-check the endpoint
+  rather than marking the finding fixed on an unverified "I turned it on".
+
 ### Fixed
 - **A fail-open path in the enforcement hook** (`hooks/gate-preflight.sh`),
   found by shellcheck (SC2164). `cd "$CWD" 2>/dev/null` was unchecked, so a

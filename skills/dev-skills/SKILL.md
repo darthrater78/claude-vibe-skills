@@ -618,9 +618,13 @@ gate, not just when it changes:
   2. **Alerts and security updates** — repository settings, not a file. Check
      rather than assume: `GET /repos/{owner}/{repo}/dependabot/alerts`. A
      `403 "Dependabot alerts are disabled for this repository"` is a
-     **Gate 3 finding**, not a pass. Claude cannot flip a repository setting,
-     so surface it with the path: Settings → Code security → enable
-     Dependabot alerts and Dependabot security updates.
+     **Gate 3 finding**, not a pass — and since 2.28.0 an open finding blocks
+     the release track, so it needs closing, not noting. Claude cannot flip a
+     repository setting, so hand the user the enablement steps in
+     `SECURITY_GATE.md` ("Enabling Dependabot alerts") — the real click path,
+     the org-owned and private-repo cases, and how to verify — rather than a
+     menu name. Then re-check the endpoint; do not mark it fixed on an
+     unverified "I turned it on".
 
   Having only (1) is the trap: the queue of "Bump X" PRs *looks* like security
   maintenance. Merging all of it fixes no vulnerability if nothing was ever

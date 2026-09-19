@@ -180,6 +180,54 @@ not a suggestion to leave on the table:
 > between security gates. This is open and blocks the release track. Want me to
 > add one (`WORKFLOW_REFERENCE.md`), or do you want to waive it with a reason?
 
+#### Enabling Dependabot alerts — hand the user these steps, not a menu path
+
+Alerts and security updates are **repository settings, not a file**, so Claude
+cannot turn them on and adding `dependabot.yml` does not turn them on either.
+When the alerts endpoint returns `403`, or no credential in the session can
+reach it at all, that is an open finding — and an open finding blocks the
+release, so the user needs steps they can actually follow, not "Settings →
+Code security". Give them this, filled in with the real owner and repo:
+
+> **Enable Dependabot so the scan can run** — about a minute.
+>
+> 1. Open `https://github.com/<OWNER>/<REPO>/settings/security_analysis`
+>    (or: repo → **Settings** → **Advanced Security**, previously
+>    **Code security and analysis**).
+> 2. **Dependency graph** — if there is an *Enable* button, press it first.
+>    Everything below reads from it. It is already on and not switchable for
+>    public repos; private repos must turn it on explicitly.
+> 3. **Dependabot alerts** → **Enable**. This is the half that finds CVEs.
+> 4. **Dependabot security updates** → **Enable**. This opens a PR that fixes
+>    an alert, rather than only telling you about it.
+> 5. Check **Security** tab → **Dependabot** — it should list alerts, or say
+>    there are none. A message that the feature is disabled means step 3 did
+>    not take.
+>
+> Then tell me and I will re-run the check.
+
+**Three cases that make this fail, and what to say about each:**
+
+- **The toggle is greyed out** — the repo is owned by an organization whose
+  settings control it. An org owner enables it at
+  `https://github.com/organizations/<ORG>/settings/security_analysis`, which
+  can apply to all repositories at once. The user may not be that person; say
+  so rather than sending them round the loop again.
+- **A private repo with no dependency graph** — step 2 is mandatory there.
+  Alerts will silently find nothing until it is on.
+- **"We have no dependencies, so this does not matter"** — check before
+  agreeing. The dependency graph covers **GitHub Actions workflows**, so a
+  repo with no package manifest at all still gets real advisory coverage for
+  the actions it pins. A repo with a `.github/workflows/` directory has
+  something to watch.
+
+**Verify rather than take "done" for an answer.** Re-run
+`GET /repos/{owner}/{repo}/dependabot/alerts`: `200` (even with an empty
+array) means alerts are on, `403` means they are not. If no credential in the
+session can reach that endpoint, say that plainly — the finding stays open on
+the user's word alone, or they waive it. Do not mark it fixed from an
+unverified "I turned it on".
+
 #### Step 2 — Quality review
 
 Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md`, plus

@@ -22,7 +22,11 @@ Release sequence for v2.28.0 — BLOCKED at Gate 3, 1 finding open:
               security updates are repository settings. Verified unverifiable
               from here — no MCP tool exposes the endpoint and `git credential
               fill` yields nothing, so the session holds no token to query
-              GET /repos/.../dependabot/alerts. Settings → Code security
+              GET /repos/.../dependabot/alerts. Enablement steps to hand
+              over: SECURITY_GATE.md, "Enabling Dependabot alerts". Impact is
+              NOT negligible as first assessed — the dependency graph covers
+              GitHub Actions, so the two pinned actions/checkout refs are real
+              advisory surface despite there being no package manifests
               ✅ fixed: no .github/dependabot.yml → added (github-actions,
               weekly, grouped); only ecosystem, no package manifests exist
               ✅ fixed: shellcheck unavailable → installed and run. 3 findings,
