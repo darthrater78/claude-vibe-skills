@@ -2386,8 +2386,14 @@ This applies to **any** environment template above — not just Android.
 - Sharing a work-in-progress build with testers
 - Running the full release pipeline as a dry run on a feature branch
 
+**Who pushes the tag.** Same rule as any other tag (`SKILL.md` Section 5.8):
+the user pushes it in manual mode, Claude pushes it in automatic mode. And
+either way it is a release sequence — a pre-release still builds and publishes
+an artifact, so all six gates apply before the tag goes anywhere.
+
 **How it works:**
-1. The user pushes a pre-release tag from their feature branch:
+1. The user pushes a pre-release tag from their feature branch (or Claude does,
+   in automatic mode):
    ```bash
    git tag v1.0.0-dev.1
    git push origin v1.0.0-dev.1

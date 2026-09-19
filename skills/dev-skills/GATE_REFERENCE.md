@@ -186,7 +186,10 @@ If the signals are ambiguous, ask — do not assume local:
    are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
    that fires the release workflow. Present the tag block to the user even
    though everything else runs here — Section 5.8, "Tag pushes and ref
-   deletions are the exceptions."
+   deletions are the exceptions." In automatic mode Claude attempts the tag
+   push itself and hands this block over only if it `403`s ("Automatic mode —
+   execution", below); the denial risk is the same, the response to it is what
+   differs.
 8. **Docker-in-a-web-container — scoped to projects that actually need
    Docker to build.** If the project has a Docker build signal (`Dockerfile`,
    `docker-compose.yml`/`compose.yaml` — the same signal
@@ -388,16 +391,19 @@ If yes:
    one, and Gate 1 will hard-block on it anyway.
 
 **Write the gate state file.** Create `.claude/dev-skills-gates.md` with all six
-gates ⬜ pending (format in Section 2). On local sessions add it to `.gitignore`;
+gates ⬜ pending and `Mode: manual` (format in Section 2). Every session starts
+manual — do not carry a mode forward from a handoff summary, a prior session, or
+the harness's own permission setting. On local sessions add it to `.gitignore`;
 on remote containers it is committed with the work. This file — not the
 conversation — is the source of truth for gate state for the rest of the session.
 
 Then show the gate tracker:
 
 ```
-Dev Skills v2.25.0 active.
+Dev Skills v2.26.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
+Mode: manual (say "auto mode" to have me run the commands and the tag push)
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
 Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced>
 CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
@@ -421,7 +427,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.25.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.26.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -449,6 +455,121 @@ Rules for the MCP check:
 Then: "What are we building?"
 
 ---
+
+## Automatic mode — execution
+
+The contract is in `SKILL.md` (Operating modes): the user opts in explicitly,
+Claude runs the commands instead of presenting them, the tag push and its
+follow-on actions are Claude's, and **commit approval is untouched**. This
+section is how that runs.
+
+### Entering the mode
+
+The user asks for it. Confirm in one short message — not a lecture — what
+changes and what does not, then record it:
+
+> **Automatic mode on.** I'll run the git commands myself from here, including
+> the tag push and the release follow-through, and I won't hand you command
+> blocks unless something fails. Two things stay the same: **every commit still
+> needs your explicit yes**, and anything that needs a decision still comes to
+> you. Say "manual mode" to switch back.
+
+Write `Mode: automatic (approved <date>) — commits still require approval` into
+`.claude/dev-skills-gates.md` in the same turn. A mode that is agreed to in
+conversation and not written down is a mode that disappears at the next
+compaction.
+
+If the session is on a remote container, add one line: the clone-path question
+(session start, step 0, item 4) is no longer coming, because there is no tag
+block to hand over.
+
+### The single checkpoint
+
+Manual mode asks in three places during a release sequence — Gate 1's version
+bump, Gate 5's release-notes approval, Gate 6's pre-ship confirmation. Automatic
+mode asks once, at the commit, and carries all three:
+
+> **Ready to commit — this is the one approval for the release.**
+>
+> **Version:** 2.25.0 → 2.26.0 (MINOR — one `feat`, no breaking change)
+> **Commit:** `feat(skill): add automatic mode`
+> **Changes:** [files, line counts, what each does]
+> **Gates:** 🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ⬜ · 🚀 ⬜
+> **Release notes (v2.26.0):**
+> - [entry]
+> - [entry]
+>
+> On your yes: commit, push the branch, open the PR, merge it once CI is green,
+> tag v2.26.0, let the release workflow publish, then verify and report back.
+> I'll stop and come back if anything fails or needs a decision.
+
+Three rules about that message:
+
+1. **It is an approval of the sequence it describes, and nothing else.** If the
+   scope moves afterwards — more commits land, the notes change, the bump
+   changes — present it again. Do not stretch one yes over a second release.
+2. **It is not a summary to skim past.** The user is approving content they will
+   not see again before it is public. The diff summary and the release notes go
+   in it in full, not "see above."
+3. **A work commit gets the short form.** No version, no notes, no ship plan —
+   the diff, the message, and what Claude will do with it (commit and push to
+   the branch). Most commits are work commits; do not run a release checkpoint
+   for one.
+
+### Running the sequence
+
+After the yes, the gates run in the normal order with the normal pass criteria.
+What changes is only the execution:
+
+| Step | Manual mode | Automatic mode |
+|---|---|---|
+| Commit | presented | Claude runs it |
+| Branch push | presented (executed in a container) | Claude runs it |
+| PR create | presented | Claude runs it |
+| Release notes approval | separate ask (Gate 5, step 6) | folded into the checkpoint |
+| Pre-ship confirmation | separate "type ship" (Gate 6) | folded into the checkpoint |
+| PR merge | presented | Claude runs it, after the merge-confirmation checks |
+| Tag + tag push | **the user's, in every environment** | **Claude runs it** |
+| Watch CI, add notes, verify | Claude, either way | Claude, either way |
+| Branch cleanup | presented | Claude runs it (`--delete-branch` + local `git branch -d`) |
+| Tracker SHIP ✅ commit | presented | Claude runs it |
+
+**Everything that was a check stays a check.** In particular, Gate 6 step 2's
+merge confirmation (`state` reads `MERGED`, and CI ran green *on the merge
+commit*) is not a formality that existed because a human was about to paste a
+block — it is what stops the tag from landing on the previous commit. Run it
+before tagging, exactly as written. The version guard that manual mode chains
+into the tag block (`grep -q` against the version file) becomes a check Claude
+performs before `git tag`: read the version out of the merged commit, compare it
+to the tag being created, and stop if they differ.
+
+**Pre-release tags are covered by the same grant.** A dev, alpha, beta, or rc
+tag (`v1.2.3-dev.1` — `WORKFLOW_REFERENCE.md`, "Dev releases") is a tag push, so
+manual mode hands it over and automatic mode runs it. What it is *not* is a
+shortcut around the track rules: a pre-release tag still publishes an artifact,
+so it is a release sequence with all six gates, not a work commit. The one thing
+it relaxes is the branch — a pre-release tag is expected on a feature branch,
+and the workflow's tag-on-default-branch check skips it by design.
+
+**Report progress as a running line, not a narration.** One message when the
+sequence starts, one when it finishes, and one whenever it stops. Between those,
+the tracker file is the record.
+
+### When it stops
+
+Automatic mode falls back to manual behavior for the operation that failed. The
+session stays automatic; the tracker is updated before Claude reports.
+
+| What happened | What Claude does |
+|---|---|
+| A required gate is not ✅ or ➖ N/A | Stop, surface the blocking gate by name, run it. Never edit the tracker to clear it |
+| Tag push returns `403` | Hand over the tag block (`SKILL.md` §5.8), including the clone-path question if it was never asked. No retry, no re-route, no different ref |
+| Branch push returns `403` | Same — present the block, report it plainly |
+| `src refspec ... does not match any` | Not a permissions failure: the tag was never created. Re-run `git tag`, then push (Gate 6, step 3) |
+| CI fails on the PR | Stop before merging. Report the failing job and its output, propose a fix, wait |
+| The release workflow fails after the tag | Stop. Recovery needs a tag deletion, which needs its own approval (`SKILL.md`, Operating modes) |
+| A Critical or High security finding | Hard stop, same as manual |
+| A decision with more than one defensible answer | Ask. Automatic mode is not permission to pick for the user |
 
 ---
 
@@ -955,7 +1076,8 @@ Execution (merge, tag, publish) happens in Gate 6.
    has not been set" error.
 5. **Present commands per Section 5.8** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
-   Claude to execute directly.
+   Claude to execute directly. **In automatic mode, Claude runs all three itself**
+   ("Automatic mode — execution", above); no block is presented unless one fails.
 6. After the branch is pushed and PR created, draft release notes and show the
    PR + notes to the user:
 
@@ -970,7 +1092,10 @@ Execution (merge, tag, publish) happens in Gate 6.
    > Do these accurately describe what's in this build? Reply "yes" to ship,
    > or tell me what to change.
 
-7. Wait for explicit approval of the PR content and release notes
+7. Wait for explicit approval of the PR content and release notes. **In
+   automatic mode this approval already happened** — the release notes were part
+   of the single commit checkpoint. Post the PR and the notes for the record and
+   continue to Gate 6. Re-ask only if the notes changed since that checkpoint.
 
 **Never commit directly to main/master.** All work happens on feature/fix/release
 branches and merges via PR. If the session is on the default branch when Gate 5
@@ -984,7 +1109,10 @@ is reached, create a branch first.
 Merge, tag, and publish. All three happen here, not in Gate 5.
 
 **Pre-ship summary — explicit confirmation required.** "Yeah" or "ok" is not
-enough — the user must say "ship", "yes push", or "go ahead."
+enough — the user must say "ship", "yes push", or "go ahead." **In automatic
+mode this confirmation was folded into the commit checkpoint** ("Automatic mode
+— execution", above): show the summary as a status line and proceed, rather than
+stopping for a second yes on a sequence the user already approved.
 
 > **Ready to ship:**
 > Branch: `release/v1.2.3` → `main` | PR: [url]
@@ -1075,11 +1203,23 @@ looks fine and is not:
    check here is what stops the wrong tag from being pushed in the first
    place.
 
-3. **Tag and push — the user runs this block, and not before step 2 is
-   confirmed.** Tag pushes are denied (`403`) to Claude's credentials far
+3. **Tag and push — in manual mode the user runs this block, and not before
+   step 2 is confirmed.** Tag pushes are denied (`403`) to Claude's credentials far
    more often than they succeed, and this is the push that starts the
    release build (Section 5.8, "Tag pushes and ref deletions are the
-   exceptions"). Present it, in one block, with the sync in front so the tag
+   exceptions").
+
+   **In automatic mode Claude runs this step itself** ("Automatic mode —
+   execution", above) — but only after step 2's merge confirmation, and with
+   the version guard performed as a check rather than chained into a block:
+   read the version out of the merged commit, confirm it matches the tag about
+   to be created, and stop if it does not. If the push returns `403`, that is
+   where automatic mode hands over: present the block below, ask for the clone
+   path if it is not known, and do not retry or re-route. The rest of this step
+   — the verification, the `src refspec` case, the UI fallback — applies in both
+   modes.
+
+   In manual mode: Present it, in one block, with the sync in front so the tag
    lands on the merged commit, **and the version declared in that commit
    checked before the tag is created** — chained with `&&` so a mismatch
    stops the block before `git tag` runs. Use `exit` only inside the sourced
@@ -1286,9 +1426,10 @@ path above applies here too — it describes what a correct release artifact loo
 like, not how CI happens to produce it. Check the artifact against its platform
 row before publishing.
 
-**Execution — present commands per Section 5.8.** The tag push goes to the user
-even when Claude is executing the rest (Section 5.8, "Tag pushes and ref
-deletions are the exceptions"), so this splits into two blocks:
+**Execution — present commands per Section 5.8.** In manual mode the tag push
+goes to the user even when Claude is executing the rest (Section 5.8, "Tag
+pushes and ref deletions are the exceptions"), so this splits into two blocks.
+In automatic mode Claude runs both, with the merge confirmation between them:
 
 Claude runs (or presents, on a local session):
 ```
@@ -1303,7 +1444,10 @@ way a CI release workflow's own version check would (this path has no such
 workflow by definition), so this manual confirmation is the only thing
 standing between a tag and the wrong commit.
 
-The user runs — stop here until they confirm the tag is on the remote:
+The user runs — stop here until they confirm the tag is on the remote. **In
+automatic mode Claude runs these steps itself instead**, with the same merge
+confirmation first and the version guard as a check ("Automatic mode —
+execution", above), falling back to this block only on a `403`:
 ```
 cd "<clone-path>"
 git checkout main && git pull origin main \

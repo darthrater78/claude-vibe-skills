@@ -21,6 +21,14 @@ The hook is strongest exactly where Claude executes git directly — remote
 container sessions (`GATE_REFERENCE.md`, session start, step 0) — and weakest on local sessions,
 where presenting commands is the default.
 
+**Automatic mode moves every path into the covered half.** When a session opts
+into automatic mode (`SKILL.md`, Operating modes), Claude runs the commits,
+pushes, PR, merge, and the tag push itself, so each one arrives as a tool call
+this hook inspects — including `git tag` and `git push origin v1.2.3`, which in
+manual mode are handed to you and never reach it. Installing the hook matters
+most in exactly that mode: it is the only enforcement that does not depend on
+Claude remembering to run the pre-flight it just granted itself more room in.
+
 ## Install
 
 The hook is **project-scoped by default**: it only governs repos you install it
