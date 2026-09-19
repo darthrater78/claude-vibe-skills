@@ -99,7 +99,7 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   generates a template — Docker, Windows, Android, Linux, Home Assistant,
   Python, Node.js, or scripts — with SHA-pinned actions, least-privilege
   permissions, and dev/pre-release build support out of the box. *(2.18.0)*
-- **[Dependencies must be current and CVE-free](#security-rules).** Every
+- **[Dependencies must be current and CVE-free](#gate-3--security--quality-).** Every
   package is pinned to a release that is looked up, never recalled from
   training data, and the whole dependency tree — transitive included — is
   re-audited on every security gate, not just when the manifest changes. A
