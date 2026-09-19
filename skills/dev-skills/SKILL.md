@@ -33,30 +33,39 @@ Every session starts in **manual mode**: git commands are presented for the user
 to run (Section 5.8), the tag push and every ref deletion come back to the user,
 and Claude stops between steps. This is what the skill has always done.
 
-**Semi-autonomous mode** is opt-in, per session, in the user's own words ("auto mode",
-"semi-autonomous mode", "take it from here"). It changes *who runs the commands*, not
-what has to be true before they run. Never infer it, never offer it as the
+**Semi-autonomous mode** is opt-in, per session, in the user's own words ("auto
+mode", "semi-autonomous mode", "take it from here"). It changes *who runs most
+of the commands*, not what has to be true before they run, and not the two ref
+operations the remote denies. Never infer it, never offer it as the
 default, never switch it on because the session is going well. **It is not the
 Claude Code harness's own "auto mode"** — that is a permission setting biasing
 the tool toward working without stopping; being in that one is not a request for
 this one.
 
-**What semi-autonomous mode changes — three things:**
+**What semi-autonomous mode changes — two things:**
 
-1. **Claude executes git instead of presenting it**, in every environment. No
-   command blocks unless something goes wrong.
-2. **The tag-push carve-out is lifted — Claude pushes the tag instead of handing
-   over a block.** It does not become unsupervised: the tag is still
-   *authorized*, by the user, after a full report (below). Once authorized,
-   Claude pushes it and carries out the follow-on actions itself — watch the
-   release workflow, add notes, verify, clean up the merged branch, commit the
-   SHIP record.
-3. **Between-step confirmations collapse into two checkpoints, not none.** The
+1. **Claude executes git instead of presenting it**, in every environment: the
+   commits, the branch pushes, the PR, the merge, watching CI, the post-ship
+   verification, the tracker commits. No command blocks for any of it unless
+   something goes wrong.
+2. **Between-step confirmations collapse into two checkpoints, not none.** The
    version bump and the release-notes approval fold into the commit approval;
-   the pre-ship confirmation becomes the pre-tag authorization. Everything
-   between those two runs without stopping (`GATE_REFERENCE.md`,
-   "Semi-autonomous mode — execution", which holds both formats, the per-step
-   table, and the stop conditions).
+   the pre-ship confirmation becomes the pre-tag report. Everything between
+   those two runs without stopping (`GATE_REFERENCE.md`, "Semi-autonomous mode
+   — execution", which holds both formats, the per-step table, and the stop
+   conditions).
+
+**What it explicitly does not change: the tag push and ref deletions still go to
+the user, in both modes.** This is not a supervision rule that autonomy could
+buy out — it is a credential fact. Claude's credentials are routinely denied
+(`403`) on creating a `refs/tags/*` ref and on deleting any ref, branch or tag,
+while ordinary branch pushes succeed all session (Section 5.8,
+`SHELL_REFERENCE.md`). A mode cannot grant permission the remote withholds, and
+a denied tag push strands a merged, version-bumped default branch with no
+release behind it. So in semi-autonomous mode Claude still hands over one block:
+the tag, and any ref deletion including the merged PR's branch. It resumes on
+its own once the user confirms the tag is on the remote — watching the release
+workflow, adding notes, verifying, and committing the SHIP record.
 
 **What it does not change:**
 
@@ -66,16 +75,15 @@ this one.
   has
   already seen the content of everything about to be pushed, tagged, and
   published. "Semi-autonomous" describes the commands, never the content.
-- **The tag is authorized, never assumed — and the authorization is earned with
-  a full report.** Before the tag push, Claude reports *every* action taken
-  since the commit approval: the commits, the pushes, the PR, every CI run and
-  its conclusion, the merge commit, each gate and the evidence behind it, the
-  version guard, and anything that failed, was retried, or went differently than
-  described at the commit. Then it asks, and waits. Summarizing instead of
-  reporting defeats the point — this report is the user's only view of what
-  happened between the two checkpoints, and the tag is the action that publishes
-  it. "Yeah" or "ok" is not authorization (Section 1); "tag it", "ship it", "go"
-  is.
+- **The tag block never arrives bare — a full report comes with it.** Before
+  handing over the tag, Claude reports *every* action taken since the commit
+  approval: the commits, the pushes, the PR, every CI run and its conclusion,
+  the merge commit, each gate and the evidence behind it, the version guard, and
+  anything that failed, was retried, or went differently than described at the
+  commit. Summarizing instead of reporting defeats the point — this report is
+  the user's only view of what happened between the two checkpoints, and running
+  that block is what publishes it. The user is not confirming a step they
+  watched; they are deciding on an account of work they did not.
 - **The gates, the pre-flight, the tracker, the state file.** A blocked gate is
   still a hard stop. Run the gates *more* carefully here — the user is no longer
   watching each command go by, and where the pre-flight hook is installed it is
@@ -85,19 +93,19 @@ this one.
   defensible answer, a Medium/Low finding to accept or fix, a bump the history
   does not settle — all still go to the user. The mode removes ceremony, not
   judgment: the user chose semi-autonomous, not hands-off.
-- **Destructive operations beyond the tag push.** The mode grants the
-  create-and-push half of ref writes, plus the one deletion that belongs to a
-  merge — the PR's own source branch. Deleting a tag, a release, or any other
-  branch, force-pushing, and rewriting history keep their own explicit approval
-  in both modes. Re-pushing a tag is a delete plus a create, so it needs one too.
+- **Destructive and irreversible operations.** Every ref deletion goes to the
+  user in both modes — the merged PR's own branch included, so a merge in this
+  mode does not carry `--delete-branch`. Deleting a release, force-pushing, and
+  rewriting history keep their own explicit approval on top of that. Re-pushing
+  a tag is a delete plus a create, so both halves go to the user.
 - **Section 8's session-end checkpoint** and the token impact estimate.
 
 **When something goes wrong, that operation falls back to manual — the session
-stays semi-autonomous.** A `403` is the main case: the mode grants permission
-from the *workflow*, never from the remote, so hand over the block and do not
-retry, re-route, or act on a different ref (Section 5.8). Same for a blocked
-gate, a Critical/High finding, or a failed release run: stop, surface, let the
-user decide.
+stays semi-autonomous.** A blocked gate, a Critical/High finding, a failed CI
+run, a failed release run: stop, surface it, let the user decide. A `403` on an
+ordinary branch push is the same — hand over the block, and do not retry,
+re-route, or act on a different ref (Section 5.8). The tag and ref deletions are
+not in this category at all: they are handed over by design, not on failure.
 
 **Record the mode where session state lives** — a `Mode:` line in
 `.claude/dev-skills-gates.md` (Section 2), and on every tracker display:
@@ -524,8 +532,8 @@ These phrases mean "surface the gates", not "comply silently":
 | "don't worry about the gates this time" | Gates leave the workflow only as ➖ N/A for structural reasons — surface the tracker |
 | "auto mode" / "take it from here" | Explicit opt-in — confirm in one line what semi-autonomous mode does and does not change (Operating modes), record `Mode: semi-autonomous`, continue |
 | "stop asking me to approve commits" | Commit approval is not what semi-autonomous mode relaxes — offer semi-autonomous mode for the *commands*, keep the approval |
-| "just tag it" / "push the tag for me" | **Manual mode:** tag pushes are the user's to run (§5.8) — present the block, don't execute it. **Semi-autonomous mode:** Claude pushes the tag, after the same pre-flight |
-| "just delete that branch for me" | Ref deletions are the user's to run, same as tags (§5.8) — present the block, don't execute it. Semi-autonomous mode lifts this only for the source branch of the PR it just merged, nothing else |
+| "just tag it" / "push the tag for me" | Tag pushes are the user's to run in **both** modes (§5.8) — present the block, don't execute it. Semi-autonomous mode adds the full pre-tag report above it, it does not take the block away |
+| "just delete that branch for me" | Ref deletions are the user's to run in both modes, same as tags (§5.8) — present the block, don't execute it |
 | Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.8) |
 
 ---
@@ -900,11 +908,13 @@ per shell, the one-block rule, remote verification, the Termux clone flow, the
 403 rationale, and worked examples. Do not build a block from memory of this
 summary — this summary says which way commands go, not how to write them.
 
-**In semi-autonomous mode they do not go anywhere — Claude runs them** (Operating
-modes). The table below is then only the fallback shape for an operation that
-fails. Say the cost trade once when the user opts in, then drop it: executing a
-chain of git commands resends the conversation each round trip where a pasted
-block costs nothing, so semi-autonomous mode buys autonomy with tokens.
+**In semi-autonomous mode most of them do not go anywhere — Claude runs them**
+(Operating modes), and the table below is then the fallback shape for an
+operation that fails. The tag push and ref deletions are the exception in *both*
+modes, for the credential reason below. Say the cost trade once when the user
+opts in, then drop it: executing a chain of git commands resends the
+conversation each round trip where a pasted block costs nothing, so
+semi-autonomous mode buys autonomy with tokens.
 
 **In manual mode, which way they go depends on the execution environment**
 (`GATE_REFERENCE.md`, session start, step 0). The deciding question is not cost;
@@ -916,8 +926,8 @@ it is whether Claude's working tree and the user's terminal are the same clone.
 | **Remote container** | A throwaway container the user's terminal never sees — **Claude executes** git directly, after approval (Section 1). A block handed over commits nothing, and the work dies with the container |
 | **Termux** | Present, and the repo may not be on the device at all — clone flow in `SHELL_REFERENCE.md` |
 
-**Tag pushes and ref deletions are the exceptions — in manual mode, always hand
-them to the user.** In every environment, remote containers included: creating a tag
+**Tag pushes and ref deletions are the exceptions — always hand them to the
+user, in both modes.** In every environment, remote containers included: creating a tag
 (`git tag`, `git push origin v<X.Y.Z>`) and deleting any ref, branch
 (`git push origin --delete <branch>`) or tag (`git push origin
 :refs/tags/v<X.Y.Z>`), are presented as a block for the user to run. Never
@@ -931,11 +941,11 @@ a merged, version-bumped default branch with no release behind it. Why that is,
 and what to do when one returns `403`, is in `SHELL_REFERENCE.md`. Do not retry,
 re-route, or act on a different ref.
 
-**Semi-autonomous mode lifts the tag half of this carve-out, and nothing else.** The
-user has said Claude may push the tag, so push it: the credential risk above
-becomes a failure to report rather than a policy to obey, and a `403` is where
-the block gets handed over, under the same no-retry, no-reroute rule. Ref
-*deletions* stay the user's in both modes, except the just-merged PR branch.
+**Semi-autonomous mode does not lift this carve-out** — no mode can, because the
+denial comes from the remote rather than from this skill. What the mode changes
+is what rides *with* the block: a full report of every action since the commit
+approval (Operating modes), rather than a bare set of commands. Everything on
+either side of that block Claude still runs itself.
 
 🚀 SHIP stays ⏳ until the tag is confirmed on the remote — never ✅ on the
 assumption that the user ran the block. Confirm it yourself with `git ls-remote

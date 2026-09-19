@@ -216,10 +216,9 @@ an Owner enables it in Claude Code admin settings.
    are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
    that fires the release workflow. Present the tag block to the user even
    though everything else runs here — Section 5.8, "Tag pushes and ref
-   deletions are the exceptions." In semi-autonomous mode Claude attempts the tag
-   push itself and hands this block over only if it `403`s ("Semi-autonomous mode —
-   execution", below); the denial risk is the same, the response to it is what
-   differs.
+   deletions are the exceptions." Semi-autonomous mode does not change this;
+   it only adds the full pre-tag report above the block ("Semi-autonomous mode
+   — execution", below).
 8. **Docker-in-a-web-container — scoped to projects that actually need
    Docker to build.** If the project has a Docker build signal (`Dockerfile`,
    `docker-compose.yml`/`compose.yaml` — the same signal
@@ -498,12 +497,14 @@ section is how that runs.
 The user asks for it. Confirm in one short message — not a lecture — what
 changes and what does not, then record it:
 
-> **Semi-autonomous mode on.** I'll run the git commands myself from here,
-> including the tag push and the release follow-through, and I won't hand you
-> command blocks unless something fails. What stays yours: **every commit still
-> needs your explicit yes**, **the tag needs your authorization after a full
-> report of everything I did**, and anything that needs a decision still comes
-> to you. Say "manual mode" to switch back.
+> **Semi-autonomous mode on.** I'll run the git commands myself from here —
+> commits, pushes, the PR, the merge, watching CI, verification — and I won't
+> hand you command blocks unless something fails. What stays yours: **every
+> commit still needs your explicit yes**; **the tag push and any ref deletion
+> are still yours to run**, because my credentials get `403`'d on exactly those,
+> and I'll hand that one block over with a full report of everything I did; and
+> anything that needs a decision still comes to you. Say "manual mode" to switch
+> back.
 
 Write `Mode: semi-autonomous (approved <date>) — commits and the tag still
 require the user's approval` into
@@ -511,16 +512,16 @@ require the user's approval` into
 conversation and not written down is a mode that disappears at the next
 compaction.
 
-If the session is on a remote container, add one line: the clone-path question
-(session start, step 0, item 4) is no longer coming, because there is no tag
-block to hand over.
+On a remote container, the clone-path question (session start, step 0, item 4)
+still applies — this mode does not remove the tag block, so a release still
+reaches the one moment that needs it.
 
 ### Checkpoint 1 — the commit approval
 
 Manual mode asks in three places during a release sequence — Gate 1's version
 bump, Gate 5's release-notes approval, Gate 6's pre-ship confirmation.
 Semi-autonomous mode carries the first two into one approval at the commit; the
-third becomes the pre-tag authorization below.
+third becomes the pre-tag report below.
 
 > **Ready to commit — this is the one approval for the release.**
 >
@@ -534,7 +535,7 @@ third becomes the pre-tag authorization below.
 >
 > On your yes: commit, push the branch, open the PR, and merge it once CI is
 > green. Then I'll come back with a full report of everything that happened and
-> ask you to authorize the tag. I'll stop sooner if anything fails or needs a
+> hand you the tag block to run. I'll stop sooner if anything fails or needs a
 > decision.
 
 Three rules about that message:
@@ -550,17 +551,18 @@ Three rules about that message:
    the branch). Most commits are work commits; do not run a release checkpoint
    for one, and a work commit has no second checkpoint because it never tags.
 
-### Checkpoint 2 — the pre-tag report and authorization
+### Checkpoint 2 — the pre-tag report, and the tag block
 
-**The tag is the one action in this sequence that publishes, and it is the one
-the user has not seen coming since the commit.** Between the two checkpoints
-Claude has been running unattended: commits, pushes, a PR, CI runs, a merge.
-Semi-autonomous mode pays for that autonomy here, with a full accounting before
-the tag is authorized — not a summary, and not a request to confirm something
-the user cannot check.
+**The tag is the one action in this sequence that publishes, and the user runs
+it** — in this mode as in manual, because Claude's credentials are denied on
+`refs/tags/*` (Section 5.8). Between the two checkpoints Claude has been running
+unattended: commits, pushes, a PR, CI runs, a merge. Semi-autonomous mode pays
+for that autonomy here, with a full accounting handed over *with* the tag block
+— not a summary, and not a bare set of commands to paste.
 
-**Nothing is pushed to `refs/tags/*` until the user answers this message.** Run
-Gate 6 step 2's merge confirmation first, then report:
+**Claude never creates or pushes the tag ref itself, in either mode.** Run
+Gate 6 step 2's merge confirmation and the version guard first, then report and
+hand over the block:
 
 > **Ready to tag v2.26.0 — full report of everything since your commit
 > approval.**
@@ -586,8 +588,18 @@ Gate 6 step 2's merge confirmation first, then report:
 > which builds the bundle and publishes the GitHub release with the notes you
 > approved.
 >
-> **Authorize the tag?** ("tag it" / "ship it" / "go" — and I'll push it, watch
-> the run, add the notes, verify, and clean up.)
+> **This one is yours to run** — my credentials get `403`'d on tag refs:
+>
+> ```
+> cd "<clone-path>"
+> git checkout main && git pull origin main \
+>   && grep -q '^2.26.0$' VERSION \
+>   && git tag v2.26.0 && git push origin v2.26.0
+> ```
+>
+> Tell me when it's done and I'll take it from there — watch the run, add the
+> notes, verify, and commit the SHIP record. The branch deletion is yours too;
+> I'll give you that block at the end.
 
 **Rules for this report:**
 
@@ -602,10 +614,16 @@ Gate 6 step 2's merge confirmation first, then report:
 3. **Reconstruct it from evidence, not memory** (`git log`, `gh pr view`,
    `gh run list`, `git ls-remote`, the gate file). If the session was compacted,
    re-derive; a gap you cannot close is something to say, not something to omit.
-4. **Explicit authorization, same bar as Section 1.** "Yeah", "ok", or silence
-   is not it. If the user asks for changes instead, the tag does not move —
-   handle the request and report again.
-5. **It runs for pre-release tags too.** A `-dev`/`-rc` tag publishes an
+4. **The block goes in the same message, below the report** (Section 1: the
+   tracker and the report go above the block, never after it). Ask for the
+   clone path first if it is not known — a `cd` the user has to edit is a
+   broken first line. If the user asks for changes instead of running it,
+   nothing about the tag moves: handle the request and report again.
+5. **Do not take "done" at face value.** 🚀 SHIP stays ⏳ until Claude has
+   confirmed the tag on the remote *and* checked what it points at against the
+   merge commit (Gate 6, step 3). Reading refs is not a write and is not
+   restricted.
+6. **It runs for pre-release tags too.** A `-dev`/`-rc` tag publishes an
    artifact; that is the trigger for this checkpoint, not the version's shape.
 
 ### Running the sequence
@@ -619,12 +637,17 @@ What changes is only the execution:
 | Branch push | presented (executed in a container) | Claude runs it |
 | PR create | presented | Claude runs it |
 | Release notes approval | separate ask (Gate 5, step 6) | folded into checkpoint 1 |
-| PR merge | presented | Claude runs it, after the merge-confirmation checks |
-| Pre-ship confirmation | separate "type ship" (Gate 6) | **checkpoint 2 — the full pre-tag report, then authorization** |
-| Tag + tag push | **the user's, in every environment** | **Claude runs it — only after that authorization** |
+| PR merge | presented | Claude runs it, after the merge-confirmation checks — without `--delete-branch` |
+| Pre-ship confirmation | separate "type ship" (Gate 6) | **checkpoint 2 — the full pre-tag report, handed over with the block** |
+| Tag + tag push | **the user's, in every environment** | **the user's, in every environment** |
 | Watch CI, add notes, verify | Claude, either way | Claude, either way |
-| Branch cleanup | presented | Claude runs it (`--delete-branch` + local `git branch -d`) |
+| Branch cleanup (a ref deletion) | presented | presented — the user's in both modes |
 | Tracker SHIP ✅ commit | presented | Claude runs it |
+
+**The last column is where the mode's value is, and the two rows that don't move
+are why it is still called semi-autonomous.** Everything Claude can actually do
+with its own credentials, it does; the two ref operations the remote denies stay
+where they have always been.
 
 **Everything that was a check stays a check.** In particular, Gate 6 step 2's
 merge confirmation (`state` reads `MERGED`, and CI ran green *on the merge
@@ -635,10 +658,10 @@ into the tag block (`grep -q` against the version file) becomes a check Claude
 performs before `git tag`: read the version out of the merged commit, compare it
 to the tag being created, and stop if they differ.
 
-**Pre-release tags are covered by the same grant.** A dev, alpha, beta, or rc
+**Pre-release tags are handed over the same way.** A dev, alpha, beta, or rc
 tag (`v1.2.3-dev.1` — `WORKFLOW_REFERENCE.md`, "Dev releases") is a tag push, so
-manual mode hands it over and semi-autonomous mode runs it. What it is *not* is a
-shortcut around the track rules: a pre-release tag still publishes an artifact,
+both modes hand it to the user, with the pre-tag report above it in this one.
+What it is *not* is a shortcut around the track rules: a pre-release tag still publishes an artifact,
 so it is a release sequence with all six gates, not a work commit. The one thing
 it relaxes is the branch — a pre-release tag is expected on a feature branch,
 and the workflow's tag-on-default-branch check skips it by design.
@@ -657,8 +680,8 @@ session stays semi-autonomous; the tracker is updated before Claude reports.
 | What happened | What Claude does |
 |---|---|
 | A required gate is not ✅ or ➖ N/A | Stop, surface the blocking gate by name, run it. Never edit the tracker to clear it |
-| Tag push returns `403` | Hand over the tag block (`SKILL.md` §5.8), including the clone-path question if it was never asked. No retry, no re-route, no different ref |
-| Branch push returns `403` | Same — present the block, report it plainly |
+| Branch push returns `403` | Present the block, report it plainly. No retry, no re-route, no different ref |
+| The tag or a ref deletion is due | Not a failure — the block goes to the user by design, with the report above it (checkpoint 2) |
 | `src refspec ... does not match any` | Not a permissions failure: the tag was never created. Re-run `git tag`, then push (Gate 6, step 3) |
 | CI fails on the PR | Stop before merging. Report the failing job and its output, propose a fix, wait |
 | The release workflow fails after the tag | Stop. Recovery needs a tag deletion, which needs its own approval (`SKILL.md`, Operating modes) |
@@ -1205,9 +1228,10 @@ Merge, tag, and publish. All three happen here, not in Gate 5.
 **Pre-ship summary — explicit confirmation required.** "Yeah" or "ok" is not
 enough — the user must say "ship", "yes push", or "go ahead." **In
 semi-autonomous mode this confirmation becomes checkpoint 2: the full pre-tag
-report, then an explicit authorization** ("Semi-autonomous mode — execution",
+report, handed over with the tag block** ("Semi-autonomous mode — execution",
 above). It is a longer stop than this one, not a shorter one — the user is
-seeing an account of work they did not watch happen.
+reading an account of work they did not watch happen, and then running the tag
+themselves.
 
 > **Ready to ship:**
 > Branch: `release/v1.2.3` → `main` | PR: [url]
@@ -1277,6 +1301,13 @@ looks fine and is not:
    git checkout main && git pull origin main
    ```
 
+   **When Claude is the one executing this — a remote container, or a
+   semi-autonomous session — drop `--delete-branch` and hand the branch
+   deletion to the user with the tag block.** Deleting a ref is its own
+   permission, denied (`403`) independently of the merge itself (Section 5.8),
+   so a merge that carries the flag can succeed at merging and still fail at
+   deleting, or fail as a whole. The flag is fine in a block the user runs.
+
    **Confirm the merge actually landed before doing anything else.** A
    request to merge is not a merged commit — don't treat "I ran the command"
    or "the user said it's done" as equivalent to verifying it:
@@ -1304,19 +1335,14 @@ looks fine and is not:
    release build (Section 5.8, "Tag pushes and ref deletions are the
    exceptions").
 
-   **In semi-autonomous mode Claude runs this step itself** ("Semi-autonomous
-   mode — execution", above) — but only after three things, in order: step 2's
-   merge confirmation; the version guard performed as a check rather than
-   chained into a block (read the version out of the merged commit, confirm it
-   matches the tag about to be created, stop if it does not); and the user's
-   explicit authorization on the full pre-tag report (checkpoint 2). No tag ref
-   is created or pushed before that answer arrives. If the push then returns
-   `403`, that is where semi-autonomous mode hands over: present the block
-   below, ask for the clone path if it is not known, and do not retry or
-   re-route. The rest of this step — the verification, the `src refspec` case,
-   the UI fallback — applies in both modes.
-
-   In manual mode: Present it, in one block, with the sync in front so the tag
+   **Semi-autonomous mode does not change who runs this step** — the `403` this
+   carve-out exists for comes from the remote, not from the skill. What it
+   changes is what goes above the block: the full pre-tag report of everything
+   Claude did since the commit approval ("Semi-autonomous mode — execution",
+   checkpoint 2), rather than a bare command block. Run step 2's merge
+   confirmation and the version guard first either way. The rest of this step —
+   the verification, the `src refspec` case, the UI fallback — is identical in
+   both modes. Present it, in one block, with the sync in front so the tag
    lands on the merged commit, **and the version declared in that commit
    checked before the tag is created** — chained with `&&` so a mismatch
    stops the block before `git tag` runs. Use `exit` only inside the sourced
@@ -1523,16 +1549,19 @@ path above applies here too — it describes what a correct release artifact loo
 like, not how CI happens to produce it. Check the artifact against its platform
 row before publishing.
 
-**Execution — present commands per Section 5.8.** In manual mode the tag push
-goes to the user even when Claude is executing the rest (Section 5.8, "Tag
-pushes and ref deletions are the exceptions"), so this splits into two blocks.
-In semi-autonomous mode Claude runs both, with the merge confirmation between them:
+**Execution — present commands per Section 5.8.** The tag push goes to the user
+even when Claude is executing the rest (Section 5.8, "Tag pushes and ref
+deletions are the exceptions"), in both modes, so this splits into two blocks:
 
 Claude runs (or presents, on a local session):
 ```
 gh pr merge <number> --merge --delete-branch
 git checkout main && git pull origin main
 ```
+
+Same caveat as the CI-driven path's step 2: when Claude is executing this
+rather than presenting it, drop `--delete-branch` and hand the branch deletion
+over with the tag block. The flag belongs in a block the user runs.
 
 **Confirm the merge landed before handing over the tag block below** — same
 check as the CI-driven path (`gh pr view <number> --json state -q '.state'`
@@ -1541,11 +1570,10 @@ way a CI release workflow's own version check would (this path has no such
 workflow by definition), so this manual confirmation is the only thing
 standing between a tag and the wrong commit.
 
-The user runs — stop here until they confirm the tag is on the remote. **In
-semi-autonomous mode Claude runs these steps itself instead**, after the merge
-confirmation, the version guard as a check, and the user's authorization on the
-full pre-tag report ("Semi-autonomous mode — execution", above), falling back to
-this block only on a `403`:
+The user runs — stop here until they confirm the tag is on the remote. **This
+is the same in semi-autonomous mode**; what changes there is that the full
+pre-tag report goes above this block ("Semi-autonomous mode — execution",
+checkpoint 2):
 ```
 cd "<clone-path>"
 git checkout main && git pull origin main \

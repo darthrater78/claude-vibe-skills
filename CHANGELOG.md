@@ -6,23 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [2.26.0] — 2026-09-19
 
-Adds an opt-in **semi-autonomous mode**: Claude runs the git commands itself,
-including the tag push and the release follow-through, instead of handing
-over command blocks. It keeps two checkpoints — commit approval, unchanged
-and required for every commit, and a new full pre-tag report the user
-authorizes before any tag is pushed. Manual mode is untouched and remains
-the default. Also: native Linux sessions now get offered Remote Control.
-No breaking changes.
+Adds an opt-in **semi-autonomous mode**: Claude runs the git commands itself
+— commits, pushes, the PR, the merge, watching CI, verification — instead of
+handing over command blocks. Two checkpoints survive: commit approval,
+unchanged and required for every commit, and the tag, which is still the
+user's to push and now arrives with a full report of every action taken
+since that approval. The tag push and ref deletions stay with the user in
+both modes; a mode cannot grant credentials the remote denies. Manual mode
+is untouched and remains the default. Also: native Linux sessions now get
+offered Remote Control. No breaking changes.
 
 ### Added
 - **Semi-autonomous mode (`SKILL.md`, "Operating modes").** Opt-in per session, in
   the user's own words ("auto mode", "semi-autonomous mode", "take it from here").
-  It changes who runs the commands, not what has to be true before they run:
-  Claude executes git in every environment, the tag-push carve-out is lifted
-  so Claude creates and pushes the version tag and carries out the follow-on
-  actions (watch CI, add notes, verify, clean up the merged branch, commit
-  the SHIP record), and the between-step confirmations collapse into two
-  checkpoints. Manual mode's behavior is unchanged in every particular.
+  It changes who runs most of the commands, not what has to be true before
+  they run: Claude executes git in every environment — commits, branch
+  pushes, the PR, the merge, watching CI, the post-ship verification, the
+  tracker commits — and the between-step confirmations collapse into two
+  checkpoints. What it does *not* change is the §5.8 carve-out: the tag push
+  and every ref deletion still go to the user, in both modes, because the
+  `403` that carve-out exists for comes from the remote and not from this
+  skill. A merge in this mode therefore carries no `--delete-branch`.
+  Manual mode's behavior is unchanged in every particular.
 - **Checkpoint 1 — the commit approval, now carrying the release.** Gate 1's
   version-bump confirmation and Gate 5's release-notes approval fold into it,
   presented together with the diff summary, the bump and its reasoning, the
@@ -30,9 +35,10 @@ No breaking changes.
   describes and nothing else — if more commits land or the notes change, it is
   presented again. Work commits get a short form with no version, notes, or
   ship plan, and no second checkpoint, because they never tag.
-- **Checkpoint 2 — a full pre-tag report, and the tag is authorized against
-  it.** Nothing reaches `refs/tags/*` in semi-autonomous mode until the user
-  answers this. Claude reports *every* action taken since the commit approval:
+- **Checkpoint 2 — a full pre-tag report, handed over with the tag block.**
+  The user still runs the tag, in this mode as in manual; what changes is that
+  the block no longer arrives bare. Claude reports *every* action taken since
+  the commit approval:
   commits with SHAs and messages, every push and whether any rewrote history,
   the PR and what happened on it, every CI run with its conclusion, the merge
   commit, each gate with the evidence that passed it, the version guard's
@@ -40,11 +46,14 @@ No breaking changes.
   retried, or went differently than what the user approved at the commit. It
   is reconstructed from evidence (`git log`, `gh pr view`, `gh run list`, the
   gate file), not from memory, and a gap that cannot be closed is stated
-  rather than omitted. "Yeah" or "ok" is not authorization; the same bar as
-  Section 1 applies. This replaces Gate 6's pre-ship "type ship" — it is a
-  longer stop than that one was, not a shorter one, because the user is seeing
-  an account of work they did not watch happen. Formats for both checkpoints
-  are in `GATE_REFERENCE.md`, "Semi-autonomous mode — execution".
+  rather than omitted. The tag block goes below the report in the same message,
+  with the clone path asked for first if it is not known. This replaces Gate
+  6's pre-ship "type ship" — it is a longer stop than that one was, not a
+  shorter one, because the user is reading an account of work they did not
+  watch happen and then running the tag themselves. Afterwards Claude confirms
+  the tag on the remote and what it points at rather than taking "done" at face
+  value. Formats for both checkpoints are in `GATE_REFERENCE.md`,
+  "Semi-autonomous mode — execution".
 - **Native Linux local sessions get offered Remote Control, in either mode**
   (`GATE_REFERENCE.md`, session start, step 0). One line, once per session:
   `claude --rc` (or `/rc` in an open session) keeps the terminal session as it
@@ -77,16 +86,16 @@ No breaking changes.
   commit approval. Section 1's step 6 gained the semi-autonomous branch: the
   approval in step 5 is what licenses Claude to execute the sequence it just
   described, and nothing beyond it.
-- **Ref-write rules are now mode-aware, and narrowly so.** Semi-autonomous mode
-  lifts the tag half of the §5.8 carve-out and grants exactly one deletion —
-  the source branch of the PR it just merged, via `--delete-branch` and the
-  local `git branch -d`. Deleting a tag, a release, or any other branch,
-  force-pushing, and rewriting history keep their own explicit approval in
-  both modes; re-pushing a tag is a delete plus a create, so it needs one
-  too. `SHELL_REFERENCE.md`'s tag section says the same thing from the other
-  side: the credential risk does not go away in semi-autonomous mode, it becomes a
-  failure to report rather than a rule to obey, and a `403` is exactly where
-  the block gets handed back — still no retry, no re-route, no different ref.
+- **Ref-write rules are stated as mode-independent, in all five places that
+  describe them.** `SKILL.md` §5.8, `SHELL_REFERENCE.md`, `GATE_REFERENCE.md`
+  Gate 6 and session start, and `WORKFLOW_REFERENCE.md`'s dev-release section
+  now all say the same thing: creating a tag ref and deleting any ref go to
+  the user in every environment and in both modes. A mode describes how much
+  ceremony the user wants; it says nothing about what credentials the remote
+  will honour, and the `403` comes from the remote. Deleting a release,
+  force-pushing, and rewriting history keep their own explicit approval on
+  top; re-pushing a tag is a delete plus a create, so both halves go to the
+  user.
 - **Gate 6's safety checks are explicitly not ceremony.** The merge
   confirmation (state reads `MERGED`, CI green *on the merge commit*) and the
   version guard run in semi-autonomous mode too — the guard as a check Claude
@@ -94,15 +103,16 @@ No breaking changes.
   user pastes. They existed to stop a tag landing on the previous commit, not
   because a human was about to paste something.
 - **Pre-release tags follow the same rule** (`WORKFLOW_REFERENCE.md`, "Dev
-  releases"): the user pushes them in manual mode, Claude pushes them in
-  semi-autonomous mode after the same pre-tag report, and either way a `-dev`/`-alpha`/`-beta`/`-rc` tag is a
-  release sequence with all six gates, because it still publishes an
+  releases"): the user pushes them in both modes, with the pre-tag report above
+  the block in this one, and either way a `-dev`/`-alpha`/`-beta`/`-rc` tag is
+  a release sequence with all six gates, because it still publishes an
   artifact. The only thing it relaxes is the branch.
-- **The enforcement hook needs no change and matters more.** In
-  semi-autonomous mode every git write — `git tag` and `git push origin v1.2.3` included,
-  which manual mode never routes through a tool call — arrives as a tool call
-  `hooks/gate-preflight.sh` inspects. `hooks/README.md` says so; the covered
-  /uncovered table above it was written for manual mode.
+- **The enforcement hook needs no change and covers more.** In semi-autonomous
+  mode the commits, pushes, PR and merge arrive as tool calls
+  `hooks/gate-preflight.sh` inspects rather than as blocks the user pastes. The
+  tag push and ref deletions stay in the uncovered half in both modes, since
+  they are exactly the operations handed to the user's own terminal.
+  `hooks/README.md` says so.
 - **Session banner and status output name the mode**, alongside the track, so
   it is visible on every tracker display rather than only when it changed.
   Handoff summaries (§5.6/§5.9) carry a `Mode:` line for the same reason.

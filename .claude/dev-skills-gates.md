@@ -15,7 +15,8 @@ Env: remote container | Branch: claude/skill-automatic-mode-i371w2 | Default: ma
 🔒 SECURITY   ✅ 0 Critical, 0 High — docs-only diff (markdown + VERSION +
               rebuilt bundle), no code, no deps, no secrets. Policy review
               of the new mode: see CHANGELOG 2.26.0. Rev 2 tightens it —
-              the tag now needs a full report plus user authorization
+              the tag push and ref deletions stay with the user in both
+              modes; the tag block now carries a full action report
 📄 DOCS       ✅ CHANGELOG 2.26.0 entry; README modes section (two
               checkpoints) + Remote Control section, size table, shortcut
               table, what's-new; hooks/README coverage note
