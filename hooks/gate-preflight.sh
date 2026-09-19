@@ -132,7 +132,20 @@ esac
 # --- locate the gate state file -----------------------------------------------
 
 CWD="$(json_get '.cwd')"
-[ -n "$CWD" ] && [ -d "$CWD" ] && cd "$CWD" 2>/dev/null
+# A cd that fails here would leave the hook resolving ROOT from whatever
+# directory it happens to be in, and so reading the wrong gate state file --
+# or none. This hook fails closed, so that is a denial, not a shrug. Note the
+# fix SC2164 suggests (`|| exit`) would exit 0, which here means ALLOW.
+if [ -n "$CWD" ] && [ -d "$CWD" ]; then
+  cd "$CWD" 2>/dev/null || deny "🚫 GATE PRE-FLIGHT — cannot enter the session's working directory.
+
+Blocked: $OP_LABEL
+Directory: $CWD
+
+The hook could not cd into the directory the tool call reported, so it cannot locate $STATE_REL and has no evidence any gate has run. Per SKILL.md Section 4, unexpected means deny, not proceed.
+
+Check the directory's permissions, then retry."
+fi
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [ -z "$ROOT" ]; then
@@ -218,6 +231,30 @@ if printf '%s' "$REQUIRED" | grep -qw BUILD; then
      && produces_compiled_artifact; then
     BLOCKING="$BLOCKING
   - BUILD — ✅ but no local-artifact-handoff annotation. This repo has a Docker/.exe/.apk build signal (Dockerfile, .csproj/.sln, or an Android Gradle project). GATE_REFERENCE.md Gate 2 requires offering the user a way to try the real artifact before this gate passes. Add \"handoff offered\", \"handoff declined\", or \"handoff n/a (remote container / Termux session)\" to the BUILD line, then retry."
+  fi
+fi
+
+# --- SECURITY gate: no open findings ------------------------------------------
+# GATE_REFERENCE.md Gate 3: severity decides urgency, not whether a finding can
+# be carried. No finding of any severity may be open when the release track
+# runs -- a finding leaves the open state only by being fixed, waived by the
+# user with a reason, or withdrawn as wrong.
+#
+# The SECURITY row's FIRST line carries the open count ("✅ 0 open — ...")
+# precisely so this check is line-oriented, per the row-format rule in
+# SKILL.md Section 2. A ✅ whose first line does not say "0 open" is an
+# illegal state: it asserts the gate passed while the row itself still counts
+# findings nobody resolved. That combination is what carried a real Medium
+# across two releases of this repo with SECURITY reading ✅ the whole way.
+#
+# Scoped to the release track. Work commits must stay possible with findings
+# open -- that is where a finding gets recorded in the first place.
+if printf '%s' "$REQUIRED" | grep -qw RELEASE; then
+  sec_first="$(gate_block SECURITY | head -1)"
+  if printf '%s' "$sec_first" | grep -qF '✅' \
+     && ! printf '%s' "$sec_first" | grep -qE '(^|[^0-9])0[[:space:]]+open'; then
+    BLOCKING="$BLOCKING
+  - SECURITY — ✅ but the row's first line does not say \"0 open\". Per GATE_REFERENCE.md Gate 3, nothing reaches the release track with an open finding of any severity. Resolve each one: fix it, have the USER waive that specific finding with a reason and date, or withdraw it as wrong. Then set the first line to \"✅ 0 open — 0 Critical, 0 High\". Do not clear this by editing the count while findings are still open, and do not waive your own finding."
   fi
 fi
 

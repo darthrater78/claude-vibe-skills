@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.27.0
+version: 2.28.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -352,6 +352,12 @@ gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
   mode changes. It is read back with the rest of the file: a session that finds
   no `Mode:` row is manual.
 - **Read it** before every git write operation, and whenever asked for status.
+- **It ships inside the release PR**, staged with the release commit at Gate 5
+  — gates 1–5 ✅ and SHIP ⏳, since the tag does not exist yet. The post-tag
+  SHIP ✅ line folds into the next release's PR. **Never open a PR whose only
+  content is tracker bookkeeping**: a release PR that omits the state file
+  leaves the tagged commit describing a release that had not happened
+  (`SHIP_REFERENCE.md`, step 7).
 - **Local sessions:** add it to `.gitignore` — it is session scratch.
 - **Remote containers:** commit it to the working branch instead. The container
   is reclaimed when the session ends, and an uncommitted state file dies with it
@@ -372,7 +378,7 @@ Updated: 2026-09-07
 
 🔢 VERSION    ✅ all refs at 2.12.0
 🔨 BUILD      ➖ N/A — skill repo, no build system
-🔒 SECURITY   ✅ 0 Critical, 0 High
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
 📦 RELEASE    ⬜
 🚀 SHIP       ⬜
@@ -493,8 +499,8 @@ When resuming work or checking gate status, detect what's already done:
 **Before running, passing, or marking ➖ N/A on any gate, read that gate's
 reference file** from this skill's base directory (shown when the skill loaded,
 e.g. "Base directory for this skill: ..."). Gates 1–5 are in
-`GATE_REFERENCE.md`; **Gate 6 is in `SHIP_REFERENCE.md`**. Each holds its
-gates' checks, pass criteria, blocked-output format, and the CI-versus-manual
+`GATE_REFERENCE.md`, except **Gate 3, which is in `SECURITY_GATE.md`** and
+**Gate 6, in `SHIP_REFERENCE.md`**. Each holds its gates' checks, pass criteria, blocked-output format, and the CI-versus-manual
 paths. Do not run a gate from memory of this summary — the summary says what
 each gate is *for*, not what makes it pass.
 
@@ -511,8 +517,8 @@ the tokens without the content ever being used.
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
 | 🚀 **SHIP** | merged, tagged, published, and all four post-ship checks verified |
 
-Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`;
-Gate 6's ship path depends on whether a CI release workflow exists, and both of
+Gate 3 (`SECURITY_GATE.md`) additionally loads `SECURITY_REFERENCE.md` and
+`QUALITY_REFERENCE.md`; Gate 6's ship path depends on whether a CI release workflow exists, and both of
 its paths are in `SHIP_REFERENCE.md`.
 
 ---
@@ -539,6 +545,9 @@ These phrases mean "surface the gates", not "comply silently":
 | "just tag it" / "push the tag for me" | Tag pushes are the user's to run in **both** modes (§5.8) — present the block, don't execute it. Semi-autonomous mode adds the full pre-tag report above it, it does not take the block away |
 | "just delete that branch for me" | Ref deletions are the user's to run in both modes, same as tags (§5.8) — present the block, don't execute it |
 | Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.8) |
+| "that finding is pre-existing" / "it's unrelated to this change" | Provenance, not a terminal state (§4.7) — it stays open and blocks the release until fixed, waived or withdrawn |
+| "ignore the Mediums" / "stop flagging that" | Category suppression is not a waiver (§4.7) — ask which specific finding, and record the waiver with their reason |
+| "we'll fix it next release" | Not a terminal state — offer the waiver explicitly so the decision is on the record, or fix it now |
 
 ---
 
@@ -562,7 +571,7 @@ Prefer:
 
 **Every dependency must be a current release with no known CVEs — direct and
 transitive.** This is a requirement, not a preference: Gate 3 hard-stops on a
-Critical or High advisory in any dependency (`GATE_REFERENCE.md`, Gate 3).
+Critical or High advisory in any dependency (`SECURITY_GATE.md`).
 
 Dependencies are audited at two moments, and both are required. Auditing only
 at the first one is how a project ends up with a Dependabot PR queue: the
@@ -609,9 +618,13 @@ gate, not just when it changes:
   2. **Alerts and security updates** — repository settings, not a file. Check
      rather than assume: `GET /repos/{owner}/{repo}/dependabot/alerts`. A
      `403 "Dependabot alerts are disabled for this repository"` is a
-     **Gate 3 finding**, not a pass. Claude cannot flip a repository setting,
-     so surface it with the path: Settings → Code security → enable
-     Dependabot alerts and Dependabot security updates.
+     **Gate 3 finding**, not a pass — and since 2.28.0 an open finding blocks
+     the release track, so it needs closing, not noting. Claude cannot flip a
+     repository setting, so hand the user the enablement steps in
+     `SECURITY_GATE.md` ("Enabling Dependabot alerts") — the real click path,
+     the org-owned and private-repo cases, and how to verify — rather than a
+     menu name. Then re-check the endpoint; do not mark it fixed on an
+     unverified "I turned it on".
 
   Having only (1) is the trap: the queue of "Bump X" PRs *looks* like security
   maintenance. Merging all of it fixes no vulnerability if nothing was ever
@@ -678,7 +691,31 @@ When the user wants to skip security ("just hardcode the key", "disable the cert
 3. If the user insists, implement with a loud `# SECURITY RISK: <reason>` comment and
    a `TODO` so it's impossible to forget. Never leave it silent.
 
-### 4.7 Security summary
+### 4.7 Finding lifecycle — nothing releases with an open finding
+
+**Severity decides urgency, not whether a finding can be carried.** Critical and
+High hard-stop everything immediately. Medium and Low do not stop a work commit
+— progress must be savable — but **no finding of any severity may be open when
+the release track runs.** Gate 5 and Gate 6 are blocked while anything is open.
+
+A finding leaves the open state three ways, and no others: **fixed** (and
+re-verified against the current diff), **waived** (only the user, for that
+specific finding, with a reason and date on the tracker), or **withdrawn** (it
+was wrong — say why). "Pre-existing", "unrelated to this change", "only a
+Medium", "next release" are not terminal states; they are how a real finding
+rode across two releases of this repo with every gate reading ✅.
+
+**Claude never waives its own finding**, and "ignore Mediums" or "stop flagging
+that" is a request to suppress a category, not a waiver — ask for the specific
+finding instead. A waiver covers the finding as it stands and re-opens if its
+context changes.
+
+**Surface a finding at the moment it is discovered**, not in the ship summary.
+A finding raised after the tag is a finding raised past every point where the
+user could have acted on it. Full lifecycle, the tracker format, and the hook's
+illegal state are in `SECURITY_GATE.md`.
+
+### 4.8 Security summary
 
 At natural breakpoints (end of a feature, before suggesting a commit), surface a
 brief security check:

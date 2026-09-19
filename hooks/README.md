@@ -75,6 +75,17 @@ Required gates scale with the operation, matching the two tracks in Section 2:
 
 Read-only git (`status`, `diff`, `log`, `tag -l`, `fetch`) is never blocked.
 
+**Open-findings check (SECURITY, release track only).** `GATE_REFERENCE.md`
+Gate 3 says no finding of any severity may be open when the release track runs
+— a finding clears only by being fixed, waived by the *user* with a reason and
+date, or withdrawn as wrong. The SECURITY row's first line carries the open
+count for exactly this reason, so the check stays line-oriented. A ✅ whose
+first line does not say `0 open` is denied for release operations: it asserts
+the gate passed while the row still counts findings nobody resolved. Work
+commits are deliberately unaffected — a finding has to be recordable before it
+can be resolved. Resolve a denial by resolving the findings, never by editing
+the count.
+
 **Local-artifact-handoff annotation (BUILD only).** GATE_REFERENCE.md's Gate 2
 requires offering the user a way to try a compiled artifact (Docker image,
 Windows `.exe`, Android `.apk`) by hand before BUILD passes — a conversational

@@ -18,7 +18,8 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 When the skill loads:
 
-**Self-check:** Verify that `GATE_REFERENCE.md`, `SHIP_REFERENCE.md`,
+**Self-check:** Verify that `GATE_REFERENCE.md`, `SECURITY_GATE.md`,
+`SHIP_REFERENCE.md`,
 `AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
 `SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`, `SECURITY_WINDOWS.md`,
 `SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, and `QUALITY_ANDROID.md` exist in this skill's base directory (shown when the
@@ -421,7 +422,7 @@ conversation — is the source of truth for gate state for the rest of the sessi
 Then show the gate tracker:
 
 ```
-Dev Skills v2.27.0 active.
+Dev Skills v2.28.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Mode: manual (say "auto mode" to have me run the commands and the tag push)
@@ -448,7 +449,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.27.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.28.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

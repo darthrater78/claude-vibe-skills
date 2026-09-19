@@ -4,6 +4,149 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.28.0] — 2026-09-19
+
+**Nothing reaches the release track with an open finding.** Severity used to
+decide whether a finding could be carried: Critical and High blocked, Medium
+and Low were "surfaced for the user to accept" and, in practice, written onto
+the tracker and carried. Severity now decides only how urgent the conversation
+is. A finding of any severity blocks Gate 5 and Gate 6 until it reaches a
+terminal state.
+
+This came out of the skill failing on its own repo. A Medium — no
+`.github/dependabot.yml`, so nothing keeping the SHA-pinned `actions/checkout`
+current — was recorded at 2.26.0, carried into 2.27.0 marked "open,
+pre-existing", and was not put to the user as a decision until after v2.27.0
+had been tagged and published. Every gate read ✅ the whole way. Section 4.1
+exists to prevent exactly that dependency-drift pattern, and the gate machinery
+let it happen anyway, twice.
+
+### Changed
+- **Gate 3 finding lifecycle (`GATE_REFERENCE.md`, `SKILL.md` §4.7).** A finding
+  leaves the open state in exactly three ways and no others:
+  - **fixed** — the code changed and the fix was re-verified against the
+    *current* diff
+  - **waived** — the user explicitly waived *that specific finding*, with a
+    reason and date recorded on the tracker
+  - **withdrawn** — the finding was wrong, and why it was wrong is stated
+
+  Anything else is open. "Pre-existing", "unrelated to this change", "only a
+  Medium", "we'll get it next release" are not terminal states — they are the
+  sentences that carried the finding above across two releases.
+- **"Pre-existing" is demoted to a provenance note.** It records where a finding
+  came from; it says nothing about what has to happen before the next tag.
+  A finding that predates the change is still a finding.
+- **Only the user waives, one finding at a time.** Claude never waives its own
+  finding, and a blanket "ignore Mediums" or "stop flagging that" is category
+  suppression, not a waiver — the skill asks which specific finding instead. A
+  waiver covers the finding as it stands and re-opens if its context changes:
+  the code is edited, the severity rises, the named dependency gets an advisory.
+- **Findings are surfaced when discovered, not in the ship summary.** A finding
+  raised after the tag is raised past every point where the user could have
+  acted on it.
+- **Quality findings follow the same lifecycle.** "Known technical debt" is a
+  description, not a terminal state; if it is genuinely accepted, it is a
+  waiver and the user records it.
+- **Gate 3's pass line and the combined output report `0 open`**, and the
+  Dependabot recommendation is now raised as the Medium finding it always was
+  rather than an optional suggestion.
+- `SKILL.md` §4.7 is the new lifecycle section; the former §4.7 security summary
+  is now §4.8.
+- **Gate 3 moved into its own `SECURITY_GATE.md` (~12KB)**, leaving
+  `GATE_REFERENCE.md` at ~22KB for gates 1, 2, 4 and 5. This was not planned:
+  the lifecycle rules pushed `GATE_REFERENCE.md` to 33KB and the per-file
+  ceiling added in 2.27.0 failed the build. Its message offers two responses —
+  extract a section that has its own load trigger, or raise the ceiling on the
+  record — and Gate 3 has the clearest trigger of the five and already pulled
+  two further references of its own. Gates 1, 2, 4 and 5 no longer carry it.
+  The ceiling working on the release that added it is the intended behavior.
+
+- **The gate state file ships inside the release PR** (`GATE_REFERENCE.md`
+  Gate 5 step 3, `SHIP_REFERENCE.md` step 7, `SKILL.md` §2). It is staged with
+  the release commit carrying gates 1–5 ✅ and 🚀 SHIP ⏳ — ⏳ being the honest
+  state, since the tag does not exist yet and no commit preceding it can claim
+  otherwise. The post-tag SHIP ✅ line folds into the next release's PR, under
+  the same close-as-you-go rule from 2.25.0 that governs every other section of
+  the file: the next sequence's VERSION step is the step that absorbs it.
+
+  **Tracker-only pull requests are now forbidden.** The previous rule said to
+  commit the SHIP ✅ record "on its own (a tracker-only commit)", and four
+  consecutive releases each trailed one — #45, #47, #50 and #52. The effect was
+  that every tagged commit's own state file was wrong: it read SHIP ⬜ for a
+  version that had shipped, and the correction landed in a PR merged after the
+  fact. Between the tag and the next release the durable record is the tag, the
+  GitHub release and the changelog entry, which is what re-derivation reads
+  anyway and what actually proves a ship.
+
+### Added
+- **The hook enforces it** (`hooks/gate-preflight.sh`). The tracker's SECURITY
+  row carries the open count on its **first line** — `✅ 0 open — 0 Critical,
+  0 High` — because that is the line the hook reads, per the row-format rule
+  from 2.25.0. A ✅ whose first line does not say `0 open` is an illegal state
+  and release operations are denied: it asserts the gate passed while the row
+  itself still counts findings nobody resolved.
+
+  Scoped to the release track on purpose. Work commits stay possible with
+  findings open, because a finding has to be recordable before it can be
+  resolved. Verified against all three states: the exact 2.26.0 tracker text
+  now denies `git tag`, a `0 open` row allows it, and a work commit with an
+  open Medium is unaffected.
+- Three shortcut-detection rows (`SKILL.md` §3) for "that finding is
+  pre-existing", "ignore the Mediums", and "we'll fix it next release" — each
+  routes to the lifecycle rather than to compliance.
+- `.github/dependabot.yml` (github-actions, weekly, grouped). This repo has no
+  package manifests of any kind, so the actions-only shape
+  `WORKFLOW_REFERENCE.md` warns about is correct here; the file says so and
+  says to add an entry the moment that stops being true.
+
+- **Dependabot enablement is now a procedure, not a menu path**
+  (`SECURITY_GATE.md`, "Enabling Dependabot alerts"). Alerts and security
+  updates are repository settings Claude cannot flip, and since this release an
+  open finding blocks the release track — so the user needs steps they can
+  follow, not "Settings → Code security". The skill now hands over the direct
+  `settings/security_analysis` URL, the order the toggles must go in
+  (dependency graph first — mandatory on private repos), how to verify from the
+  Security tab, and the three cases that make it fail: an org-owned repo whose
+  toggle is greyed out and needs an org owner, a private repo with no
+  dependency graph, and "we have no dependencies".
+
+  That last one was wrong in this repo's own notes. **The dependency graph
+  covers GitHub Actions workflows**, so a repo with no package manifest still
+  gets real advisory coverage for the actions it pins. A `.github/workflows/`
+  directory is something to watch. Claude must also re-check the endpoint
+  rather than marking the finding fixed on an unverified "I turned it on".
+
+### Fixed
+- **A fail-open path in the enforcement hook** (`hooks/gate-preflight.sh`),
+  found by shellcheck (SC2164). `cd "$CWD" 2>/dev/null` was unchecked, so a
+  directory that exists but cannot be entered left the hook resolving `ROOT`
+  from wherever it happened to be — reading the wrong gate state file, or
+  none, and then evaluating gates against it. The hook's header has always
+  said it fails closed; this path did not. It now denies, with the directory
+  named. Note the fix SC2164 suggests, `|| exit`, would exit 0 — which in this
+  hook means **allow** — so the denial is written explicitly.
+- **The bundle is now a reproducible build** (`scripts/build-skill.sh`).
+  `zipfile.writestr` stamped every entry with the build time, so two builds of
+  identical sources produced different archive bytes: v2.27.0's released asset
+  and its own committed copy hashed differently with all 21 entries identical.
+  Entry metadata is now fixed at the zip epoch, so comparing a released asset
+  against the committed one is a real check rather than a meaningless one. This
+  also retires an inaccurate claim — the v2.26.0 tracker recorded that the
+  asset's "sha256 matches the API digest", which it could not have.
+- **Dead code in `scripts/validate.sh`** (SC2034): `readme_version` was
+  assigned and never read. Also a useless `cat` (SC2002). All three scripts now
+  pass shellcheck 0.9.0 with zero findings.
+
+### Notes
+- Behavior-tightening, released as MINOR in line with 2.24.0's version guard.
+  It is worth knowing that a repo carrying open findings will find its next
+  release blocked where 2.27.0 would have let it through. That is the point.
+- `SKILL.md` is now 63KB against its 64KB ceiling. The lifecycle rule has to be
+  resident — it fires unprompted or not at all — but this release spends most
+  of the headroom 2.27.0's ceiling allowed, and the next addition to the
+  per-turn tier will have to extract something first. Which is what the ceiling
+  is for.
+
 ## [2.27.0] — 2026-09-19
 
 A cost release. No rule changes, no gate changes, no behavior removed: the
