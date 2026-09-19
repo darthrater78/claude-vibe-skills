@@ -1,25 +1,28 @@
 # Dev Skills gate state
-Track: release sequence
+Track: work commit (tracker bookkeeping — no version bump, no artifact, no tag)
 Mode: manual
 Version: 2.26.0
-Updated: 2026-09-19 (rev 3)
+Updated: 2026-09-19
 
-Env: remote container | Branch: claude/skill-automatic-mode-i371w2 | Default: master
+Env: remote container | Branch: chore/gate-tracker-2.26.0-ship | Default: master
 
-🔢 VERSION    ✅ 2.26.0 in VERSION, SKILL.md frontmatter, banner, README —
-              validate.sh confirms. v2.25.0 tagged on remote at c3a49f7.
-              MINOR: 2 feat + 2 fix since the tag, no breaking change
-🔨 BUILD      ✅ build-skill.sh + validate.sh green at 5166b61; tree checked
-              before/after — only the bundle moved, content proven identical
-              (zip timestamp), restored. handoff n/a (no Docker/.exe/.apk)
-🔒 SECURITY   ✅ 0 Critical, 0 High — docs-only diff, no executable code
-              changed. Secrets scan clean; dangerous-pattern hits are prose
-              about force-push, not commands. No dependency manifests.
-              📝 Medium: no .github/dependabot.yml (pre-existing) — see PR
-🔒 QUALITY    ✅ reviewed with the user: SKILL.md +7.6KB/turn is the real cost
-📄 DOCS       ✅ CHANGELOG 2.26.0; README modes + Remote Control sections,
-              size table, shortcut table; hooks/README. All anchors resolve
-              (fixed pre-existing #security-rules → #gate-3--security--quality-)
-📦 RELEASE    ⏳ PR #49 open, CI running; release notes awaiting user
-              approval. Branch synced, all work committed
-🚀 SHIP       ⬜ tag push is the user's (§5.8)
+Release sequence for v2.26.0 — CLOSED, all six gates passed:
+
+🔢 VERSION    ✅ 2.26.0 across VERSION, SKILL.md frontmatter, banner, README;
+              v2.25.0 was tagged at c3a49f7. MINOR: 2 feat + 2 fix
+🔨 BUILD      ✅ validate.sh green; tree checked before/after the run
+🔒 SECURITY   ✅ 0 Critical, 0 High — docs-only diff, secrets scan clean
+              📝 Medium, open: no .github/dependabot.yml (pre-existing) —
+              nothing keeps the SHA-pinned actions/checkout current
+📄 DOCS       ✅ CHANGELOG 2.26.0; README; all anchors resolve
+📦 RELEASE    ✅ PR #49 merged as a55504f; CI green on the merge commit
+🚀 SHIP       ✅ tag v2.26.0 confirmed on remote at a55504f (dereferenced,
+              matches the merge commit exactly); "Publish release" run 17
+              succeeded; asset dev-skills.skill verified — sha256 matches
+              the API digest and all ten bundled files are byte-identical
+              to master's source; release notes auto-extracted, correct
+
+This commit's own gates (work-commit track):
+🔒 SECURITY   ✅ tracker text only
+🔢 🔨 📄       ➖ N/A — no version bump, no build, no doc claims changed
+📦 🚀          ➖ N/A — no version/artifact/tag involved, bookkeeping only
