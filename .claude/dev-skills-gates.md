@@ -6,7 +6,7 @@ Updated: 2026-09-19
 
 Env: remote container | Branch: claude/cost-optimization-review-1oesyw | Default: master
 
-Release sequence for v2.28.0 — BLOCKED at Gate 3, 1 finding open:
+Release sequence for v2.28.0 — Gates 1-5 passed, awaiting merge + tag:
 
 🔢 VERSION    ✅ 2.28.0 across VERSION, SKILL.md frontmatter, the banner in
               SESSION_START.md, and README; v2.27.0 tagged on the remote at
@@ -17,16 +17,15 @@ Release sequence for v2.28.0 — BLOCKED at Gate 3, 1 finding open:
               ALLOW, work commit with an open finding ALLOW, missing cwd DENY,
               un-enterable cwd DENY
               handoff n/a — no Docker/.exe/.apk artifact in this repo
-🔒 SECURITY   🚫 1 open — release track blocked (SECURITY_GATE.md)
-              📝 Medium, OPEN, needs the repo owner: Dependabot alerts and
-              security updates are repository settings. Verified unverifiable
-              from here — no MCP tool exposes the endpoint and `git credential
-              fill` yields nothing, so the session holds no token to query
-              GET /repos/.../dependabot/alerts. Enablement steps to hand
-              over: SECURITY_GATE.md, "Enabling Dependabot alerts". Impact is
-              NOT negligible as first assessed — the dependency graph covers
-              GitHub Actions, so the two pinned actions/checkout refs are real
-              advisory surface despite there being no package manifests
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
+              🔕 waived 2026-09-19 by user: Dependabot alerts/security updates
+              are a repo setting, not a skill defect. The deliverable is the
+              skill and the enablement instructions it now ships
+              (SECURITY_GATE.md, "Enabling Dependabot alerts"); this repo's own
+              setting is the owner's to flip and does not gate shipping them.
+              Unverified from this session either way — no credential reaches
+              GET /repos/.../dependabot/alerts. Re-opens if the finding's
+              context changes
               ✅ fixed: no .github/dependabot.yml → added (github-actions,
               weekly, grouped); only ecosystem, no package manifests exist
               ✅ fixed: shellcheck unavailable → installed and run. 3 findings,
@@ -44,12 +43,14 @@ Release sequence for v2.28.0 — BLOCKED at Gate 3, 1 finding open:
 📄 DOCS       ✅ CHANGELOG 2.28.0 complete; README shortcut and size tables;
               hooks/README.md documents the new check; 0 broken anchors; every
               file the README names exists
-📦 RELEASE    ⬜ blocked by SECURITY. PR #52 exists but opened as bookkeeping
-              and is now mis-titled; retitle as the 2.28.0 release PR. When
-              SECURITY clears, THIS FILE ships inside that PR (Gate 5 step 3)
-              with gates 1–5 ✅ and SHIP ⏳
-🚀 SHIP       ⬜ blocked by SECURITY. Post-tag ✅ folds into the next release's
-              PR, not its own (SHIP_REFERENCE.md step 7)
+📦 RELEASE    ✅ PR #52 — retitled from its bookkeeping origin to the 2.28.0
+              release PR, out of draft. This file ships inside it (Gate 5
+              step 3), not as a bookkeeping PR afterwards
+🚀 SHIP       ⏳ plan: merge #52, confirm CI green on the merge commit, verify
+              VERSION reads 2.28.0 in it, then the USER pushes the tag
+              (credential carve-out, both modes). Release workflow publishes;
+              Claude verifies tag/release/assets. The post-tag ✅ line folds
+              into the next release's PR (SHIP_REFERENCE.md step 7)
 
-The one open finding is not fixable from this session and is not Claude's to
-waive. It is the user's: fix it in repo settings, or waive it with a reason.
+⏳ is the honest state here, not a gap: the tag does not exist yet, so no
+commit preceding it can claim it does.
