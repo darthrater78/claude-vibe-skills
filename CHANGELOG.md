@@ -80,6 +80,21 @@ offered Remote Control. No breaking changes.
   judgment.
 
 ### Changed
+- **Tag and ref-deletion blocks no longer carry a `cd`, and no longer trigger
+  a clone-path question.** The path was the one line in those blocks the user
+  could not copy as given — Claude does not know it in a remote container,
+  which is exactly where the block is always handed over — so it asked, which
+  put a question in front of the one command someone releasing a tag already
+  knows how to run. Now the reminder goes in the prose above the block ("run
+  this from your local clone of the repo") and the block itself is copyable
+  verbatim. With the `cd` gone, nothing in those blocks varies by shell
+  either: they are plain single-line `git` commands, so remote container
+  sessions that skip the shell question at session start never need to come
+  back and ask it. `SHELL_REFERENCE.md`'s section on this is rewritten around
+  the new rule, and the general "always start with `cd`" rule for presented
+  blocks now names its two exceptions — commands Claude executes itself, and
+  these. Blocks on a local session, where Claude knows the real path, are
+  unchanged.
 - **Section 1 now names both "auto modes" and refuses both.** The existing
   rule covered the Claude Code harness's auto mode; the skill now has one of
   its own, and the bullet distinguishes them and states that neither relaxes

@@ -183,30 +183,17 @@ an Owner enables it in Claude Code admin settings.
 
    If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
    rather than discovering it mid-ship.
-4. **Skip step 2 (shell detection) at session start — and skip it for the tag
-   and ref-deletion blocks too.** Every git command Claude runs here uses the
-   container's own bash, so there is nothing to ask about up front. The
-   tag-push and ref-deletion carve-out (Section 5.8) changes that at exactly
-   one moment: a remote session that reaches Gate 6, or that needs to delete a
-   branch or tag, *always* hands the user a block to run on their own
-   machine — but that block needs a real clone path, not a shell choice.
-   Everything in it below `cd` is a plain single-line `git` command (`git
-   checkout`, `git pull`, `git tag`, `git push`) with no heredocs, no
-   multi-line strings, no shell-specific syntax at all — it runs unmodified in
-   every shell `SHELL_REFERENCE.md` lists. The only line that varies is `cd`,
-   and a quoted path (`cd "<clone-path>"`) parses the same way regardless of
-   which of the seven the user pastes it into.
-
-   So ask only for the clone path, **when the block is about to be
-   presented**, not at session start — a session that never releases and never
-   deletes a ref never needs it:
-
-   > Before I hand you this block — **what's the path to your local clone**,
-   > so it starts in the right directory?
-
-   Store it for the rest of the session. Presenting `cd <your-repo-path>` as a
-   placeholder is a defect, not a neutral default: it is the one line the user
-   cannot copy as given, in the one block they must run by hand.
+4. **Skip step 2 (shell detection) entirely — including for the tag and
+   ref-deletion blocks.** Every git command Claude runs here uses the
+   container's own bash. The tag-push and ref-deletion carve-out (Section 5.8)
+   still hands the user a block to run on their own machine, but that block
+   carries no `cd` and nothing else that varies by shell: it is plain
+   single-line `git` commands (`git checkout`, `git pull`, `git tag`,
+   `git push`) that run unmodified in every shell `SHELL_REFERENCE.md` lists.
+   So there is no clone path to ask for and no shell to ask about — put "run
+   this from your local clone" in the prose above the block and leave the block
+   itself copyable as given (`SHELL_REFERENCE.md`, "Tag and ref-deletion blocks
+   carry no `cd`").
 5. **Step 3 (sync offer) is usually unnecessary** — the clone is fresh as of
    session start. Still run `git fetch origin` before Gate 5 in case the branch
    moved during a long session.
@@ -512,9 +499,9 @@ require the user's approval` into
 conversation and not written down is a mode that disappears at the next
 compaction.
 
-On a remote container, the clone-path question (session start, step 0, item 4)
-still applies — this mode does not remove the tag block, so a release still
-reaches the one moment that needs it.
+On a remote container, nothing extra needs asking: the tag block this mode still
+hands over carries no `cd` and no shell-specific syntax (session start, step 0,
+item 4).
 
 ### Checkpoint 1 — the commit approval
 
@@ -588,10 +575,10 @@ hand over the block:
 > which builds the bundle and publishes the GitHub release with the notes you
 > approved.
 >
-> **This one is yours to run** — my credentials get `403`'d on tag refs:
+> **This one is yours to run** — my credentials get `403`'d on tag refs. From
+> your local clone of the repo:
 >
 > ```
-> cd "<clone-path>"
 > git checkout main && git pull origin main \
 >   && grep -q '^2.26.0$' VERSION \
 >   && git tag v2.26.0 && git push origin v2.26.0
@@ -615,9 +602,9 @@ hand over the block:
    `gh run list`, `git ls-remote`, the gate file). If the session was compacted,
    re-derive; a gap you cannot close is something to say, not something to omit.
 4. **The block goes in the same message, below the report** (Section 1: the
-   tracker and the report go above the block, never after it). Ask for the
-   clone path first if it is not known — a `cd` the user has to edit is a
-   broken first line. If the user asks for changes instead of running it,
+   tracker and the report go above the block, never after it). No `cd` and no
+   clone-path question — "from your local clone" in the prose, and the block
+   copyable as given. If the user asks for changes instead of running it,
    nothing about the tag moves: handle the request and report again.
 5. **Do not take "done" at face value.** 🚀 SHIP stays ⏳ until Claude has
    confirmed the tag on the remote *and* checked what it points at against the
@@ -1355,12 +1342,13 @@ looks fine and is not:
    ("once the merge and CI are confirmed, I'll give you the tag block"), not
    the commands themselves.
 
-   **If the clone path is not known yet — every remote session, by design
-   (step 0, item 4) — ask for it before writing this block.** A `cd` the user
-   has to edit is a broken first line.
+   **No `cd`, and no clone-path question.** Say "run this from your local clone
+   of the repo" in the prose above the block and leave the block copyable as
+   given — a `cd` the user has to edit is a broken first line, and someone
+   pushing a release tag knows where their checkout is
+   (`SHELL_REFERENCE.md`, "Tag and ref-deletion blocks carry no `cd`").
 
    ```
-   cd "<clone-path>"
    git checkout main && git pull origin main \
      && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
      && git tag v1.2.3 && git push origin v1.2.3
@@ -1402,8 +1390,9 @@ looks fine and is not:
    v1.2.3` never actually ran — or ran in a different directory than the one
    this block is pushing from — so there is no local tag for `push` to send.
    Two sessions have misread this message as the credential denial above and
-   gone looking for a permissions fix; the fix here is simpler: from inside
-   `<clone-path>`, re-run `git tag v1.2.3`, then push again.
+   gone looking for a permissions fix; the fix here is simpler: from inside the
+   clone, re-run `git tag v1.2.3`, then push again. This is the failure the
+   prose reminder above the block is there to prevent.
 
 4. **Wait for CI to complete.** Monitor with:
    ```
@@ -1435,9 +1424,8 @@ looks fine and is not:
    > Check logs: `gh run view <run-id> --log-failed`
    > Fix the issue, then delete and re-push the tag. **Deleting and re-pushing
    > a tag are both ref writes — they go to the user in one block, same as the
-   > original push:**
+   > original push. From their local clone:**
    > ```
-   > cd "<clone-path>"
    > git tag -d v1.2.3
    > git push origin :refs/tags/v1.2.3
    > # after the fix is merged to the default branch:
@@ -1573,9 +1561,9 @@ standing between a tag and the wrong commit.
 The user runs — stop here until they confirm the tag is on the remote. **This
 is the same in semi-autonomous mode**; what changes there is that the full
 pre-tag report goes above this block ("Semi-autonomous mode — execution",
-checkpoint 2):
+checkpoint 2). From the user's local clone of the repo — no `cd`, same reason
+as the CI-driven path:
 ```
-cd "<clone-path>"
 git checkout main && git pull origin main \
   && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
   && git tag v1.2.3 && git push origin v1.2.3
@@ -1595,7 +1583,7 @@ git rev-parse v1.2.3^{}
 If the push instead reports `error: src refspec v1.2.3 does not match any`
 instead of a `403`, the tag was never created locally — see the
 troubleshooting note under the CI-driven path's tag step above. Re-run
-`git tag v1.2.3` from inside `<clone-path>` and push again.
+`git tag v1.2.3` from inside the clone and push again.
 
 Then, once `git ls-remote --tags origin v1.2.3` shows the tag:
 ```

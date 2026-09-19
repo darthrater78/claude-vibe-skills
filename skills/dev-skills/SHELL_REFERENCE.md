@@ -38,25 +38,27 @@ commands *instead of* pushing is not.
 
 ---
 
-## Remote containers ask for the clone path, not the shell
+## Tag and ref-deletion blocks carry no `cd`, and need no shell question
 
-Step 0 of the session-start procedure skips the shell question for remote
-containers, and the tag carve-out below is the one moment that would seem to
-need it back. It does not. Everything in a tag or ref-deletion block below `cd`
-is a plain single-line `git` invocation — `git checkout`, `git pull`, `git tag`,
+These two blocks are handed to the user in every environment and both modes
+(below), which makes them the one place Claude does not know the path to write.
+Do not invent one, do not ask for one, and do not emit a `cd <your-repo-path>`
+placeholder — it is the one line the user cannot copy as given.
+
+Say it in the prose instead, above the block:
+
+> Run this from your local clone of the repo.
+
+Someone pushing a release tag knows where their checkout is. The prose reminder
+covers the case where their terminal is sitting somewhere else; the block covers
+the part that is actually worth copying.
+
+This also means these blocks need no shell question. Everything in them is a
+plain single-line `git` invocation — `git checkout`, `git pull`, `git tag`,
 `git push` — with no heredocs, no multi-line strings and no shell-specific
-syntax, so it runs unmodified in all seven shells above. The only line that
-varies is `cd`, and a quoted path parses the same way in every one of them.
-
-So ask for the clone path, and ask when the block is about to be presented — a
-session that never releases and never deletes a ref never needs it:
-
-> Before I hand you this block — **what's the path to your local clone**, so it
-> starts in the right directory?
-
-Store it for the rest of the session. Presenting `cd <your-repo-path>` as a
-placeholder is a defect, not a neutral default: it is the one line the user
-cannot copy as given, in the one block they must run by hand.
+syntax, so with the `cd` gone there is nothing left that varies between the
+seven shells above. Remote container sessions, which skip the shell question at
+session start, therefore never need to come back and ask it.
 
 ---
 
@@ -103,10 +105,12 @@ fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
 
 ## Every presented block
 
-**Always start with `cd`.** Never assume the user's terminal is in the project
-directory. Use the `cd` format for their shell from the table above. (This does
-not apply to commands Claude executes itself — the container's working directory
-is already correct.)
+**Always start with `cd`** — with two exceptions. Never assume the user's
+terminal is in the project directory; use the `cd` format for their shell from
+the table above. This does not apply to commands Claude executes itself (the
+container's working directory is already correct), and it does not apply to the
+tag and ref-deletion blocks above, where the path is unknown and the reminder
+goes in the prose instead.
 
 **Never use bare `git push`.** Every push specifies the remote and the branch:
 `git push -u origin <branch-name>`. The `-u` sets upstream tracking, which

@@ -456,9 +456,9 @@ Version guard: VERSION in c3a49f7 reads 2.26.0, matches the tag ✅
 Deviations from what you approved: the CI failure above added one commit.
 
 Pushing v2.26.0 fires release.yml, which builds and publishes the release.
-This one is yours to run — my credentials get 403'd on tag refs:
+This one is yours to run — my credentials get 403'd on tag refs. From your
+local clone of the repo:
 
-  cd "<clone-path>"
   git checkout main && git pull origin main \
     && grep -q '^2.26.0$' VERSION \
     && git tag v2.26.0 && git push origin v2.26.0
@@ -647,10 +647,10 @@ with the work instead of gitignoring it, and fall back to GitHub MCP tools when
 `gh` is unavailable.
 
 They skip the shell question entirely — Claude runs every git command in the
-container's own bash — and the tag/ref-deletion block needs only a clone path,
-since everything below `cd` is a plain single-line `git` command with no
-shell-specific syntax. So they ask for the clone path *when that block is about
-to be presented*, rather than up front.
+container's own bash — and the tag/ref-deletion block needs nothing asked at
+all: it carries no `cd`, and everything in it is a plain single-line `git`
+command with no shell-specific syntax. "Run this from your local clone" goes in
+the prose above it; the block itself is copyable as given.
 
 </details>
 
