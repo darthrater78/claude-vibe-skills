@@ -3,6 +3,11 @@ set -euo pipefail
 
 errors=0
 
+# The skill's files, in load order: the always-on tier first, then the
+# on-demand references. build-skill.sh bundles exactly this list — keep the
+# two in step.
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md)
+
 # Extract versions from each source
 version_file=$(cat VERSION | tr -d '[:space:]')
 skill_frontmatter=$(grep -m1 '^version:' skills/dev-skills/SKILL.md | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
@@ -43,7 +48,8 @@ fi
 # Check required skill files exist
 echo ""
 echo "=== Required files ==="
-for f in skills/dev-skills/SKILL.md skills/dev-skills/GATE_REFERENCE.md skills/dev-skills/SECURITY_REFERENCE.md skills/dev-skills/QUALITY_REFERENCE.md skills/dev-skills/SHELL_REFERENCE.md skills/dev-skills/WORKFLOW_REFERENCE.md skills/dev-skills/SECURITY_WINDOWS.md skills/dev-skills/SECURITY_LINUX.md skills/dev-skills/SECURITY_ANDROID.md skills/dev-skills/QUALITY_ANDROID.md; do
+for name in "${files[@]}"; do
+  f="skills/dev-skills/$name"
   if [ -f "$f" ]; then
     echo "  OK: $f"
   else
@@ -75,6 +81,46 @@ for f in skills/dev-skills/*.md; do
   fi
 done
 
+# Per-file size ceilings.
+#
+# SKILL.md is billed on every request of every session that loads the skill, so
+# every KB here is a recurring cost, not a one-time one. The reference files are
+# each read IN FULL when they load, so a file that grows back into a monolith
+# charges the whole file for the one section that was actually needed — which is
+# what the 2.27.0 split was undoing.
+#
+# A ceiling is not a cap on what the skill may say. It is a prompt to put new
+# content where it belongs: extract a section that has its own trigger, or raise
+# the number here in the same commit as the growth that needs it, on the record.
+# What it stops is the silent 2KB-per-release drift that undid the 2.14.0
+# extraction over ten releases without anyone deciding to.
+echo ""
+echo "=== Size ceilings ==="
+ceiling_for() {
+  case "$1" in
+    # Billed every request. Deliberately the tightest number here.
+    SKILL.md) echo 64 ;;
+    # Still carries the best-practices and Dependabot sections; it is the next
+    # extraction candidate, and this number comes down when they move.
+    WORKFLOW_REFERENCE.md) echo 44 ;;
+    # Every other reference file: read in full, one purpose each.
+    *) echo 32 ;;
+  esac
+}
+for f in skills/dev-skills/*.md; do
+  base=$(basename "$f")
+  ceiling=$(ceiling_for "$base")
+  actual=$(( ( $(wc -c < "$f") + 512 ) / 1024 ))
+  if [ "$actual" -gt "$ceiling" ]; then
+    echo "  FAIL: $base is ${actual}KB, over its ${ceiling}KB ceiling"
+    echo "        Extract a section that has its own load trigger, or raise the"
+    echo "        ceiling in scripts/validate.sh in this same commit."
+    errors=$((errors + 1))
+  else
+    echo "  OK: $base ${actual}KB / ${ceiling}KB"
+  fi
+done
+
 # Check .skill archive if present
 if [ -f skills/dev-skills.skill ]; then
   echo ""
@@ -83,7 +129,7 @@ if [ -f skills/dev-skills.skill ]; then
     echo "  OK: dev-skills.skill is a valid zip"
     # Every required file must actually be in the bundle, and the bundled
     # SKILL.md must carry the current version — a stale archive ships old rules.
-    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md; do
+    for f in "${files[@]}"; do
       if unzip -l skills/dev-skills.skill | grep -q "  $f\$"; then
         echo "  OK: bundled $f"
       else
@@ -93,7 +139,7 @@ if [ -f skills/dev-skills.skill ]; then
     done
     # The bundle must match the source, not merely contain the right filenames —
     # a stale archive ships old rules under a current version number.
-    for f in SKILL.md GATE_REFERENCE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md; do
+    for f in "${files[@]}"; do
       if ! unzip -p skills/dev-skills.skill "$f" 2>/dev/null | diff -q - "skills/dev-skills/$f" > /dev/null 2>&1; then
         # Tell a stale bundle apart from a CRLF checkout. The bundle always holds
         # LF and .gitattributes keeps checkouts LF, but an older clone predating

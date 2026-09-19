@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.26.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.27.0`
 
 ---
 
@@ -757,7 +757,10 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~61KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~85KB | When a gate runs, and at session start — each gate's checks and pass criteria, the session-start procedure, and how semi-autonomous mode executes a sequence |
+| `SESSION_START.md` | ~25KB | Once, at session start — self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `GATE_REFERENCE.md` | ~29KB | When gates 1–5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
+| `SHIP_REFERENCE.md` | ~22KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
+| `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, round-trip rules, stop conditions |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -765,12 +768,28 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~97KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
+| `WORKFLOW_REFERENCE.md` | ~40KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
+| `WORKFLOW_DOCKER.md` | ~9KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template |
+| `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
+| `WORKFLOW_LINUX.md` | ~7KB | Workflow help, only when environment detection matches a Linux application — the binary/.deb/.rpm/AppImage template |
+| `WORKFLOW_HOMEASSISTANT.md` | ~6KB | Workflow help, only when environment detection matches Home Assistant/HACS — the integration template |
+| `WORKFLOW_SCRIPTS.md` | ~7KB | Workflow help, only when environment detection matches a script collection — the shell/PowerShell/Python-scripts template |
+| `WORKFLOW_ANDROID.md` | ~9KB | Workflow help, only when environment detection matches Android — the Gradle/APK/AAB template |
+| `WORKFLOW_PYTHON.md` | ~8KB | Workflow help, only when environment detection matches a Python package — the PyPI template |
+| `WORKFLOW_NODEJS.md` | ~8KB | Workflow help, only when environment detection matches Node.js — the npm template |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
 gate lives in `GATE_REFERENCE.md`, loaded when the pre-flight says one is owed.
 Security, quality, and shell formatting work the same way.
+
+The second rule is **one file, one moment.** A reference file is read in full,
+so a file that covers several unrelated moments charges every one of them for
+all of it. Session start happens once and never again; Gate 6 is the largest of
+the six and fires last; semi-autonomous execution is dead weight in a manual
+session; seven of the eight workflow templates are wrong for any given project.
+Each of those is its own file, so loading one does not drag the others along.
+`scripts/validate.sh` enforces a per-file size ceiling to keep it that way.
 
 Security is the clearest case. *Knowing* that a `pickle.loads` on untrusted
 input is worth flagging has to be resident — nobody asks for it, and Gate 3 runs
@@ -828,4 +847,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.26.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.27.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

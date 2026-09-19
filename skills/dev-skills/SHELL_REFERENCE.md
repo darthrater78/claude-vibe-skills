@@ -18,7 +18,7 @@ governs the two blocks it always hands over — the tag push and any ref deletio
 
 ## Remote containers — do not format, execute
 
-When the session runs in a remote container (`GATE_REFERENCE.md`, session start, step 0), none of this
+When the session runs in a remote container (`SESSION_START.md`, step 0), none of this
 file applies:
 
 - **There is no clone step.** The container is provisioned with the repo already
@@ -31,7 +31,7 @@ file applies:
   session ends. Claude commits and pushes from inside the container, after
   approval (Section 1).
 - **`gh` is usually absent.** Use the GitHub MCP mapping table in
-  `GATE_REFERENCE.md`, session start, step 0.
+  `SESSION_START.md`, step 0.
 
 Showing the user a summary of what you are about to run is fine. Handing them
 commands *instead of* pushing is not.
@@ -99,7 +99,7 @@ than pasting commands cold.
 
 The block's exact shape, the sync that must precede the tag, the `src refspec
 does not match any` case that is *not* a permissions problem, and the GitHub UI
-fallback for users with no local clone are in `GATE_REFERENCE.md`, Gate 6.
+fallback for users with no local clone are in `SHIP_REFERENCE.md`.
 
 ---
 
@@ -118,7 +118,7 @@ prevents the error on subsequent pushes.
 
 **Verify the remote first.** Before presenting any push, run `git remote -v`. If
 `origin` is not set, make `git remote add origin <url>` the first command in the
-block, using the URL stored at session start (`GATE_REFERENCE.md`, step 1). This
+block, using the URL stored at session start (`SESSION_START.md`, step 1). This
 prevents the "default repo has not been set" error.
 
 **Explanation goes above or below the block, never inside it** as interleaved
@@ -229,7 +229,7 @@ pre-cloned, and local sessions are already in the repo. When the user's shell is
 Termux, every command block must account for this:
 - **First time (repo not yet cloned):** start with `git clone <url>` then `cd`
   into the cloned directory. Use the repo URL stored at session start
-  (`GATE_REFERENCE.md`, step 1).
+  (`SESSION_START.md`, step 1).
 - **Subsequent commands (repo already cloned):** start with `cd` then
   `git fetch origin && git pull origin <branch>` to sync before any work.
 
