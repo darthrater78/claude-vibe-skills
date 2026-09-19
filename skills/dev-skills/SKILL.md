@@ -352,6 +352,12 @@ gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
   mode changes. It is read back with the rest of the file: a session that finds
   no `Mode:` row is manual.
 - **Read it** before every git write operation, and whenever asked for status.
+- **It ships inside the release PR**, staged with the release commit at Gate 5
+  — gates 1–5 ✅ and SHIP ⏳, since the tag does not exist yet. The post-tag
+  SHIP ✅ line folds into the next release's PR. **Never open a PR whose only
+  content is tracker bookkeeping**: a release PR that omits the state file
+  leaves the tagged commit describing a release that had not happened
+  (`SHIP_REFERENCE.md`, step 7).
 - **Local sessions:** add it to `.gitignore` — it is session scratch.
 - **Remote containers:** commit it to the working branch instead. The container
   is reclaimed when the session ends, and an uncommitted state file dies with it

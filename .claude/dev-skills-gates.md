@@ -29,8 +29,11 @@ Release sequence for v2.28.0 — BLOCKED at Gate 3 by its own new rule:
               (github-actions, weekly, grouped)
 📄 DOCS       ✅ CHANGELOG 2.28.0; README shortcut table and size table;
               hooks/README.md documents the new check
-📦 RELEASE    ⬜ blocked by SECURITY — PR #52 must not merge while 2 are open
-🚀 SHIP       ⬜ blocked by SECURITY
+📦 RELEASE    ⬜ blocked by SECURITY — PR #52 must not merge while 2 are open.
+              When it unblocks, THIS FILE ships inside that PR (Gate 5 step 3),
+              gates 1–5 ✅ and SHIP ⏳ — not a bookkeeping PR afterwards
+🚀 SHIP       ⬜ blocked by SECURITY. The post-tag ✅ line folds into the next
+              release's PR, not its own (SHIP_REFERENCE.md step 7)
 
 Why this is the correct state, not a problem to route around: 2.28.0 is the
 release that made an open finding of any severity block the release track. Both

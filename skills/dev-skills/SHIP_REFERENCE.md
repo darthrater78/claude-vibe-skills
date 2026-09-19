@@ -241,16 +241,31 @@ looks fine and is not:
    > git push origin v1.2.3
    > ```
 
-7. **Commit and push the gate-state file's SHIP ✅ record — the last action
-   of this gate, not an afterthought.** This only applies when
-   `.claude/dev-skills-gates.md` is tracked in this repo (the remote-container
-   convention, Section 2 — or a local repo that force-adds it despite
-   gitignoring it, the way this one does). A tracker that says SHIP ✅ only
-   in the local working tree does not close the sequence: the next session's
-   re-derivation (Section 2) reads the remote and the committed history, sees
-   RELEASE/SHIP still ⬜ there, and has no way to know the release actually
-   finished. Commit it on its own (a tracker-only commit, same as any other
-   work commit) and push before telling the user the sequence is done.
+7. **The SHIP ✅ record does not get its own PR.** The gate state file rode in
+   with the release PR (Gate 5) and is already on the default branch carrying
+   gates 1–5 ✅ and SHIP ⏳ with the plan. What is left after the tag is the
+   one line that could not have existed before it — and that line is folded
+   into **the next release's PR**, by the same close-as-you-go rule that
+   governs every other section of this file (Section 2: close a section as
+   part of the step that absorbs it). The next sequence's VERSION step is the
+   step that absorbs it.
+
+   **Never open a pull request whose only content is tracker bookkeeping.**
+   Four consecutive releases of this repo each trailed one, which means the
+   tagged commit's own state file was wrong every time — it said SHIP ⬜ for a
+   version that had shipped, and the correction arrived in a PR merged after
+   the fact.
+
+   **Between the tag and the next release, the durable record is the tag, the
+   GitHub release and the `CHANGELOG.md` entry.** Those are on the default
+   branch, they are what the next session's re-derivation (Section 2) actually
+   reads, and they prove the ship far better than a tracker line does. A
+   tracker committed at ⏳ is not stale — it is accurate as of the commit it
+   is in, which is the last commit that existed before the tag.
+
+   Report the SHIP ✅ state to the user in the message, and hold it in the
+   working tree for the rest of the session. It reaches git when the next
+   release does.
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag pushed, CI release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | CI assets ✅
@@ -403,11 +418,10 @@ gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 3. **PR merged:** state is "merged", not just "closed"
 4. **Assets match:** expected artifacts are attached per detection above
 
-**Then commit and push the gate-state file's SHIP ✅ record — the last
-action of this gate, not an afterthought.** Same rule as the CI-driven path
-above: applies whenever `.claude/dev-skills-gates.md` is tracked in this
-repo. A SHIP ✅ that only exists in the local working tree hasn't actually
-closed the sequence.
+**Do not open a tracker-only PR to record SHIP ✅.** Same rule as the
+CI-driven path above (step 7): the state file shipped inside the release PR
+at ⏳, and the post-tag line folds into the next release's PR. The tag, the
+release and the changelog entry are the durable record in the meantime.
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
 > Verified: tag ✅ | release ✅ | PR merged ✅ | assets ✅

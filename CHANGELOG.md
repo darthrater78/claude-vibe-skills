@@ -61,6 +61,23 @@ let it happen anyway, twice.
   two further references of its own. Gates 1, 2, 4 and 5 no longer carry it.
   The ceiling working on the release that added it is the intended behavior.
 
+- **The gate state file ships inside the release PR** (`GATE_REFERENCE.md`
+  Gate 5 step 3, `SHIP_REFERENCE.md` step 7, `SKILL.md` §2). It is staged with
+  the release commit carrying gates 1–5 ✅ and 🚀 SHIP ⏳ — ⏳ being the honest
+  state, since the tag does not exist yet and no commit preceding it can claim
+  otherwise. The post-tag SHIP ✅ line folds into the next release's PR, under
+  the same close-as-you-go rule from 2.25.0 that governs every other section of
+  the file: the next sequence's VERSION step is the step that absorbs it.
+
+  **Tracker-only pull requests are now forbidden.** The previous rule said to
+  commit the SHIP ✅ record "on its own (a tracker-only commit)", and four
+  consecutive releases each trailed one — #45, #47, #50 and #52. The effect was
+  that every tagged commit's own state file was wrong: it read SHIP ⬜ for a
+  version that had shipped, and the correction landed in a PR merged after the
+  fact. Between the tag and the next release the durable record is the tag, the
+  GitHub release and the changelog entry, which is what re-derivation reads
+  anyway and what actually proves a ship.
+
 ### Added
 - **The hook enforces it** (`hooks/gate-preflight.sh`). The tracker's SECURITY
   row carries the open count on its **first line** — `✅ 0 open — 0 Critical,

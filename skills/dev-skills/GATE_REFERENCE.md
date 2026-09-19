@@ -374,16 +374,29 @@ Execution (merge, tag, publish) happens in Gate 6.
    > [status: up to date / N commits behind / diverged]
 
    If diverged, resolve before proceeding. Do not skip this step.
-3. **Get commit approval** (per `SKILL.md` Section 1) — show what's staged, get explicit yes
-4. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
+3. **Stage the gate state file with the release — it ships inside this PR.**
+   `.claude/dev-skills-gates.md` is part of the release commit, not a
+   follow-up. Bring it up to date first: gates 1–5 ✅ with the evidence that
+   passed each, SECURITY reading `0 open` (Gate 3 — it cannot be ✅ otherwise),
+   and 🚀 SHIP ⏳ carrying the plan rather than ⬜. Where the file is
+   gitignored, force-add it: `git add -f .claude/dev-skills-gates.md`.
+
+   SHIP is ⏳ here and that is correct, not a gap: the tag does not exist yet,
+   so no commit that precedes it can honestly claim it does. The post-tag line
+   folds into the next release's PR (`SHIP_REFERENCE.md`, step 7). **There is
+   never a separate bookkeeping PR**, and a release PR that does not carry the
+   state file leaves the tagged commit describing a release that had not
+   happened.
+4. **Get commit approval** (per `SKILL.md` Section 1) — show what's staged, get explicit yes
+5. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
    include `git remote add origin <url>` (using the URL stored at session start)
    in the command block before any push commands. This prevents the "default repo
    has not been set" error.
-5. **Present commands per Section 5.8** — format the commit, push, and PR creation
+6. **Present commands per Section 5.8** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
    Claude to execute directly. **In semi-autonomous mode, Claude runs all three itself**
    (`AUTO_MODE.md`); no block is presented unless one fails.
-6. After the branch is pushed and PR created, draft release notes and show the
+7. After the branch is pushed and PR created, draft release notes and show the
    PR + notes to the user:
 
    > 📝 **PR created — review before shipping:**
@@ -397,7 +410,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    > Do these accurately describe what's in this build? Reply "yes" to ship,
    > or tell me what to change.
 
-7. Wait for explicit approval of the PR content and release notes. **In
+8. Wait for explicit approval of the PR content and release notes. **In
    semi-autonomous mode this approval already happened** — the release notes were part
    of the single commit checkpoint. Post the PR and the notes for the record and
    continue to Gate 6. Re-ask only if the notes changed since that checkpoint.
@@ -407,6 +420,7 @@ branches and merges via PR. If the session is on the default branch when Gate 5
 is reached, create a branch first.
 
 > ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
+> Gate state file included in the PR: gates 1–5 ✅, SHIP ⏳
 > Pending: merge, tag, and publish (Gate 6)
 
 ---
