@@ -4,6 +4,106 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.27.0] — 2026-09-19
+
+A cost release. No rule changes, no gate changes, no behavior removed: the
+reference set is split so a file loads only the moment it covers, semi-autonomous
+mode learns to stop spending round trips it does not need, and
+`scripts/validate.sh` gains a per-file size ceiling so the per-turn tier cannot
+drift upward unnoticed again.
+
+The problem it fixes is structural, not cosmetic. Tiered loading has always been
+this skill's design, but the on-demand tier was two monolithic files. A reference
+file is read in full, so `GATE_REFERENCE.md` at 85KB charged every gate for the
+session-start procedure, the semi-autonomous execution detail, and the entire
+ship path — regardless of which gate was running or whether the session was even
+in that mode. `WORKFLOW_REFERENCE.md` at 97KB charged every Docker project for
+the Android, Python, Node.js, Windows, Linux, Home Assistant and script
+templates. Splitting along the boundaries those files already had costs nothing
+and changes nothing about what is enforced.
+
+### Changed
+- **`GATE_REFERENCE.md` split four ways, along its existing section
+  boundaries.** Same content, same triggers, read in the sizes the moment
+  actually needs:
+  - `SESSION_START.md` (~25KB) — the session-start procedure, read once, at
+    session start, and never again. `SKILL.md` Section 6 now points here.
+  - `GATE_REFERENCE.md` (~29KB) — gates 1 through 5.
+  - `SHIP_REFERENCE.md` (~22KB) — Gate 6 only. It is the largest of the six and
+    fires once, at the end of a release; gates 1–5 have no use for the
+    CI-driven path, the manual path, or the wrong-commit tag recovery, and no
+    longer pay for them.
+  - `AUTO_MODE.md` (~13KB) — semi-autonomous execution, loaded only when the
+    user has opted in. In 2.26.0 this rode along in every read of the gate
+    reference, including in manual sessions that will never use it.
+- **The eight workflow templates are now eight files**
+  (`WORKFLOW_DOCKER.md`, `WORKFLOW_WINDOWS.md`, `WORKFLOW_LINUX.md`,
+  `WORKFLOW_HOMEASSISTANT.md`, `WORKFLOW_SCRIPTS.md`, `WORKFLOW_ANDROID.md`,
+  `WORKFLOW_PYTHON.md`, `WORKFLOW_NODEJS.md`). The templates are mutually
+  exclusive and the environment detection that picks one already runs, so a
+  project now loads the one it matches instead of all eight.
+  `WORKFLOW_REFERENCE.md` keeps everything that applies to *every* template —
+  the selection and audit procedures, linting, best practices, dev releases,
+  Cosign, Dependabot — and drops from ~97KB to ~40KB. Its Step 1 detection
+  table now names files rather than in-page anchors.
+- **All cross-references updated** across `SKILL.md`, `SHELL_REFERENCE.md`,
+  `WORKFLOW_REFERENCE.md`, `hooks/README.md`, and the split files themselves:
+  "session start, step N" now points at `SESSION_START.md`, "Gate 6" at
+  `SHIP_REFERENCE.md`, and "Semi-autonomous mode — execution" at `AUTO_MODE.md`.
+
+### Added
+- **Round-trip discipline for semi-autonomous mode** (`AUTO_MODE.md`, "Round
+  trips"). 2.26.0 named this mode's cost honestly — a chain of executed git
+  commands resends the conversation on every call where a pasted block costs
+  nothing — and then left it unmanaged. The mode now says how to spend less:
+  chain a step's commands into one invocation (`git add -A && git commit -m … &&
+  git push -u origin <branch>`) rather than one call each, and gather
+  checkpoint 2's evidence (`git log`, `gh pr view`, `gh run list`, the gate
+  file) in one call rather than four. With an explicit boundary: **do not chain
+  across a stop.** Anything the user must see or decide between two commands —
+  the commit approval, the tag block, a failed command whose output changes what
+  comes next — is a boundary the chain does not cross. This removes round trips,
+  never checks.
+- **Batched reads at session start** (`SESSION_START.md`). Steps 1, 4, 5 and 7
+  are independent read-only commands; they now chain into one invocation. Steps
+  2 and 3 are questions for the user and stay separate. Nothing is skipped — a
+  step that is skipped is still a step that was skipped.
+- **Per-file size ceilings in `scripts/validate.sh`.** `SKILL.md` is capped at
+  64KB, `WORKFLOW_REFERENCE.md` at 44KB, every other skill file at 32KB. The
+  failure message names the two legitimate responses: extract a section that has
+  its own load trigger, or raise the ceiling in the same commit as the growth
+  that needs it.
+
+  This exists because the 2.14.0 extraction was silently undone. That release
+  cut `SKILL.md` from ~61KB to 37KB to restore the tiered design; across the ten
+  releases since, it accreted back to 62KB at roughly 2.5KB per release, and
+  `GATE_REFERENCE.md` doubled from 43KB to 87KB. No single release was wrong. No
+  check noticed the trend. A ceiling is not a cap on what the skill may say — it
+  is what makes the next addition a decision rather than a drift.
+- **`scripts/validate.sh` and `scripts/build-skill.sh` now share one file
+  list**, declared once at the top of each. The validator previously repeated
+  the same ten filenames in three places, which is how a 21-file bundle would
+  have gone wrong.
+
+### Unchanged
+No gate, rule, approval, or enforcement behavior changed in this release. The
+pre-flight, the six gates, commit approval, the tag and ref-deletion carve-out,
+the two tracks, the gate state file, and `hooks/gate-preflight.sh` are all
+byte-for-byte as they were in 2.26.0. Three reductions considered for this
+release were **rejected** for contradicting deliberate earlier decisions, and are
+recorded here so they are not proposed again:
+- Moving §2's gate-state mechanics out of `SKILL.md` — 2.14.0 names "gate state
+  and re-derivation" as content that deliberately stays in the per-turn tier,
+  all three of the gate-file discipline rules landed in 2.25.0 from a real
+  postmortem, and `hooks/gate-preflight.sh` cites the re-derivation table's
+  location in its deny message.
+- De-duplicating the mode contract across §1, §3, §5.8 and §8 — 2.26.0 states
+  the ref-write rules in all five places on purpose, and the rationale copies
+  are already one or two sentences that defer to `SHELL_REFERENCE.md`.
+- Moving §4.1 dependency auditing behind a load — 2.14.0 names "always-on
+  security awareness" as staying resident, and 2.16.1 documents three cost
+  behaviors that died precisely because their trigger was softer than a gate.
+
 ## [2.26.0] — 2026-09-19
 
 Adds an opt-in **semi-autonomous mode**: Claude runs the git commands itself

@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.26.0
+version: 2.27.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -51,9 +51,8 @@ this one.
 2. **Between-step confirmations collapse into two checkpoints, not none.** The
    version bump and the release-notes approval fold into the commit approval;
    the pre-ship confirmation becomes the pre-tag report. Everything between
-   those two runs without stopping (`GATE_REFERENCE.md`, "Semi-autonomous mode
-   — execution", which holds both formats, the per-step table, and the stop
-   conditions).
+   those two runs without stopping (`AUTO_MODE.md`, which holds both formats,
+   the per-step table, the round-trip rules, and the stop conditions).
 
 **What it explicitly does not change: the tag push and ref deletions still go to
 the user, in both modes.** This is not a supervision rule that autonomy could
@@ -356,7 +355,7 @@ gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
 - **Local sessions:** add it to `.gitignore` — it is session scratch.
 - **Remote containers:** commit it to the working branch instead. The container
   is reclaimed when the session ends, and an uncommitted state file dies with it
-  (`GATE_REFERENCE.md`, session start, step 0). If the repo already gitignores
+  (`SESSION_START.md`, step 0). If the repo already gitignores
   the file — this one does, for local users — stage it explicitly with
   `git add -f .claude/dev-skills-gates.md`, or accept that state will not survive
   the session and re-derive from evidence next time. Do not silently let it
@@ -483,7 +482,7 @@ still owed — run them on the merged code and surface what you find.
 
 When resuming work or checking gate status, detect what's already done:
 1. Run `git log`, `git ls-remote --heads origin`, `git ls-remote --tags origin`, and `gh pr list` / `gh pr view`
-   — or the GitHub MCP equivalents when `gh` is unavailable (`GATE_REFERENCE.md`, session start, step 0)
+   — or the GitHub MCP equivalents when `gh` is unavailable (`SESSION_START.md`, step 0)
 2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
 3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
    a commit
@@ -491,12 +490,17 @@ When resuming work or checking gate status, detect what's already done:
 
 ### Running a gate
 
-**Before running, passing, or marking ➖ N/A on any gate, read
-`GATE_REFERENCE.md`** from this skill's base directory (shown when the skill
-loaded, e.g. "Base directory for this skill: ..."). It holds each gate's
-checks, pass criteria, blocked-output format, and the CI-versus-manual paths.
-Do not run a gate from memory of this summary — the summary says what each gate
-is *for*, not what makes it pass.
+**Before running, passing, or marking ➖ N/A on any gate, read that gate's
+reference file** from this skill's base directory (shown when the skill loaded,
+e.g. "Base directory for this skill: ..."). Gates 1–5 are in
+`GATE_REFERENCE.md`; **Gate 6 is in `SHIP_REFERENCE.md`**. Each holds its
+gates' checks, pass criteria, blocked-output format, and the CI-versus-manual
+paths. Do not run a gate from memory of this summary — the summary says what
+each gate is *for*, not what makes it pass.
+
+**Read the one the gate you are running is in, not both.** The ship path is the
+largest of the six and fires once, at the end; loading it during Gate 1 costs
+the tokens without the content ever being used.
 
 | Gate | Passes when |
 |---|---|
@@ -508,8 +512,8 @@ is *for*, not what makes it pass.
 | 🚀 **SHIP** | merged, tagged, published, and all four post-ship checks verified |
 
 Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`;
-Gate 6's ship path depends on whether a CI release workflow exists. Both are
-detailed in `GATE_REFERENCE.md`.
+Gate 6's ship path depends on whether a CI release workflow exists, and both of
+its paths are in `SHIP_REFERENCE.md`.
 
 ---
 
@@ -917,7 +921,7 @@ conversation each round trip where a pasted block costs nothing, so
 semi-autonomous mode buys autonomy with tokens.
 
 **In manual mode, which way they go depends on the execution environment**
-(`GATE_REFERENCE.md`, session start, step 0). The deciding question is not cost;
+(`SESSION_START.md`, step 0). The deciding question is not cost;
 it is whether Claude's working tree and the user's terminal are the same clone.
 
 | Environment | Git operations |
@@ -953,7 +957,7 @@ assumption that the user ran the block. Confirm it yourself with `git ls-remote
 origin <branch>` returning nothing. Reading refs is not a write and is not
 restricted. **Existence alone is not enough** — a tag pushed before its
 release PR merged still exists and still passes an existence check, on the
-wrong commit. Confirm what it points at (`GATE_REFERENCE.md`, Gate 6)
+wrong commit. Confirm what it points at (`SHIP_REFERENCE.md`)
 matches the commit that was actually merged.
 
 **The gates are identical either way.** Presenting a command is performing it
@@ -988,9 +992,10 @@ Don't nag. Once offered, drop it unless the user asks.
 
 ## 6. Session start
 
-When this skill loads, **read `GATE_REFERENCE.md` from this skill's base
+When this skill loads, **read `SESSION_START.md` from this skill's base
 directory** (shown when the skill loaded, e.g. "Base directory for this
-skill: ...") and follow its session-start procedure. It covers, in order:
+skill: ...") and follow its procedure. It is read once, at session start, and
+is not needed again. It covers, in order:
 
 - **Self-check** — the skill's reference files are all present
 - **Version check** — compares this copy's version against the latest tag on
@@ -1063,7 +1068,7 @@ Before wrapping up, check:
    gets to wind down — a remote container that is reclaimed, a usage limit, or a
    crash skips it entirely, and that is precisely when a release is most likely
    to be half-finished. The check that always runs is at session *start*
-   (`GATE_REFERENCE.md`, step 7).
+   (`SESSION_START.md`, step 7).
 
 5. **Check for orphaned test containers.** If this session started any Docker
    container for Gate 2 testing (`GATE_REFERENCE.md`, Gate 2 — the local
