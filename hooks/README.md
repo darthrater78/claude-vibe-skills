@@ -21,6 +21,16 @@ The hook is strongest exactly where Claude executes git directly — remote
 container sessions (`GATE_REFERENCE.md`, session start, step 0) — and weakest on local sessions,
 where presenting commands is the default.
 
+**Semi-autonomous mode moves most paths into the covered half.** When a session
+opts into semi-autonomous mode (`SKILL.md`, Operating modes), Claude runs the
+commits, pushes, PR and merge itself, so each arrives as a tool call this hook
+inspects rather than as a block you paste. The tag push and ref deletions are
+still handed to you in that mode — they are exactly the operations your
+credentials can do and Claude's often cannot — so those stay in the uncovered
+half either way. Installing the hook matters most in that mode: it is the
+enforcement that does not depend on Claude remembering to run a pre-flight
+nobody is watching.
+
 ## Install
 
 The hook is **project-scoped by default**: it only governs repos you install it

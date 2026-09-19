@@ -1,24 +1,25 @@
 # Dev Skills gate state
 Track: release sequence
-Version: 2.25.0
-Updated: 2026-09-18
+Mode: manual
+Version: 2.26.0
+Updated: 2026-09-19 (rev 3)
 
-Env: local | Branch: master | Default: master
+Env: remote container | Branch: claude/skill-automatic-mode-i371w2 | Default: master
 
-🔢 VERSION    ✅ 2.25.0 — validate.sh confirms all refs agree; v2.24.0 tag
-              confirmed on remote at bc37ae3
-🔨 BUILD      ✅ build-skill.sh + validate.sh passed; handoff n/a (no
-              Docker/.exe/.apk signal in this repo)
-🔒 SECURITY   ✅ 0 Critical, 0 High — hook's new awk block-parser reviewed
-              (no eval/exec/network/secrets, fixed gate names only, fails
-              closed); bug reproduced and fix confirmed, no regression
-📄 DOCS       ✅ CHANGELOG 2.25.0 entry; README/CONTRIBUTING/hooks-README
-              updated; validate.sh clean
-📦 RELEASE    ✅ PR #46 merged (c3a49f7); merge state + CI on merge commit
-              confirmed before the tag was handed over
-🚀 SHIP       ✅ tag v2.25.0 confirmed on c3a49f7 (matches merge commit
-              exactly); "Publish release" workflow succeeded; release
-              asset content verified identical to local rebuild via
-              decompress + diff (raw zip bytes differ — writestr()
-              stamps build time into the zip, expected, not a defect);
-              release notes auto-extracted from CHANGELOG and correct
+🔢 VERSION    ✅ 2.26.0 in VERSION, SKILL.md frontmatter, banner, README —
+              validate.sh confirms. v2.25.0 tagged on remote at c3a49f7.
+              MINOR: 2 feat + 2 fix since the tag, no breaking change
+🔨 BUILD      ✅ build-skill.sh + validate.sh green at 5166b61; tree checked
+              before/after — only the bundle moved, content proven identical
+              (zip timestamp), restored. handoff n/a (no Docker/.exe/.apk)
+🔒 SECURITY   ✅ 0 Critical, 0 High — docs-only diff, no executable code
+              changed. Secrets scan clean; dangerous-pattern hits are prose
+              about force-push, not commands. No dependency manifests.
+              📝 Medium: no .github/dependabot.yml (pre-existing) — see PR
+🔒 QUALITY    ✅ reviewed with the user: SKILL.md +7.6KB/turn is the real cost
+📄 DOCS       ✅ CHANGELOG 2.26.0; README modes + Remote Control sections,
+              size table, shortcut table; hooks/README. All anchors resolve
+              (fixed pre-existing #security-rules → #gate-3--security--quality-)
+📦 RELEASE    ⏳ PR #49 open, CI running; release notes awaiting user
+              approval. Branch synced, all work committed
+🚀 SHIP       ⬜ tag push is the user's (§5.8)

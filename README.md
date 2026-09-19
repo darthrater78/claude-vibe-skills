@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.25.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.26.0`
 
 ---
 
@@ -19,6 +19,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Install](#install) — claude.ai, Desktop, CLI, web
 - [The six gates](#the-six-gates) — what each one checks
 - [Two tracks](#two-tracks) — why a work commit isn't a release
+- [Manual and semi-autonomous mode](#manual-and-semi-autonomous-mode) — who runs the commands
 - [How gates are enforced](#how-gates-are-enforced) — the state file, and why memory isn't trusted
 - [Enforcement hook](#enforcement-hook-optional) — optional, blocks git at the tool call
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
@@ -33,7 +34,8 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 **1. Commits require approval.** Claude never runs `git commit`, `git push`, or
 `gh pr create` without your explicit say-so. No surprise commits after a single
 edit. A vague "ok" doesn't count, and neither does a hook telling Claude the
-tree is dirty.
+tree is dirty. This is the one rule [semi-autonomous
+mode](#manual-and-semi-autonomous-mode) doesn't relax.
 
 **2. All work happens on branches.** Never directly on `main`/`master`. At
 session start the skill finds the repo, offers to sync with origin, and flags
@@ -60,10 +62,12 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   itself, and gate state moved into a
   [file](#how-gates-are-enforced) so a compacted session can't "remember" a
   scan that never ran. *(2.12, 2.13)*
-- **Ref operations always come back to you.** Tag pushes *and* ref deletions
-  are handed over in every environment, containers included — Claude's
-  credentials are routinely denied on exactly those two.
-  [Why](#tag-pushes-and-ref-deletions-always-come-back-to-you) *(2.15.0, 2.15.2)*
+- **Ref operations come back to you.** Tag pushes *and* ref deletions are
+  handed over in every environment, containers included — Claude's credentials
+  are routinely denied on exactly those two. [Semi-autonomous
+  mode](#manual-and-semi-autonomous-mode) does not change this — no mode can
+  grant what the remote withholds — it only puts a full report above the block.
+  [Why](#tag-pushes-and-ref-deletions-come-back-to-you) *(2.15.0, 2.15.2)*
 - **Ref checks read the remote.** `git tag -l` and `git branch -r` both report
   absence that means nothing in a fresh clone; every check is now
   `git ls-remote`. *(2.15.0, 2.15.2)*
@@ -95,7 +99,7 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   generates a template — Docker, Windows, Android, Linux, Home Assistant,
   Python, Node.js, or scripts — with SHA-pinned actions, least-privilege
   permissions, and dev/pre-release build support out of the box. *(2.18.0)*
-- **[Dependencies must be current and CVE-free](#security-rules).** Every
+- **[Dependencies must be current and CVE-free](#gate-3--security--quality-).** Every
   package is pinned to a release that is looked up, never recalled from
   training data, and the whole dependency tree — transitive included — is
   re-audited on every security gate, not just when the manifest changes. A
@@ -150,6 +154,15 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   catches this pattern automatically. The Node.js template moved to npm's
   OIDC trusted publishing (GA since July 2025) instead of a long-lived
   `NPM_TOKEN`. *(2.25.0)*
+- **[Semi-autonomous mode](#manual-and-semi-autonomous-mode).** Say "auto mode"
+  and Claude runs the git commands itself instead of handing you blocks —
+  commits, pushes, the PR, the merge, watching CI, verification. Two checkpoints
+  survive: **every commit still needs your explicit yes**, and the tag still
+  comes back to you as a block — with a full report of every action Claude took
+  since that approval above it. The version bump and release notes fold into the
+  commit approval. Manual mode is unchanged and remains the default; the mode is
+  written to the gate state file so a compacted session can't lose it, and never
+  carries into a new session. *(2.26.0)*
 
 ---
 
@@ -175,6 +188,7 @@ Gate state lives in a file, not in Claude's memory:
 ```
 # .claude/dev-skills-gates.md
 Track: release sequence
+Mode: manual
 Version: 2.18.0
 
 🔢 VERSION    ✅ all refs at 2.18.0; prev v2.17.0 tagged on remote
@@ -372,6 +386,117 @@ stated out loud on the tracker.
 
 ---
 
+## Manual and semi-autonomous mode
+
+Every session starts in **manual mode** — the behavior this skill has always
+had. Claude hands you the git commands, you run them, and the tag push comes
+back to you no matter where the session is running.
+
+**Semi-autonomous mode** is opt-in, per session, and you turn it on by asking:
+"auto mode", "semi-autonomous mode", "take it from here". It changes *who runs
+most of the commands* — not what has to be true before they run, and not the two
+ref operations GitHub denies Claude.
+
+| | Manual (default) | Semi-autonomous |
+|---|---|---|
+| **Commit approval** | required, every commit | **required, every commit** |
+| Commit, branch push, PR | presented for you to run | Claude runs them |
+| PR merge | presented | Claude runs it after confirming CI on the merge commit, without `--delete-branch` |
+| **Tag push** | always yours | **always yours — with a full report above the block** |
+| **Branch / tag deletion** | always yours | **always yours** |
+| Release publish, notes, verification | presented / Claude | Claude runs them |
+| Command blocks | the normal way commands arrive | the tag and ref deletions, plus anything that fails |
+| The six gates and the pre-flight | enforced | enforced, identically |
+| Questions and judgment calls | yours | still yours |
+
+**Two checkpoints, not none.** A release in semi-autonomous mode stops twice:
+once at the commit, once before the tag.
+
+**Checkpoint 1 — the commit.** The version-bump confirmation and the
+release-notes review fold in here, presented together:
+
+```
+Ready to commit — this is the one approval for the release.
+
+Version:  2.25.0 → 2.26.0 (MINOR — one feat, no breaking change)
+Commit:   feat(skill): add semi-autonomous mode
+Changes:  SKILL.md +118, GATE_REFERENCE.md +96, README.md +54 …
+Gates:    🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ⬜ · 🚀 ⬜
+Release notes (v2.26.0):
+  - …
+
+On your yes: commit, push, open the PR, and merge it once CI is green. Then
+I'll come back with a full report and the tag block for you to run.
+```
+
+That yes covers the sequence it describes and nothing else — if more commits
+land or the notes change, you get asked again.
+
+**Checkpoint 2 — the tag.** The tag is the action that publishes, and **you run
+it** — in this mode exactly as in manual, because Claude's credentials get
+`403`'d on tag refs and no mode can grant what the remote withholds. What this
+mode adds is what arrives *with* the block: Claude reports **everything** it did
+since your approval — commits with SHAs, every push, the PR and what happened on
+it, every CI run and its conclusion, the merge commit, each gate with the
+evidence behind it, the version guard, and anything that failed, was retried, or
+went differently than described at the commit. Then it asks:
+
+```
+Ready to tag v2.26.0 — full report of everything since your commit approval.
+
+Commits (3)
+  257b224 feat(skill): add semi-autonomous mode — 6 files, +412/−38
+  …
+Pushes:  feature/x → origin, 3 times (no force, no rewrite)
+PR:      #48 — opened, 2 review comments addressed, merged as c3a49f7
+CI:      validate ✅ 257b224 · ✅ 9ab0e12 · ✅ merge commit c3a49f7
+         (one earlier ❌ on 4c1a88e — shellcheck SC2086, fixed in 9ab0e12)
+Gates:   🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ✅ PR #48 merged
+Version guard: VERSION in c3a49f7 reads 2.26.0, matches the tag ✅
+Deviations from what you approved: the CI failure above added one commit.
+
+Pushing v2.26.0 fires release.yml, which builds and publishes the release.
+This one is yours to run — my credentials get 403'd on tag refs. From your
+local clone of the repo:
+
+  git checkout main && git pull origin main \
+    && grep -q '^2.26.0$' VERSION \
+    && git tag v2.26.0 && git push origin v2.26.0
+
+Tell me when it's done and I'll take it from there.
+```
+
+Failures, retries and deviations are the part of that report that matters most —
+a report listing only successes is the one nobody needed. Afterwards Claude
+confirms the tag on the remote itself rather than taking "done" at face value,
+then finishes the release: watch the run, add the notes, verify, commit the SHIP
+record.
+
+**It is semi-autonomous, not hands-off.** Beyond those two checkpoints, a
+blocked gate, a Critical or High security finding, an ambiguous requirement, a
+`403` on a branch push, a failed CI run, or anything that needs a tag, branch,
+or release *deleted* stops the sequence and comes back to you. Claude deletes no
+refs in either mode — the merged PR's own branch included.
+
+**The mode is written to the gate state file**, not remembered — a compacted
+session can't lose track of it, and if the file says nothing, the session is
+manual. Semi-autonomous mode never carries into a new session; every session starts
+manual and you opt in again in one word. Switch back any time with "manual
+mode".
+
+Two notes worth knowing:
+
+- **Don't confuse it with Claude Code's own "auto mode"** — that's a permission
+  setting in the harness. Being in that one is not asking for this one.
+- **It costs more tokens on a local session.** A pasted block is free; a chain
+  of executed git commands resends the conversation each round trip. You're
+  buying autonomy with tokens, which is usually the right trade when you asked
+  for it — and if you install the [enforcement
+  hook](#enforcement-hook-optional), semi-autonomous mode is the mode where it does
+  the most work, since every command now arrives as a tool call it can inspect.
+
+---
+
 ## How gates are enforced
 
 **Gate state is a file, not a memory.** `.claude/dev-skills-gates.md` is written
@@ -448,14 +573,32 @@ performing it covers the rest.
 
 ## Execution environments
 
-The skill detects where the session is running, because that determines whether
-Claude's working tree and your terminal are the same clone:
+The skill detects where the session is running, because in
+[manual mode](#manual-and-semi-autonomous-mode) that determines whether Claude's
+working tree and your terminal are the same clone. (In semi-autonomous mode Claude
+runs every command itself, and this table describes only the fallback when one
+fails.)
 
 | Environment | Git behavior |
 |---|---|
 | **Local** (Claude Code CLI) | Same clone — commands are **presented** for you to run, at no tool-call token cost |
 | **Remote container** (web/mobile) | A clone your terminal never sees — Claude **executes** git directly. A pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Presented, plus a clone flow — the repo may not be on the device |
+
+### Native Linux sessions get offered Remote Control
+
+On a **local session on native Linux** (not Termux, not WSL, not a container),
+the skill mentions once — in either mode — that starting with `claude --rc`, or
+running `/rc` in the open session, keeps the terminal session exactly as it is
+while also publishing it to claude.ai/code and the Claude desktop and mobile
+apps. Same session, reachable from either surface, still executing on your
+machine.
+
+It offers the **interactive** form deliberately. `claude remote-control` is
+server mode: it serves sessions to the apps and gives you no local prompt, which
+is the opposite of the point here. One line, once; decline it and it drops.
+(Remote Control needs an eligible login, and on Team and Enterprise plans an
+Owner has to enable it first.)
 
 Every environment capability the skill records — Docker daemon reachable,
 push allowed, tag push allowed — is measured, not inferred, and re-measured
@@ -466,12 +609,21 @@ available" until a build actually tries it. The skill checks `docker info`
 instead, and treats a capability noted in an earlier context as a claim
 about *that* context, not a fact about this one.
 
-### Tag pushes and ref deletions always come back to you
+### Tag pushes and ref deletions come back to you
 
 In **every** environment, remote containers included, `git tag` /
 `git push origin v<X.Y.Z>` and any ref deletion (branch or tag) are presented as
 a block for you to run. Claude never executes them, and never creates or deletes
 a ref through a GitHub MCP tool.
+
+[Semi-autonomous mode](#manual-and-semi-autonomous-mode) does not change this.
+The denial comes from the remote, not from the skill, so no mode can hand Claude
+a credential it doesn't have — what that mode adds is a full report of
+everything it did, above the block, instead of a bare set of commands. Ref *deletions* stay yours in both modes, apart from
+the source branch of a PR Claude just merged. Everything below still applies:
+the permission risk doesn't go away, it just becomes a failure to report rather
+than a rule to obey, and a `403` is exactly where semi-autonomous mode hands the block
+back to you.
 
 The reason is permissions. Creating a `refs/tags/*` ref — especially one that
 *triggers a workflow* — is commonly withheld even where ordinary branch pushes
@@ -495,10 +647,10 @@ with the work instead of gitignoring it, and fall back to GitHub MCP tools when
 `gh` is unavailable.
 
 They skip the shell question entirely — Claude runs every git command in the
-container's own bash — and the tag/ref-deletion block needs only a clone path,
-since everything below `cd` is a plain single-line `git` command with no
-shell-specific syntax. So they ask for the clone path *when that block is about
-to be presented*, rather than up front.
+container's own bash — and the tag/ref-deletion block needs nothing asked at
+all: it carries no `cd`, and everything in it is a plain single-line `git`
+command with no shell-specific syntax. "Run this from your local clone" goes in
+the prose above it; the block itself is copyable as given.
 
 </details>
 
@@ -530,7 +682,7 @@ release breaks.
 
 ## Cost discipline
 
-**Automatic — these fire on their own:**
+**Semi-autonomous — these fire on their own:**
 
 - **Sonnet ceiling** — flags a session running on an expensive model and asks
   before proceeding
@@ -592,7 +744,9 @@ template you review before anything is written.
 | "just give me the commands" | Same gates as executing them — tracker shown above the block |
 | "looks good" | That's feedback on the diff, not commit approval — Claude asks explicitly |
 | "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A, for structural reasons |
-| "just tag it for me" | Tag pushes are always yours to run — the block is presented, not executed |
+| "just tag it for me" | Manual mode: tag pushes are yours to run — the block is presented, not executed. Semi-autonomous mode: Claude pushes it, after the same gates |
+| "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands and the tag push. Commit approval stays |
+| "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
 
 ---
 
@@ -602,16 +756,16 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~52KB | **Every turn** — commit discipline, gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `GATE_REFERENCE.md` | ~70KB | When a gate runs, and at session start — each gate's checks and pass criteria, plus the session-start procedure |
+| `SKILL.md` | ~61KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `GATE_REFERENCE.md` | ~85KB | When a gate runs, and at session start — each gate's checks and pass criteria, the session-start procedure, and how semi-autonomous mode executes a sequence |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
 | `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
-| `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~96KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
+| `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
+| `WORKFLOW_REFERENCE.md` | ~97KB | When a CI workflow is missing or the user asks for workflow help — GitHub Actions templates for Docker, Windows, Linux, Android, Home Assistant, Python, Node.js, and scripts, dev/pre-release builds, Cosign signing, Dependabot config, workflow linting, CI-status release gates, audit procedures, best practices, and review checklist |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -674,4 +828,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.25.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.26.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
