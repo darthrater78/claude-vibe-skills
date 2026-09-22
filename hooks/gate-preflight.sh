@@ -96,11 +96,45 @@ case "$TOOL_NAME" in
     [ -z "$CMD" ] && allow
     # Strip quoting so `git commit -m "..."` and friends match predictably.
     SCAN="$(printf '%s' "$CMD" | tr '\n' ' ')"
+    # `git -C <dir> push` and `git -c k=v commit` are the same operations;
+    # without this they slipped past every pattern below.
+    SCAN="$(printf '%s' "$SCAN" | sed -E 's/git([[:space:]]+-[cC][[:space:]]*[^[:space:]]+)+/git/g')"
 
-    if printf '%s' "$SCAN" | grep -qE '(^|[;&|(]|&&|\|\|)[[:space:]]*(gh[[:space:]]+release[[:space:]]+create|gh[[:space:]]+pr[[:space:]]+merge|git[[:space:]]+tag[[:space:]]+[^-])' \
-       || printf '%s' "$SCAN" | grep -qE 'git[[:space:]]+push[[:space:]].*(--tags|[[:space:]]v[0-9]+\.[0-9]+)' \
+    # Tag pushes and ref deletions are the user's to run, in BOTH modes
+    # (SKILL.md Section 5.8). No gate state makes them Claude's, so this is
+    # checked before the gate file is even read. Listing tags stays allowed.
+    # `git tag` with no argument, or only listing/verifying/local-delete
+    # flags, reads. Any other argument creates a tag. Allowlisted, so an option
+    # nobody thought of (--annotate, --sign, --force) fails closed.
+    tag_creates=""
+    while IFS= read -r seg; do
+      [ -z "$seg" ] && continue
+      args="$(printf '%s' "$seg" | sed -E 's/^git[[:space:]]+tag[[:space:]]*//')"
+      [ -z "$args" ] && continue
+      printf '%s' " $args" | grep -qE '[[:space:]](-l|--list|-d|--delete|-v|--verify|--contains|--no-contains|--points-at|--merged|--no-merged|-n[0-9]*|--column|-i|--ignore-case)([[:space:]=]|$)' && continue
+      printf '%s' " $args" | grep -qE '[[:space:]](--sort|--format)[=[:space:]]' && continue
+      tag_creates=1
+    done <<< "$(printf '%s' "$SCAN" | grep -oE 'git[[:space:]]+tag([[:space:]]+[^;&|]*)?')"
+
+    if [ -n "$tag_creates" ] \
+       || printf '%s' "$SCAN" | grep -qE 'git[[:space:]]+push[[:space:]].*(--tags|--follow-tags|--mirror|--delete|[[:space:]]-d([[:space:]]|$)|[[:space:]]\+?:[^[:space:]]|refs/tags/|[[:space:]]v[0-9]+\.[0-9]+)' \
+       || printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+pr[[:space:]]+merge[[:space:]].*(--delete-branch|[[:space:]]-d([[:space:]]|$))' \
+       || printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+api[[:space:]].*(-X|--method)[[:space:]]*DELETE.*git/refs' \
+       || printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+api[[:space:]].*git/refs.*(-X|--method)[[:space:]]*DELETE'; then
+      deny "🚫 USER-ONLY REF OPERATION
+
+Blocked: creating or pushing a tag, or deleting a ref (branch or tag)
+
+Per SKILL.md Section 5.8 these are the user's to run in BOTH manual and semi-autonomous mode. Claude's credentials are routinely denied on exactly these ref operations, and a failed tag push strands a merged default branch with no release behind it. No gate state changes this.
+
+Present the command as a block for the user to run from their own clone, with the tracker (and, in semi-autonomous mode, the full pre-tag report) above it. Then confirm the result yourself with git ls-remote. Do not retry through another path."
+    fi
+
+    # Tag creation and tag pushes were denied above, so the release track here
+    # is the merge, the publish, and a direct push to the default branch.
+    if printf '%s' "$SCAN" | grep -qE '(^|[;&|(]|&&|\|\|)[[:space:]]*(gh[[:space:]]+release[[:space:]]+create|gh[[:space:]]+pr[[:space:]]+merge)' \
        || printf '%s' "$SCAN" | grep -qE 'git[[:space:]]+push[[:space:]]+origin[[:space:]]+(main|master)([[:space:]]|$)'; then
-      OP_LABEL="a release operation (tag / merge / publish)"
+      OP_LABEL="a release operation (merge / publish)"
       REQUIRED="VERSION BUILD SECURITY DOCS RELEASE"
     elif printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+pr[[:space:]]+create'; then
       OP_LABEL="opening a pull request (Gate 5)"
@@ -119,6 +153,13 @@ case "$TOOL_NAME" in
   mcp__github__create_pull_request)
     OP_LABEL="opening a pull request (Gate 5)"
     REQUIRED="VERSION BUILD SECURITY DOCS"
+    ;;
+  mcp__github__create_tag|mcp__github__delete_branch|mcp__github__delete_tag|mcp__github__delete_ref)
+    deny "🚫 USER-ONLY REF OPERATION
+
+Blocked: $TOOL_NAME
+
+Tag creation and ref deletion are the user's to run in both modes (SKILL.md Section 5.8). Present the equivalent git command as a block for the user instead."
     ;;
   mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file)
     OP_LABEL="a work commit / push"
@@ -167,6 +208,88 @@ Do this before retrying:
 3. Write $STATE_REL with the resulting state.
 
 Do not work around this by editing the state file to say a gate passed when it did not."
+fi
+
+# --- operating mode must be chosen ---------------------------------------------
+# SKILL.md "Operating modes": every session starts with the mode unchosen and
+# the user picks manual or semi-autonomous before any git write. A missing row,
+# "unchosen", or anything else is not a default of manual -- it is a question
+# nobody asked. Only the first Mode: line counts.
+
+MODE_LINE="$(grep -m1 -E '^Mode:' "$STATE" 2>/dev/null)"
+if ! printf '%s' "$MODE_LINE" | grep -qE '^Mode:[[:space:]]*(manual|semi-autonomous)([[:space:]]|$)'; then
+  deny "🚫 GATE PRE-FLIGHT — operating mode not chosen.
+
+Blocked: $OP_LABEL
+Found: ${MODE_LINE:-no Mode: row in $STATE_REL}
+
+Per SKILL.md \"Operating modes\", the user chooses manual or semi-autonomous at session start, and no git write runs until they have. Ask the mode question (SESSION_START.md, \"Mode choice\"), then write their answer to the Mode: row.
+
+Do not pick the mode yourself, and do not write one the user did not say. A missing row means unchosen, not manual."
+fi
+
+# --- forks: every write targets the fork ---------------------------------------
+# SKILL.md Section 5.8 / SHELL_REFERENCE.md "Forks". The Origin: row records the fork
+# ("Origin: owner/repo (fork of parent/repo)"). In a fork, a bare
+# `gh pr create` opens the PR against the PARENT repo, so a gh write must name
+# the fork explicitly, and nothing may name any other repo or push to any
+# remote other than origin.
+
+ORIGIN_LINE="$(grep -m1 -E '^Origin:' "$STATE" 2>/dev/null)"
+ORIGIN_SLUG="$(printf '%s' "$ORIGIN_LINE" | sed -nE 's#^Origin:[[:space:]]*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+).*#\1#p')"
+IS_FORK=""
+printf '%s' "$ORIGIN_LINE" | grep -qiF 'fork of' && IS_FORK=1
+
+fork_deny() {
+  deny "🚫 GATE PRE-FLIGHT — fork target check.
+
+Blocked: $OP_LABEL
+Origin: ${ORIGIN_LINE:-none recorded}
+Problem: $1
+
+Per SKILL.md Section 5.8 and SHELL_REFERENCE.md \"Forks\", every push, PR, merge and release goes to the fork (origin). Nothing in the session targets the upstream repo. The user does anything upstream on GitHub directly. Pass --repo $ORIGIN_SLUG explicitly. If the Origin: row is wrong, re-run SESSION_START.md step 1a instead of editing it to fit."
+}
+
+if [ -n "$IS_FORK" ] && [ -z "$ORIGIN_SLUG" ]; then
+  fork_deny "the Origin: row says this is a fork but does not name the fork as owner/repo."
+fi
+
+# fork_check_bash -- every gh target named in the command is the fork; in a
+# fork, every gh pr/release call names one, and every push names origin.
+fork_check_bash() {
+  local clean targets target calls named
+  clean="$(printf '%s' "$SCAN" | tr -d "\"'")"
+  if printf '%s' "$clean" | grep -qE 'gh[[:space:]]+(pr|release)[[:space:]]'; then
+    # A chain can carry more than one gh call, and GH_REPO= retargets gh the
+    # same way --repo does, so every named target is checked.
+    targets="$(printf '%s' "$clean" | grep -oE '(^|[[:space:]])(--repo[= ]|-R[= ]?|GH_REPO=)[[:space:]]*[^[:space:]]+' | sed -E 's/^[[:space:]]*(--repo|-R|GH_REPO=)[= ]?[[:space:]]*//; s#^https?://github\.com/##; s#\.git$##')"
+    while IFS= read -r target; do
+      [ -n "$target" ] && [ "$target" != "$ORIGIN_SLUG" ] \
+        && fork_deny "this command targets $target, not $ORIGIN_SLUG."
+    done <<< "$targets"
+    calls="$(printf '%s' "$clean" | grep -oE 'gh[[:space:]]+(pr|release)[[:space:]]' | wc -l)"
+    named="$(printf '%s' "$clean" | grep -oE '(^|[[:space:]])(--repo[= ]|-R[= ]?)[[:space:]]*[^[:space:]]+' | wc -l)"
+    [ -n "$IS_FORK" ] && [ "$named" -lt "$calls" ] \
+      && ! printf '%s' "$clean" | grep -qE '(^|[[:space:]])GH_REPO=' \
+      && fork_deny "a gh pr/release call with no --repo in a fork resolves to the PARENT repo by default."
+  fi
+  [ -z "$IS_FORK" ] && return 0
+  printf '%s' "$clean" | grep -qE 'git[[:space:]]+push([[:space:]]|$)' || return 0
+  printf '%s' "$clean" | grep -qE 'git[[:space:]]+push([[:space:]]+-[^[:space:]]+)*[[:space:]]+origin([[:space:]]|$)' \
+    || fork_deny "git push must name origin (the fork) explicitly, never another remote or an implicit one."
+}
+
+# fork_check_mcp -- an MCP write names the fork as owner/repo.
+fork_check_mcp() {
+  local owner repo
+  owner="$(json_get '.tool_input.owner')"
+  repo="$(json_get '.tool_input.repo')"
+  [ -n "$owner$repo" ] && [ "$owner/$repo" != "$ORIGIN_SLUG" ] \
+    && fork_deny "this call targets $owner/$repo, not $ORIGIN_SLUG."
+}
+
+if [ -n "$ORIGIN_SLUG" ]; then
+  if [ "$TOOL_NAME" = "Bash" ]; then fork_check_bash; else fork_check_mcp; fi
 fi
 
 # --- evaluate the required gates ----------------------------------------------

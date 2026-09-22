@@ -391,7 +391,11 @@ Execution (merge, tag, publish) happens in Gate 6.
 5. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
    include `git remote add origin <url>` (using the URL stored at session start)
    in the command block before any push commands. This prevents the "default repo
-   has not been set" error.
+   has not been set" error. **If the gate state file's `Origin:` row says
+   `fork of`, confirm that `origin` still points at the fork, and give
+   `gh pr create` an explicit `--repo <fork-owner>/<repo>` (and `--base` a
+   branch of the fork).** Without `--repo`, `gh` opens the PR against the parent
+   repo (`SHELL_REFERENCE.md`, "Forks").
 6. **Present commands per Section 5.8** — format the commit, push, and PR creation
    commands for the user's shell environment. The user runs them manually or asks
    Claude to execute directly. **In semi-autonomous mode, Claude runs all three itself**
