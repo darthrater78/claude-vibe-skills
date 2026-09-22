@@ -71,9 +71,39 @@ Required gates scale with the operation, matching the two tracks in Section 2:
 |---|---|
 | `git commit`, `git push` to a branch | SECURITY |
 | `gh pr create`, MCP `create_pull_request` | VERSION, BUILD, SECURITY, DOCS |
-| `git tag`, `git push --tags`, `git push origin main`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | VERSION, BUILD, SECURITY, DOCS, RELEASE |
+| `git push origin main`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | VERSION, BUILD, SECURITY, DOCS, RELEASE |
 
 Read-only git (`status`, `diff`, `log`, `tag -l`, `fetch`) is never blocked.
+
+**User-only ref operations: always denied, in both modes.** Creating a tag
+(`git tag <name>`, `git tag -a/-s/-f/-m/-u`), pushing one (`git push … v1.2.3`,
+`--tags`, `--follow-tags`, `refs/tags/…`), and deleting any ref (`git push
+--delete` / `-d`, `git push origin :<ref>`, `--mirror`, `gh pr merge
+--delete-branch`, `gh api -X DELETE …/git/refs/…`, MCP `create_tag` /
+`delete_branch` / `delete_tag` / `delete_ref`) are all denied before the gate
+file is read. SKILL.md Section 5.8 makes these the user's to run in manual
+*and* semi-autonomous mode, so no gate state can turn them into something
+Claude executes. Present the block instead.
+
+**Operating mode chosen.** Every classified git write is denied unless the gate
+file's first `Mode:` line reads `manual` or `semi-autonomous`. A missing row,
+`Mode: unchosen`, or any other value means the session-start mode question was
+never answered (SKILL.md, "Operating modes"). The hook does not fall back to
+manual. Ask the user, then write their answer.
+
+**Fork targeting.** The gate file's `Origin:` row
+(`Origin: owner/repo (fork of parent/repo)` or `Origin: owner/repo (not a
+fork)`) drives three checks (`skills/dev-skills/SHELL_REFERENCE.md`, "Forks"):
+
+| Situation | Denied |
+|---|---|
+| Any repo with an `Origin:` slug | a `gh pr`/`gh release` write whose `--repo`/`-R` names a different repo; an MCP write whose `owner`/`repo` differ |
+| A fork | a `gh pr`/`gh release` write with **no** `--repo`, because `gh` resolves a fork to its parent by default |
+| A fork | a `git push` that does not name `origin` explicitly (bare `git push`, `git push upstream …`) |
+
+A row that says `fork of` but doesn't name the fork as `owner/repo` is denied
+outright. A gate file with no `Origin:` row skips these checks, but every
+session now writes the row at start (`SESSION_START.md`, step 1a).
 
 **Open-findings check (SECURITY, release track only).** `GATE_REFERENCE.md`
 Gate 3 says no finding of any severity may be open when the release track runs
@@ -108,6 +138,9 @@ file.
 
 **Neither `jq` nor `python3`** → denied, with instructions to install one.
 
+**`Mode:` missing or `unchosen`** → denied. This includes a gate file written
+before 2.29.0 that has no `Mode:` row: ask the mode question and add the row.
+
 **Bypass:** `DEV_SKILLS_GATE_HOOK=off` disables the hook entirely. It exists for
 debugging the hook itself, not for getting past a gate — the supported way past
 a gate is to run it, or to mark it ➖ N/A for a structural reason on the tracker.
@@ -121,6 +154,14 @@ printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git tag v1
 
 # expect: no output (allow)
 printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git status"}}' \
+  | .claude/hooks/gate-preflight.sh
+
+# with "Mode: unchosen" in the gate file — expect: deny, mode not chosen
+printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git commit -m x"}}' \
+  | .claude/hooks/gate-preflight.sh
+
+# with "Origin: me/repo (fork of up/repo)" — expect: deny, no --repo in a fork
+printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr create --title x"}}' \
   | .claude/hooks/gate-preflight.sh
 
 # handoff annotation check — run from a repo with a Dockerfile/.csproj/.sln/

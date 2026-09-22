@@ -103,6 +103,31 @@ fallback for users with no local clone are in `SHIP_REFERENCE.md`.
 
 ---
 
+## Forks — `origin` is the fork, and the session never targets upstream
+
+When the working repo is a fork, every git write Claude runs or presents goes to the
+fork: pushes, PRs (base repo *and* head repo), merges, releases, and the tag
+block. The upstream repo is out of scope for the session in both modes. If the
+user wants to open a PR upstream, sync the fork, or file an issue there, they do
+it on GitHub directly. Claude does not present it, run it, or offer a
+workaround. Session start checks and fixes the remote (`SESSION_START.md`,
+step 1a). What holds for the rest of the session:
+
+- **`origin` points at the fork.** A clone whose `origin` is the upstream repo
+  is corrected before any work starts, not worked around with a second remote.
+- **No `upstream` remote is added, and none is used for writes.** One that
+  already exists stays read-only: Claude never pushes to it.
+- **Every `gh` command that writes passes `--repo <fork-owner>/<repo>`.** In a
+  fork, `gh pr create` defaults its *base* to the parent repo, so a bare
+  `gh pr create` opens the PR upstream. That exact failure is why this rule
+  exists. `gh repo set-default <fork-owner>/<repo>` is set at session start as
+  a second guard, but the explicit `--repo` is the rule. The GitHub MCP
+  equivalents take the fork's owner and repo, never the parent's.
+- **The `Origin:` row in the gate state file records it** (`Origin:
+  <owner>/<repo> (fork of <parent>)`). The pre-flight hook reads that row and
+  blocks a `gh` write in a fork that has no `--repo`, or whose `--repo` is not
+  the fork (`hooks/README.md`).
+
 ## Every presented block
 
 **Always start with `cd`** — with two exceptions. Never assume the user's

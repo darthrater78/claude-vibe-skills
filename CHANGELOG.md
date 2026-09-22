@@ -4,6 +4,82 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.29.0] — 2026-09-22
+
+**You choose the operating mode at the start of every session, and forks
+always target the fork.** Two gaps closed. The manual vs semi-autonomous
+choice was documented but never enforced: session start wrote `Mode: manual`
+and the banner mentioned "say auto mode" as a hint, so nobody was ever asked
+and every session silently ran manual. Forks had no handling at all. A clone
+whose `origin` was the upstream repo went unnoticed, and in a fork `gh pr
+create` defaults its base to the *parent* repo, so a bare PR command opened
+upstream.
+
+### Added
+- **Mandatory mode question at session start (`SESSION_START.md`, "Mode
+  choice").** Manual vs semi-autonomous is asked every session, neutrally
+  (manual listed first, no recommendation), in the same `AskUserQuestion` call
+  as the shell, sync and branch questions. Until it is answered, Claude makes
+  no edits, runs or presents no git writes, and does not ask "What are we
+  building?".
+- **`Mode: unchosen` state, and no silent default.** The gate file starts with
+  `Mode: unchosen`. A missing row, `unchosen`, or any other value means no
+  mode, never manual. A resumed session, or one that finds a committed gate
+  file, asks again.
+- **Fork check (`SESSION_START.md`, step 1a; `SKILL.md` §5.8; `SHELL_REFERENCE.md` "Forks").**
+  `gh repo view` against `origin` decides between four cases. If `origin` is
+  the upstream parent of the user's fork, it is repointed with
+  `git remote set-url origin <fork>` before any work starts. No `upstream`
+  remote is added, and an existing one is never pushed to. Every `gh` write
+  carries `--repo <fork>`. Anything upstream, the user does on GitHub
+  directly. The result is recorded as an `Origin:` row in the gate file.
+- **Hook: mode check.** `gate-preflight.sh` denies every classified git write
+  unless the first `Mode:` row reads `manual` or `semi-autonomous`.
+- **Hook: fork targeting.** Using the `Origin:` row, the hook denies `gh
+  pr`/`gh release` writes whose `--repo`/`-R` names another repo, MCP writes
+  with a different `owner`/`repo`, and, in a fork, a `gh` write with no
+  `--repo` or a `git push` that doesn't name `origin`.
+- **Hook: user-only ref operations.** Tag creation, tag pushes, and every ref
+  deletion (`git push --delete`/`-d`/`:<ref>`/`--mirror`, `gh pr merge
+  --delete-branch`, `gh api -X DELETE …/git/refs`, MCP tag/delete tools) are
+  now denied outright, in both modes. Previously the hook *allowed* `git tag`
+  once the gates passed, although SKILL.md §5.8 says Claude never runs it.
+  Tag creation is checked against an allowlist of read-only flags (`-l`,
+  `--sort`, `--contains`, …), so an unknown option fails closed.
+
+### Changed
+- **Cost pass on the always-loaded tier: SKILL.md 66KB → 51KB, SESSION_START.md
+  30KB → 25KB.** About 18KB, roughly 4.5k tokens, less context carried by every
+  session. No rule was removed and the hook and scripts are untouched. What
+  went:
+  - text that duplicated an on-demand file (the pre-tag report's contents are
+    in `AUTO_MODE.md`, §5.8's mechanics are in `SHELL_REFERENCE.md`, the
+    Dependabot enablement is in `SECURITY_GATE.md`, and the MCP disable
+    options now live only in `SESSION_START.md`'s MCP check)
+  - §6 restating `SESSION_START.md`, which is read right after it
+  - narration around rules that were already stated
+  - sample output §8 didn't need
+
+### Fixed
+- **Contradictions about who pushes the tag in semi-autonomous mode.**
+  `SKILL.md` §1 said the mode "lifts the tag-push carve-out", `AUTO_MODE.md`
+  said "the tag push and its follow-on actions are Claude's", the session
+  banner said auto mode would "run … the tag push", and two README shortcut
+  rows said the same. All of them contradicted §5.8 and the Operating modes
+  section, which keep the tag push and ref deletions with the user in both
+  modes. All now agree.
+- **Hook: `git -C <dir>` / `git -c k=v` slipped past every pattern.** The
+  classifier matched `git push`/`git commit` literally, so `git -C x push`
+  was never inspected. Those options are now normalized away first. The same
+  pass found that a chained command with two `gh` calls was only checked on
+  its first `--repo`, and that `GH_REPO=` was ignored. All three are fixed,
+  covered by a 52-case test matrix that master's hook fails 28 of.
+- The Gate 5 remote check (`GATE_REFERENCE.md`) now requires `--repo <fork>`
+  on `gh pr create` in a fork.
+- The committed gate file's v2.28.0 SHIP row was left ⏳. The tag is
+  confirmed on 6e4919f (PR #52 merge commit) with the release asset attached,
+  so it is folded into this release as ✅.
+
 ## [2.28.0] — 2026-09-19
 
 **Nothing reaches the release track with an open finding.** Severity used to

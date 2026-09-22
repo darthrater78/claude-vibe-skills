@@ -51,56 +51,32 @@ is not optional and does not wait for the user to ask.
 3. **Compare** (strip the leading `v`, semver order).
    - **Current:** fold a single confirmed line into the banner — no separate
      callout needed.
-   - **Behind:** this cannot be quiet, easy to skim past, or foldable into
-     routine banner text. An outdated copy means every gate this session
-     runs may be silently missing a fix, a tightened check, or a corrected
-     mistake — treat it with the same severity as a failed security gate,
-     not an FYI:
-
-     - **It is the first thing in the first message** — before a greeting,
-       before acknowledging what the user asked, before the session banner.
-       Nothing goes above it.
-     - **Bracket it with a full-width warning line** so it cannot be
-       mistaken for routine output, and repeat the version numbers at both
-       ends so they're visible even if the middle gets scrolled past:
+   - **Behind:** treat it like a failed security gate, not an FYI. It is **the
+     first thing in the first message**, above any greeting and the banner,
+     bracketed so it can't pass as routine output, with the versions at both
+     ends:
 
        > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
        > **STOP — dev-skills is out of date: running v2.17.0, latest is v2.19.0.**
        >
        > Gates run in this session may be missing fixes released since
-       > v2.17.0. This is not a routine notice — proceeding means every gate
-       > below runs on code this skill's own maintainers have already
-       > patched.
-       >
-       > Release notes for what changed since v2.17.0:
+       > v2.17.0. Release notes:
        > https://github.com/darthrater78/claude-vibe-skills/releases
        >
        > **To update:** download the new `dev-skills.skill` from
        > https://github.com/darthrater78/claude-vibe-skills/releases/latest
-       > and replace this copy (README → Install) — re-upload on
-       > claude.ai/Desktop if that's how it was installed, or re-run the
-       > manual CLI unzip into `~/.claude/skills/dev-skills/` (or the
-       > project's `.claude/skills/`).
+       > and replace this copy (README → Install): re-upload on
+       > claude.ai/Desktop, or re-unzip into `~/.claude/skills/dev-skills/`
+       > (or the project's `.claude/skills/`).
        >
        > **Continue this session on v2.17.0 (outdated), or pause to update
        > to v2.19.0 first?**
        > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
 
-     Wait for an explicit answer before moving on to "What are we building?" —
-     same as any other session-start finding that changes what happens next
-     (branch check, unfinished release check). Don't just print the warning
-     and keep going.
-
-     **If the user chooses to continue anyway, the warning doesn't get to
-     disappear after this one message.** Carry a short, compact tag —
-     `⚠️ outdated (v2.17.0, latest v2.19.0)` — on every later display of the
-     gate tracker this session (gate transitions, Section 7 status checks,
-     the session banner, handoff summaries per Section 5.6/5.9). This is not
-     the loud bracketed warning repeated every time — that would be noise —
-     it's a one-line reminder that the condition is still true, the same
-     pattern already used for an unfinished release or uncommitted work
-     (Section 8): surfaced once loudly, then kept visibly present, never
-     silently dropped.
+     Wait for an explicit answer before "What are we building?". If the user
+     continues anyway, carry `⚠️ outdated (v2.17.0, latest v2.19.0)` on every
+     later tracker display, status check, banner and handoff for the rest of
+     the session: loud once, then visibly present, never silently dropped.
 4. This check is unconditional — it runs even in sessions with no git repo
    detected for the *host* project (step 0 below is about that project's own
    repo; this check targets the skill's own upstream repo, which is unrelated
@@ -126,13 +102,9 @@ If the signals are ambiguous, ask — do not assume local:
 > 3. Termux (Android)
 
 **Native Linux local sessions — offer Remote Control (`--rc`) once, in either
-mode.** When step 0 resolves to **local** and the host is native Linux, say so
-once and offer it. "Native Linux" is narrower than `uname -s` reporting `Linux`,
-which Termux and WSL both do — confirm it is neither (no `com.termux` in
-`$PREFIX`, no `microsoft` in `/proc/version`) and that this is not a remote
-container.
-
-The suggestion is the **interactive** form, `--rc` / `/rc`, not server mode:
+mode.** Only when step 0 resolves to **local** on native Linux: not Termux (no
+`com.termux` in `$PREFIX`), not WSL (no `microsoft` in `/proc/version`), not a
+container. Offer the **interactive** form:
 
 > 💡 **This is a local Linux session.** Starting Claude Code with
 > `claude --rc` (or running `/rc` in this one) keeps your terminal session
@@ -140,20 +112,11 @@ The suggestion is the **interactive** form, `--rc` / `/rc`, not server mode:
 > and mobile apps, so you can pick the same session up from either surface.
 > Everything still executes here on your machine.
 
-Which invocation matters, so do not offer them interchangeably:
-
-| Command | What it gives | Offer it? |
-|---|---|---|
-| `claude --rc` / `claude --remote-control` | a normal interactive terminal session that is *also* reachable from the web and desktop apps — you can type in either place | **yes, this one** |
-| `/rc` / `/remote-control` | the same, for a session already open | yes — the in-session form |
-| `claude remote-control` | server mode: serves sessions to the apps with no local interactive prompt | no — it takes the terminal away, which is the opposite of the point |
-
-It is one line, once per session (Section 5, cost discipline): if the user
-declines or ignores it, drop it. It changes nothing about gates, tracks, or the
-mode — a session is reachable from more places, not governed differently. Two
-failure cases worth naming rather than debugging blind: Remote Control needs an
-eligible login (`/login`), and on Team and Enterprise plans it stays off until
-an Owner enables it in Claude Code admin settings.
+Never offer `claude remote-control`: that is server mode, which takes the
+local prompt away. It is one line, once. If the user declines or ignores it,
+drop it. It changes nothing about gates, tracks or mode. It needs an eligible
+login (`/login`), and on Team/Enterprise plans an Owner must enable it in
+Claude Code admin settings.
 
 **Remote container specifics:**
 
@@ -203,61 +166,40 @@ an Owner enables it in Claude Code admin settings.
    deletions are the exceptions." Semi-autonomous mode does not change this;
    it only adds the full pre-tag report above the block ("Semi-autonomous mode
    — execution", below).
-8. **Docker-in-a-web-container — scoped to projects that actually need
-   Docker to build.** If the project has a Docker build signal (`Dockerfile`,
-   `docker-compose.yml`/`compose.yaml` — the same signal
-   `hooks/gate-preflight.sh`'s `produces_compiled_artifact` checks for),
-   don't assume the container can build or run it just because the `docker`
-   binary is on `PATH`. Measure the daemon, not the binary (see the
-   measurement rule below): `docker info` (or `docker version --format
-   '{{.Server.Version}}'`). `which docker` only proves the CLI exists — a
-   web container commonly ships the client with no daemon behind it, which
-   looks identical to "Docker available" until something tries to actually
-   build.
-
-   If `docker info` fails in this environment, say so plainly and offer a
-   choice — this is a real limitation, not something to route around
-   silently:
+8. **Docker in a web container: only for projects with a Docker build
+   signal** (`Dockerfile`, `docker-compose.yml`/`compose.yaml`). Measure the
+   daemon, not the binary: `docker info`. A web container often ships the
+   CLI with no daemon behind it. If `docker info` fails, say so and offer a
+   choice. This is a real limitation, not something to route around:
 
    > ⚠️ **Docker isn't usable in this container** — the `docker` CLI is
    > present but `docker info` can't reach a daemon, so I can't build or
    > verify the image here. Two ways forward:
-   > 1. **Work commit now** — save this progress on the branch (no version
-   >    bump, no artifact) so you can pull it down on a machine with a
-   >    working Docker daemon and finish Gate 2 there.
-   > 2. **CI-only BUILD** — if this repo already has a release workflow that
-   >    builds and tests the image in CI, Gate 2 can pass on that basis
-   >    (Gate 2, "CI-only" below) instead of a local build.
+   > 1. **Work commit now** — save progress on the branch so you can finish
+   >    Gate 2 on a machine with a working Docker daemon.
+   > 2. **CI-only BUILD** — if a release workflow builds and tests the image
+   >    in CI, Gate 2 can pass on that basis (Gate 2, "CI-only").
    >
    > Which do you want?
 
-   This is a different step from the local-artifact-handoff offer below —
-   that offer is about letting a human try an already-built artifact by
-   hand; this is about whether the artifact can be built and verified in
-   this environment at all. Don't conflate marking BUILD "handoff n/a
-   (remote container)" with actually resolving this — a container that
-   can't build Docker still owes the user this choice before BUILD passes.
+   This is separate from the local-artifact handoff. Marking BUILD "handoff
+   n/a (remote container)" does not resolve it: a container that can't build
+   Docker still owes the user this choice before BUILD passes.
 
 Report the detected environment in the session banner.
 
-**Measure, don't infer — for every environment capability recorded anywhere
-(gate file, banner, handoff summary).** `which <tool>` proves a binary is on
-`PATH`; it proves nothing about whether the thing behind it actually works
-(the Docker case above is the concrete failure mode this caught: binary
-present, daemon unreachable). Record exactly what was checked and what it
-returned — "`docker info`: daemon unreachable", not "no docker"; "push to
-`fix/x` succeeded", not "push allowed" — and re-measure at the start of
-every session, or whenever the execution context changes (a handoff moves
-work from a container to a local clone, or vice versa). A capability noted
-in a prior session or a handoff summary is a claim about *that* context, not
-a fact about this one — never carry it forward as still true without
-re-checking.
+**Measure, don't infer, for every environment capability recorded anywhere**
+(gate file, banner, handoff). `which <tool>` proves a binary is on `PATH`, not
+that it works. Record what was checked and what it returned ("`docker info`:
+daemon unreachable", "push to `fix/x` succeeded"), and re-measure every session
+and whenever the execution context changes. A capability noted in a prior
+session or handoff describes *that* context, not this one.
 
 **Git repo detection — run at session start.** Check if the current working
 directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
 If yes:
 
-**Batch the reads.** Steps 1, 4, 5 and 7 are independent read-only commands,
+**Batch the reads.** Steps 1, 1a, 4, 5 and 7 are independent read-only commands,
 and every one of them run as its own call resends the whole conversation
 again. Chain them into one invocation and read the combined output — for
 example `git rev-parse --is-inside-work-tree && git remote -v && git status
@@ -278,6 +220,36 @@ was skipped.
 
    Store the answer, and include `git remote add origin <url>` in the first
    command block presented to the user.
+
+1a. **Fork check: `origin` must be the fork, never upstream.** Resolve what
+   `origin` points at and whether a fork is involved. Fold these into the
+   batched read below:
+
+   ```
+   gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission
+   gh api user -q .login
+   ```
+
+   (Without `gh`, use the GitHub MCP `get_repository` equivalent.) Then there
+   are four cases:
+
+   | What you find | What it means | Do |
+   |---|---|---|
+   | `isFork: true` | `origin` is the fork | Correct. Record `Origin: <owner>/<repo> (fork of <parent>)` and run `gh repo set-default <owner>/<repo>` |
+   | `isFork: false`, and `<login>/<repo>` exists with this repo as its `parent` | `origin` is **upstream**, and the user's fork exists | Stop. Fix the remote before any work: `git remote set-url origin <fork-url>`, then `git fetch origin`. Record the fork as above |
+   | `isFork: false`, the user is not the owner, `viewerPermission` is below `WRITE`, and no fork exists | They cloned someone else's repo and have nowhere to push | Stop and ask. The user creates the fork on GitHub (or approves `gh repo fork --remote=false`), and then the remote is fixed as above. Never plan a push or PR to the upstream repo |
+   | `isFork: false`, and the user owns it or has `WRITE` | An ordinary repo | Nothing to do. Record `Origin: <owner>/<repo> (not a fork)` |
+
+   The user's rule: **the user can go to GitHub directly if they want to go
+   upstream.** So the fix is always to repoint `origin` to the fork. Adding an
+   `upstream` remote beside it is not a fix. If an `upstream` remote already
+   exists, leave it alone and never push to it. Changing `set-url` is a local
+   config change, not a ref write: it follows the session's mode (presented in
+   manual, run by Claude in semi-autonomous), after the user has seen the
+   before and after URLs. Full rule: `SHELL_REFERENCE.md`, "Forks".
+
+   **Re-check after a fix, don't assume it worked.** `git remote -v` and the
+   `gh repo view` call must now both name the fork. Record what they returned.
 
 2. **Shell environment detection.** *Local and Termux sessions ask this now.
    Remote containers defer it until a tag block is due (step 0, item 4) — they
@@ -324,61 +296,30 @@ was skipped.
 
 5. **Report the repo state** in the session start banner (see below).
 
-6. **Workflow detection — two workflows, and both are needed.** A project has a
-   *local development workflow* and a *CI workflow*. They are not substitutes
-   for one another, and different gates depend on each. Detect both, and report
-   both in the banner.
+6. **Workflow detection: two workflows, both needed, both in the banner.**
+   - **Local dev workflow**, which **Gate 2 (BUILD) runs**: `scripts/`,
+     `Makefile`/`justfile`/`Taskfile.yml`, `package.json` `"scripts"`,
+     `tox.ini`, `noxfile.py`, `gradlew`, `Cargo.toml`, `.csproj`/`.sln`, a
+     `docker compose` dev stack, or build steps in `CONTRIBUTING.md`/`README.md`.
+   - **CI build check** (on push/PR), which validates **Gate 5's PR**.
+   - **CI release workflow** (`on: push: tags:`), which **Gate 6 fires**.
 
-   **The local development workflow** — what a developer runs on their own
-   machine to build, test, and lint before anything is pushed. Look for:
-   `scripts/`, `Makefile` / `justfile` / `Taskfile.yml`, `package.json`
-   `"scripts"`, `tox.ini`, `noxfile.py`, `gradlew`, `Cargo.toml`, `.csproj` /
-   `.sln`, a `docker compose` dev stack, or build instructions in
-   `CONTRIBUTING.md` / `README.md`.
+   Name the gate each missing one breaks:
 
-   **Gate 2 (BUILD) runs this one.** It is the only thing that turns "the code
-   should work" into "the code was run." A project with no local dev workflow
-   has nothing for Gate 2 to execute.
+   | Missing | Surface |
+   |---|---|
+   | Local dev workflow | 💡 **No local build/test workflow found.** Gate 2 can only confirm this builds if there's something to run. How do you build and test this locally? |
+   | CI build check | 💡 **No CI build check detected.** PRs are not compiled before merge. Want me to create one? |
+   | CI release workflow (Gate 2 not ➖ N/A) | 💡 **No CI release workflow detected.** CI could build and publish artifacts when you push a version tag. Want me to create `.github/workflows/release.yml`? |
 
-   **The CI workflow** — what runs on the server. Two distinct kinds, and a
-   project can easily have one without the other:
-   - a **build check** — triggers on push or pull request, compiles and tests
-   - a **release workflow** — triggers on tag push (`on: push: tags:`), builds
-     artifacts and publishes the release
-
-   **Gate 5's PR is validated by the build check; Gate 6 (SHIP) fires the
-   release workflow.**
-
-   Then flag whichever is missing. Each gap breaks a different gate, so name the
-   gate rather than reporting a generic absence:
-
-   | Missing | What it breaks | Surface |
-   |---|---|---|
-   | Local dev workflow | Gate 2 has no command to run — "verified working" becomes a guess | 💡 **No local build/test workflow found.** Gate 2 can only confirm this builds if there's something to run. How do you build and test this locally? |
-   | CI build check | PRs merge without ever being compiled | 💡 **No CI build check detected.** PRs are not compiled before merge. A build check catches compile errors before they land on the default branch. Want me to create one? |
-   | CI release workflow (and Gate 2 is not ➖ N/A) | Gate 6 has no publish path; release artifacts get built by hand | 💡 **No CI release workflow detected.** A release workflow would let CI build and publish artifacts when you push a version tag — no local release build needed. Want me to create `.github/workflows/release.yml`? |
-
-   **When both exist, check that they agree.** CI should invoke the project's
-   own scripts — `bash scripts/validate.sh`, `npm test`, `./gradlew test` — not
-   reimplement them inline. A CI job carrying its own hand-rolled copy of the
-   build is testing something the developer never runs locally, and the two
-   drift apart silently until a release breaks. Flag the divergence:
-
-   > ⚠️ **CI and local dev have drifted.** `validate.yml` runs its checks
-   > inline, but `scripts/validate.sh` is what a developer runs. They can pass
-   > and fail independently. CI should call the script.
-
-   If the user asks for a workflow to be created, or accepts the suggestion,
-   **load `WORKFLOW_REFERENCE.md`** from this skill's base directory. It holds
-   environment-detection rules, template workflows for Docker, Windows,
-   Android, Linux, Home Assistant, Python, Node.js, and script projects,
-   dev/pre-release builds, and the procedure for asking all configuration
-   questions in a single turn. Follow its workflow selection procedure
-   rather than asking questions piecemeal.
-
-   The generated workflow must be adapted from the project's actual build
-   tooling. A workflow that does not run the project's real build is worse
-   than none, because it goes green without proving anything.
+   **When both exist, check that they agree.** CI should call the project's
+   own scripts (`bash scripts/validate.sh`, `npm test`), not reimplement them
+   inline. Otherwise flag it: "⚠️ **CI and local dev have drifted.**
+   `validate.yml` runs its checks inline, but `scripts/validate.sh` is what a
+   developer runs." To create a workflow, **load `WORKFLOW_REFERENCE.md`** and
+   follow its selection procedure, asking every question in one turn. Adapt
+   the workflow from the project's real build tooling. A workflow that doesn't
+   run the real build goes green without proving anything.
 
 7. **Unfinished release check — did the last release actually ship?** Gate 6 has
    four parts (merge, tag, publish, verify) and a session can die between any two
@@ -412,20 +353,53 @@ was skipped.
    gap here means the *next* release is about to be stacked on an unpublished
    one, and Gate 1 will hard-block on it anyway.
 
-**Write the gate state file.** Create `.claude/dev-skills-gates.md` with all six
-gates ⬜ pending and `Mode: manual` (format in Section 2). Every session starts
-manual — do not carry a mode forward from a handoff summary, a prior session, or
-the harness's own permission setting. On local sessions add it to `.gitignore`;
-on remote containers it is committed with the work. This file — not the
-conversation — is the source of truth for gate state for the rest of the session.
+**Mode choice — ask every session, and block until it is answered.** This is
+the question the skill used to leave to the user to volunteer. In practice
+that meant it was never asked, and every session ran manual whether or not
+the user wanted that. Now it is asked every time:
+
+- **Ask it in the first message that asks the user anything**, in the same
+  `AskUserQuestion` call as the shell, sync and branch questions (steps 2–4)
+  and the model-ceiling question (`SKILL.md` §5.2). It is one more question in
+  a call that is already being made, so it adds no extra round trip. If there
+  is nothing else to ask (a remote container with a clean, current branch),
+  ask it on its own. Never skip it.
+- **Word it neutrally, with manual first and no recommendation:**
+
+  > **Operating mode for this session?**
+  > 1. **Manual:** I present git commands and you run them. I stop between
+  >    steps.
+  > 2. **Semi-autonomous:** I run git myself after your approval of each
+  >    commit. The tag push and any ref deletion are still yours to run.
+
+- **Nothing selects it for the user.** Not the harness's permission mode, not
+  a handoff summary, not a `Mode:` line committed by an earlier session, and
+  not silence. If the user answers the other questions and skips this one, ask
+  again. The mode stays `unchosen`.
+- **Until it is answered:** no edits, no git write executed or presented, and
+  no "What are we building?". Read-only session-start checks continue. Once it
+  is answered, write it to the state file in the same turn. If the answer is
+  semi-autonomous, give the one-message confirmation from `AUTO_MODE.md`
+  ("Entering the mode").
+
+**Write the gate state file.** Create `.claude/dev-skills-gates.md` with all
+six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
+(format in Section 2). Replace `unchosen` with the user's answer as soon as it
+arrives. Where the pre-flight hook is installed, it denies every git write
+while the row reads `unchosen`. A file committed by an earlier session is
+overwritten, not inherited: its `Mode:` line describes that session. On local
+sessions add the file to `.gitignore`; on remote containers it is committed
+with the work. This file, not the conversation, is the source of truth for gate
+state and mode for the rest of the session.
 
 Then show the gate tracker:
 
 ```
-Dev Skills v2.28.0 active.
+Dev Skills v2.29.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
-Mode: manual (say "auto mode" to have me run the commands and the tag push)
+Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
+Mode: <manual / semi-autonomous / ⬜ unchosen — answer the mode question first>
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
 Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced>
 CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
@@ -449,7 +423,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.28.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.29.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -472,7 +446,16 @@ Rules for the MCP check:
   disabling [name] — not needed for this task. Run `/mcp` to toggle."
 - `/mcp` is the in-session command. It toggles servers on/off without leaving
   the session. This is the primary recommendation for disabling during a session.
-- For permanent removal, see Section 5.5.
+- Permanent removal, by how the server was added: CLI-added → `claude mcp
+  list` / `claude mcp remove <name>`; project `.mcp.json` → add it to
+  `"disabledMcpjsonServers"` in `.claude/settings.json`; desktop app
+  connectors → the app's Settings (Claude cannot change these); a clean start →
+  `claude --strict-mcp-config --mcp-config '{"mcpServers":{}}'`, which is worth
+  a shell alias for users who want a cheap default.
+- **After `/mcp` changes, re-check from your own context** (tool prefixes), not
+  `claude mcp list`, which returns the full catalog. Give a short before/after:
+  `Connections now: X, Y (was: + Z)` and `Estimated overhead: ~12k/turn, down
+  from ~40k/turn`.
 
 Then: "What are we building?"
 

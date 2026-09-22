@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.28.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.29.0`
 
 ---
 
@@ -160,9 +160,21 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   survive: **every commit still needs your explicit yes**, and the tag still
   comes back to you as a block — with a full report of every action Claude took
   since that approval above it. The version bump and release notes fold into the
-  commit approval. Manual mode is unchanged and remains the default; the mode is
-  written to the gate state file so a compacted session can't lose it, and never
-  carries into a new session. *(2.26.0)*
+  commit approval. The mode is written to the gate state file so a compacted
+  session can't lose it, and it never carries into a new session. *(2.26.0)*
+- **You choose the mode at the start of every session.** Manual versus
+  semi-autonomous is now one of the session-start questions, asked neutrally
+  with no default. Until you answer, Claude makes no edits and runs or presents
+  no git writes, and the enforcement hook denies git writes while the gate file
+  reads `Mode: unchosen`. Before this, the mode was only ever mentioned as a
+  hint, so it was never actually chosen. *(2.29.0)*
+- **[Forks: `origin` is the fork, never upstream.](#forks)** Session start
+  checks whether `origin` is a fork, or is the upstream parent of a fork you
+  own, and repoints it to the fork before any work begins. Every push, PR,
+  merge and release targets the fork, with an explicit `--repo`, because a bare
+  `gh pr create` in a fork opens the PR upstream. Anything upstream, you do on
+  GitHub yourself. The hook blocks `gh` writes in a fork that lack `--repo` or
+  point anywhere else. *(2.29.0)*
 
 ---
 
@@ -189,6 +201,7 @@ Gate state lives in a file, not in Claude's memory:
 # .claude/dev-skills-gates.md
 Track: release sequence
 Mode: manual
+Origin: you/your-repo (not a fork)
 Version: 2.18.0
 
 🔢 VERSION    ✅ all refs at 2.18.0; prev v2.17.0 tagged on remote
@@ -388,16 +401,22 @@ stated out loud on the tracker.
 
 ## Manual and semi-autonomous mode
 
-Every session starts in **manual mode** — the behavior this skill has always
-had. Claude hands you the git commands, you run them, and the tag push comes
-back to you no matter where the session is running.
+**You pick the mode at the start of every session.** It is one of the
+session-start questions, manual listed first and neither recommended, and
+nothing proceeds until you answer. No edits and no git writes happen before
+then, and a `Mode: unchosen` gate file is denied by the enforcement hook.
 
-**Semi-autonomous mode** is opt-in, per session, and you turn it on by asking:
-"auto mode", "semi-autonomous mode", "take it from here". It changes *who runs
+**Manual mode** is the behavior this skill has always had. Claude hands you the
+git commands, you run them, and the tag push comes back to you no matter where
+the session is running.
+
+**Semi-autonomous mode** is chosen per session, either at that question or
+later by asking for it: "auto mode", "semi-autonomous mode", "take it from
+here". It changes *who runs
 most of the commands* — not what has to be true before they run, and not the two
 ref operations GitHub denies Claude.
 
-| | Manual (default) | Semi-autonomous |
+| | Manual | Semi-autonomous |
 |---|---|---|
 | **Commit approval** | required, every commit | **required, every commit** |
 | Commit, branch push, PR | presented for you to run | Claude runs them |
@@ -479,10 +498,11 @@ or release *deleted* stops the sequence and comes back to you. Claude deletes no
 refs in either mode — the merged PR's own branch included.
 
 **The mode is written to the gate state file**, not remembered — a compacted
-session can't lose track of it, and if the file says nothing, the session is
-manual. Semi-autonomous mode never carries into a new session; every session starts
-manual and you opt in again in one word. Switch back any time with "manual
-mode".
+session can't lose track of it. A file with no `Mode:` row, or one that reads
+`unchosen`, means no mode has been chosen, not manual, and git writes wait
+until you answer. The mode never carries into a new session: every session
+asks again, even when it resumes from a handoff or finds a committed gate file.
+Switch any time with "manual mode" or "auto mode".
 
 Two notes worth knowing:
 
@@ -551,9 +571,14 @@ stops being advisory for anything Claude runs itself.
 |---|---|
 | `git commit`, `git push` to a branch | Security |
 | `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
-| `git tag`, `git push --tags`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
+| `gh pr merge`, `gh release create`, `git push origin main`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
+| Creating or pushing a tag, deleting any ref (`git push --delete`, `:<ref>`, `gh pr merge --delete-branch`, …) | **Always denied.** These are yours to run in both modes |
 
-Read-only git is never blocked. For BUILD specifically, the hook also denies a
+On top of the gates, every git write is denied until the gate file's `Mode:`
+row names `manual` or `semi-autonomous`, so an unanswered mode question
+blocks. In a fork, a `gh` write without `--repo <fork>` and a push that
+doesn't name `origin` are denied too ([Forks](#forks)). Read-only git is never
+blocked. For BUILD specifically, the hook also denies a
 ✅ with no `handoff` annotation in any repo with a Docker/.exe/.apk build
 signal — the deterministic half of the [local-artifact-handoff
 offer](#gate-2--build-). It reads a gate row's full text (the status line
@@ -576,14 +601,31 @@ performing it covers the rest.
 The skill detects where the session is running, because in
 [manual mode](#manual-and-semi-autonomous-mode) that determines whether Claude's
 working tree and your terminal are the same clone. (In semi-autonomous mode Claude
-runs every command itself, and this table describes only the fallback when one
-fails.)
+runs every command itself except the tag push and ref deletions, which are
+always yours, and this table describes only the fallback when one fails.)
 
 | Environment | Git behavior |
 |---|---|
 | **Local** (Claude Code CLI) | Same clone — commands are **presented** for you to run, at no tool-call token cost |
 | **Remote container** (web/mobile) | A clone your terminal never sees — Claude **executes** git directly. A pasted block would commit nothing, and container work is destroyed when the session ends |
 | **Termux** (Android) | Presented, plus a clone flow — the repo may not be on the device |
+
+### Forks
+
+If the repo is a fork, **`origin` must be the fork.** Session start checks this
+with `gh repo view` against `origin`. If `origin` turns out to be the upstream
+parent of a fork you own, Claude stops and repoints it with
+`git remote set-url origin <fork-url>` before any work begins. No `upstream`
+remote is added for you. If one exists already, it is never pushed to.
+
+From then on every push, PR, merge and release targets the fork, and every
+`gh` write carries `--repo <you>/<repo>`. The reason is concrete: in a fork,
+a bare `gh pr create` defaults to opening the PR against the **parent** repo.
+Anything you want to do upstream, like opening a PR there or syncing the fork,
+you do on GitHub directly. The gate file records this as
+`Origin: <you>/<repo> (fork of <parent>)`, and the [enforcement
+hook](#enforcement-hook-optional) blocks a `gh` write in a fork that has no
+`--repo` or names another repo.
 
 ### Native Linux sessions get offered Remote Control
 
@@ -744,8 +786,8 @@ template you review before anything is written.
 | "just give me the commands" | Same gates as executing them — tracker shown above the block |
 | "looks good" | That's feedback on the diff, not commit approval — Claude asks explicitly |
 | "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A, for structural reasons |
-| "just tag it for me" | Manual mode: tag pushes are yours to run — the block is presented, not executed. Semi-autonomous mode: Claude pushes it, after the same gates |
-| "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands and the tag push. Commit approval stays |
+| "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it) |
+| "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands. Commit approval stays, and the tag push and ref deletions stay yours |
 | "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
 | "that finding is pre-existing" | Provenance, not a verdict — it stays open and blocks the release until fixed, waived or withdrawn |
 | "ignore the Mediums" | Category suppression isn't a waiver — you're asked which specific finding, and the waiver is recorded with your reason |
@@ -759,7 +801,7 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~64KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SKILL.md` | ~51KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~25KB | Once, at session start — self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
 | `GATE_REFERENCE.md` | ~22KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
 | `SECURITY_GATE.md` | ~15KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
@@ -771,7 +813,7 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
-| `SHELL_REFERENCE.md` | ~12KB | Before writing any command block — `cd` formats, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
+| `SHELL_REFERENCE.md` | ~14KB | Before writing any command block — fork targeting, `cd` formats, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
 | `WORKFLOW_REFERENCE.md` | ~40KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
 | `WORKFLOW_DOCKER.md` | ~9KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |

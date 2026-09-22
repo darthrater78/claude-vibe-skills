@@ -1,8 +1,8 @@
 # Semi-Autonomous Mode Reference
 
-Loaded on demand by the dev-skills skill, **only when the user has opted into
-semi-autonomous mode** (`SKILL.md`, "Operating modes"). A manual-mode session
-never needs this file.
+Loaded on demand by the dev-skills skill, **only when the user has chosen
+semi-autonomous mode**, either at the session-start mode question or later
+(`SKILL.md`, "Operating modes"). A manual-mode session never needs this file.
 
 The contract is in `SKILL.md`: the user opts in explicitly, Claude runs the
 commands instead of presenting them, the tag push and every ref deletion stay
@@ -16,15 +16,17 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 ## Semi-autonomous mode — execution
 
-The contract is in `SKILL.md` (Operating modes): the user opts in explicitly,
-Claude runs the commands instead of presenting them, the tag push and its
-follow-on actions are Claude's, and **commit approval is untouched**. This
-section is how that runs.
+The contract is in `SKILL.md` (Operating modes): the user chooses it
+explicitly, Claude runs the commands instead of presenting them, the tag push
+and every ref deletion stay with the user, and **commit approval is
+untouched**. This section is how that runs.
 
 ### Entering the mode
 
-The user asks for it. Confirm in one short message — not a lecture — what
-changes and what does not, then record it:
+The user picks it, either as the answer to the session-start mode question
+(`SESSION_START.md`, "Mode choice") or later in their own words. Confirm in
+one short message, not a lecture, what changes and what does not, then record
+it:
 
 > **Semi-autonomous mode on.** I'll run the git commands myself from here —
 > commits, pushes, the PR, the merge, watching CI, verification — and I won't
