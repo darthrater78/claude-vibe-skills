@@ -1,5 +1,5 @@
 # Dev Skills gate state
-Track: work commit (release v2.29.0 paused — Dependabot finding open)
+Track: release sequence (v2.29.0)
 Mode: semi-autonomous (approved 2026-09-22) — commits and the tag still
       require the user's approval
 Origin: darthrater78/claude-vibe-skills (not a fork)
@@ -17,11 +17,9 @@ release asset dev-skills.skill present. Folded in from the 2.28.0 ⏳ row.
               handoff n/a — no Docker/.exe/.apk signal in this repo
               Hook: 52-case matrix pass (master's hook fails 28)
               Re-run after cost pass: validate green, tree stable, matrix 52/52
-🔒 SECURITY   ✅ 1 open — 0 Critical, 0 High, 1 Medium (blocks release)
-              📝 open: Dependabot alerts DISABLED — verified this session,
-              GET .../dependabot/alerts → 403 "disabled". The 2.28.0 waiver
-              was granted as "unverified either way"; verification changed
-              its context, so it re-opened. Needs the user: enable, or re-waive
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
+              🔕 waived 2026-09-22 by user: Dependabot alerts disabled
+              (verified 403) — deferred to next release; re-opens then
               ✅ fixed: hook bypasses — git -C/-c, chained gh --repo, GH_REPO=,
               git tag long options, git push +:ref
               Code scan: no secrets, no eval, no piped-curl, no rm -rf.
@@ -33,5 +31,5 @@ release asset dev-skills.skill present. Folded in from the 2.28.0 ⏳ row.
               stale "Claude pushes the tag" claims removed; validate clean
               Cost pass: SKILL.md 66→51KB, SESSION_START 30→25KB; README
               size table + CHANGELOG "Changed" updated; no rule phrase lost
-📦 RELEASE    ⬜
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR to master — this file ships inside it; notes = CHANGELOG 2.29.0
+🚀 SHIP       ⏳ merge, CI on merge commit, then USER pushes tag v2.29.0
