@@ -12,13 +12,14 @@ files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFEREN
 version_file=$(tr -d '[:space:]' < VERSION)
 skill_frontmatter=$(grep -m1 '^version:' skills/dev-skills/SKILL.md | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
 skill_banner=$(grep -rhoP 'Dev Skills v\K[0-9]+\.[0-9]+\.[0-9]+' skills/dev-skills/*.md | head -1)
-readme_version_code=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1)
+readme_version_codes=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
+readme_version_code=$(echo "$readme_version_codes" | head -1)
 
 echo "=== Version sources ==="
 echo "  VERSION file:        $version_file"
 echo "  SKILL.md frontmatter: $skill_frontmatter"
 echo "  Session banner:       $skill_banner"
-echo "  README.md:            $readme_version_code"
+echo "  README.md:            $(echo "$readme_version_codes" | tr '\n' ' ')"
 
 # Check all versions match
 if [ "$version_file" != "$skill_frontmatter" ]; then
@@ -31,10 +32,14 @@ if [ "$version_file" != "$skill_banner" ]; then
   errors=$((errors + 1))
 fi
 
-if [ "$version_file" != "$readme_version_code" ]; then
-  echo "FAIL: VERSION ($version_file) != README.md ($readme_version_code)"
-  errors=$((errors + 1))
-fi
+# Every `vX.Y.Z` code-span in README.md must match VERSION, not just the
+# first — a stale footer or a second badge would otherwise pass silently.
+while IFS= read -r v; do
+  if [ "$v" != "$version_file" ]; then
+    echo "FAIL: VERSION ($version_file) != a README.md \`v$v\` reference"
+    errors=$((errors + 1))
+  fi
+done <<< "$readme_version_codes"
 
 # Check CHANGELOG has an entry for current version
 if [ -f CHANGELOG.md ]; then

@@ -893,4 +893,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.28.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.29.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
