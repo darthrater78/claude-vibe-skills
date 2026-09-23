@@ -471,7 +471,7 @@ state and mode for the rest of the session.
 Track: release sequence
 Mode: manual
 Origin: owner/repo (not a fork)
-Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined
+Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅
 Version: 2.12.0
 Updated: 2026-09-07
 
@@ -498,7 +498,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.35.0 active.
+Dev Skills v2.36.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -532,7 +532,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.35.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

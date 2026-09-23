@@ -68,3 +68,6 @@ SKILL|Encryption at rest is always considered
 SKILL|The main page links to GitHub and the latest release notes, without exception
 SKILL|Docker projects offer Apprise notifications
 SKILL|trust this device for 30 days
+SKILL|Docker projects document a compose quickstart
+SKILL|Every volume is a bind mount under
+SKILL|The image tag is pinned to the current version
