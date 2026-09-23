@@ -417,9 +417,26 @@ the user wanted that. Now it is asked every time:
 
   > **Operating mode for this session?**
   > 1. **Manual:** I present git commands and you run them. I stop between
-  >    steps.
+  >    steps. *Cost:* running the commands costs no tokens, since they run
+  >    outside me. Each stop is one more turn when you reply.
   > 2. **Semi-autonomous:** I run git myself after your approval of each
   >    commit. The tag push and any ref deletion are still yours to run.
+  >    *Cost:* every command I run is a tool call that resends the whole
+  >    conversation. I chain steps to keep that down, and the output lands
+  >    in context.
+
+  **The cost line is part of each option and is shown every time.** A picker
+  that shows only what a mode does, without its cost, is the wrong question.
+  With `AskUserQuestion`, use these option descriptions word for word. Both
+  options carry a `Cost:` sentence, and neither is labeled "(Recommended)":
+
+  | Option label | Description, local and Termux sessions | Description, remote container |
+  |---|---|---|
+  | `Manual` | I present git commands and you run them; I stop between steps. Cost: the commands run outside me, so they cost no tokens; each stop is one more turn. | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
+  | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run resends the whole conversation; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
+
+  In a remote container Claude runs git in both modes (`SKILL.md` §5.8), so the
+  difference there is only the number of stops.
 
 - **Nothing selects it for the user.** Not the harness's permission mode, not
   a handoff summary, not a `Mode:` line committed by an earlier session, and
@@ -474,7 +491,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.31.0 active.
+Dev Skills v2.32.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -508,7 +525,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.31.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.32.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -518,7 +535,9 @@ MCP tool prefixes (`mcp__<server>__`). Report what's connected:
 
 ```
 MCP servers active: [list names derived from tool prefixes]
-To disable for this session: /mcp → toggle off any you don't need
+To disable for this session, run the line for each one you don't need:
+  /mcp disable <server-1>
+  /mcp disable <server-2>
 ```
 
 Rules for the MCP check:
@@ -527,10 +546,17 @@ Rules for the MCP check:
 - Distinguish **active** (full tool definitions loaded — expensive, thousands of
   tokens per request) from **deferred** (name-only, schemas loaded on demand —
   cheap). Report deferred as a count only: "N deferred (low overhead)".
+- **Give one ready-to-paste `/mcp disable <server>` line per active server**,
+  never a bare `/mcp`. `<server>` is the name from the tool prefix. If Claude
+  Code does not recognize it, the name shown in the `/mcp` list is the one to
+  use (the prefix can swap spaces or hyphens for `_`). `/mcp enable <server>`
+  turns one back on, and `/mcp disable all` turns off every server. On a
+  Claude Code version without these arguments, fall back to plain `/mcp` and
+  toggle the server off in the list.
 - If active servers look irrelevant to the work ahead, say so: "Consider
-  disabling [name] — not needed for this task. Run `/mcp` to toggle."
-- `/mcp` is the in-session command. It toggles servers on/off without leaving
-  the session. This is the primary recommendation for disabling during a session.
+  disabling [name] — not needed for this task: `/mcp disable [name]`."
+- `/mcp disable` works without leaving the session. This is the primary
+  recommendation for disabling during a session.
 - Permanent removal, by how the server was added: CLI-added → `claude mcp
   list` / `claude mcp remove <name>`; project `.mcp.json` → add it to
   `"disabledMcpjsonServers"` in `.claude/settings.json`; desktop app
