@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.30.0
+version: 2.31.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -31,78 +31,59 @@ begins — including work on the skill.
 
 **Every session starts with the mode unchosen, and the user picks it before any
 work begins** (`SESSION_START.md`, "Mode choice"). Until it is answered,
-nothing is edited and no git write is executed or presented. This is a hard
-stop, not a default: a mode nobody chose is a mode Claude guessed.
+nothing is edited and no git write is executed or presented. A mode nobody
+chose is a mode Claude guessed.
 
 **Manual mode:** git commands are presented for the user to run (Section 5.8),
-the tag push and every ref deletion come back to the user, and Claude stops
-between steps. This is what the skill has always done.
+and Claude stops between steps.
 
-**Semi-autonomous mode:** the user's own words pick it, at that question or
-later ("auto mode", "take it from here"). It changes *who runs most of the
-commands*, not what has to be true before they run, and not the two ref
-operations the remote denies. Ask neutrally, manual first, recommending
-neither; never infer, pre-select, or switch it on because the session is going
-well. **It is not the harness's own "auto mode"** (a permission setting) —
-being in that one answers nothing.
-
-It changes two things (`AUTO_MODE.md` holds the checkpoint formats, the
-per-step table and the stop conditions; chaining commands is §5.1, for every
-mode):
+**Semi-autonomous mode:** only the user's own words pick it, at that question or
+later ("auto mode", "take it from here"). Ask neutrally, manual first,
+recommending neither; never infer it, pre-select it, or switch it on because
+the session is going well. **It is not the harness's own "auto mode"** (a
+permission setting), and being in that one answers nothing. It changes two
+things, detailed in `AUTO_MODE.md`:
 
 1. **Claude executes git instead of presenting it**, in every environment:
-   commits, branch pushes, the PR, the merge, CI watching, post-ship
-   verification, tracker commits.
-2. **Between-step confirmations collapse into two checkpoints, not none.** The
-   version bump and release notes fold into the commit approval; the pre-ship
-   confirmation becomes the **pre-tag report**, a full account of *every*
-   action since the commit approval (commits, pushes, PR, every CI run, the
-   merge commit, each gate's evidence, the version guard, and anything that
-   failed, was retried or deviated), handed over with the tag block. It is
-   the user's only view of the unattended stretch, so it is never a summary.
+   commits, branch pushes, the PR, the merge, CI watching, verification.
+2. **Between-step confirmations collapse into two checkpoints, not none**: the
+   commit approval (which also carries the version bump and release notes),
+   and the **pre-tag report**, a full account of *every* action since that
+   approval, handed over with the tag block. It is the user's only view of the
+   unattended stretch, so it is never a summary.
 
 **What no mode changes:**
 
-- **Commit approval (Section 1)**: every commit, with the diff and the drafted
-  message seen and approved first. "Semi-autonomous" describes the commands,
-  never the content.
+- **Commit approval (Section 1)**: the diff and the drafted message, seen and
+  approved, for every commit.
 - **The tag push and every ref deletion go to the user**, including the merged
   PR's own branch, so a merge never carries `--delete-branch`. This is a
-  credential fact, not supervision: Claude's credentials are routinely `403`'d
-  on exactly these (Section 5.8), and a mode cannot grant what the remote
-  withholds. Claude resumes by itself once the tag is confirmed on the remote.
-  Deleting a release, force-pushing and rewriting history keep their own
-  explicit approval on top.
+  credential fact, not supervision (Section 5.8). Claude resumes once the tag
+  is confirmed on the remote. Deleting a release, force-pushing and rewriting
+  history keep their own explicit approval on top.
 - **The gates, the pre-flight, the tracker, the state file.** Run them *more*
-  carefully here, because the user is no longer watching each command.
-- **Questions**: an ambiguous requirement, a design choice, a finding to
-  resolve, a bump the history doesn't settle. The user chose semi-autonomous,
-  not hands-off.
+  carefully when the user is not watching each command.
+- **Questions**: an ambiguous requirement, a design choice, a finding, a bump
+  the history doesn't settle. Semi-autonomous is not hands-off.
 - **Section 8's session-end checkpoint** and the token impact estimate.
 
 **When something goes wrong, that operation falls back to manual; the session
 stays semi-autonomous.** A blocked gate, a Critical/High finding, a failed CI
 or release run, a `403` on a branch push: stop, surface it, let the user decide.
-Do not retry, re-route, or act on a different ref (Section 5.8).
 
-**Record the mode where session state lives** — a `Mode:` line in
-`.claude/dev-skills-gates.md` (Section 2), and on every tracker display:
-
-```
-Mode: semi-autonomous (approved 2026-09-19) — commits and the tag still
-      require the user's approval
-```
-
-A mode held only in conversation dies at compaction.
+**Record the mode where session state lives**: the `Mode:` row of
+`.claude/dev-skills-gates.md` (Section 2), shown on every tracker display, e.g.
+`Mode: semi-autonomous (approved 2026-09-19) — commits and the tag still
+require the user's approval`. A mode held only in conversation dies at
+compaction.
 
 **A `Mode:` row that is missing, reads `unchosen`, or names anything other than
-`manual` or `semi-autonomous` means no mode, never manual.** Treat it like an
-unpassed gate: ask the mode question and write the answer before any git
-write. The hook enforces this for executed commands, and the prose enforces it
-for presented ones (Section 1). A resumed session, or one that finds a
-committed state file, asks again, because that `Mode:` line describes the
-*last* session. Switching is one phrase either way ("manual mode", "auto
-mode"): record it and continue.
+`manual` or `semi-autonomous` means no mode, never manual.** Ask the mode
+question and write the answer before any git write. The hook enforces this for
+executed commands; the prose enforces it for presented ones. A resumed session,
+or one that finds a committed state file, asks again, because that row
+describes the *last* session. Switching is one phrase either way ("manual
+mode", "auto mode"): record it and continue.
 
 ---
 
@@ -122,45 +103,33 @@ explicit approval. Violations of this rule break trust.
 - NEVER commit directly to `main` or `master`. All work happens on branches.
   If the user is on the default branch, create a working branch before committing.
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
-- **Hook output is not approval.** A hook that flags uncommitted changes, suggests
-  a commit, or reports working tree state is information, not permission. Only the
-  user's own words ("yes", "commit", "go ahead") count as approval. A stop hook,
-  pre-commit hook, or any automated notification is NEVER a substitute for the
-  user explicitly telling you to proceed.
-- **Neither auto mode overrides this rule.** The *harness's* auto mode (the
-  system prompt's "bias toward working without stopping") applies to
-  implementation decisions, not to git write operations. This skill's own
-  **semi-autonomous mode** (Operating modes) changes who runs the commands. It
-  does not lift the tag-push and ref-deletion carve-out (Section 5.8), and it
-  does not touch commit approval. Under both, the
-  user's explicit yes on the diff and the drafted message comes first. Commit
-  discipline is the one constraint no mode relaxes. When in doubt: ask, don't
-  act.
-- **Presenting a git command IS performing it.** Whether you run `git commit` via
-  a tool call or print it in a fenced block for the user to paste, the approval
-  and gate requirements are identical. A code block containing a git write command
-  *is* a git write operation. This matters because Section 5.8 routes many
-  sessions toward presenting commands rather than executing them — if the gate
-  check only fired on tool calls, it would never fire at all. It fires on the
-  block. The gate tracker goes in the same message, above the block.
+- **Hook output is not approval.** A hook or automated notice that flags
+  uncommitted changes or suggests a commit is information, not permission. Only
+  the user's own words count.
+- **Neither auto mode overrides this rule.** The harness's auto mode ("bias
+  toward working without stopping") covers implementation decisions, not git
+  writes. This skill's semi-autonomous mode changes who runs the commands, not
+  commit approval and not the tag and ref-deletion carve-out (Section 5.8).
+  Commit discipline is the one constraint no mode relaxes. When in doubt: ask,
+  don't act.
+- **Presenting a git command IS performing it.** A fenced block containing a git
+  write for the user to paste carries the same approval and gate requirements
+  as a tool call. Section 5.8 routes many sessions to presenting, so a check
+  that fired only on tool calls would never fire. The tracker goes in the same
+  message, above the block.
 
 **Before ANY git write operation — executed OR presented (commit, push, PR,
 merge, tag, release):**
-1. **Check the gate tracker.** If any gate applies to this session's work and
-   has not passed, stop and surface the blocking gate. This is not optional —
-   even if the user says "commit", "merge", or "push", check the gates FIRST.
-   The gates exist precisely for the moments when you're moving fast and want
-   to skip them.
+1. **Run the pre-flight (Section 2).** If a gate this work needs has not
+   passed, stop and name it, even when the user said "commit", "merge" or
+   "push". The gates exist for exactly the moments you are moving fast.
 2. If building an app: confirm a test build has been created and verified working.
 3. Run `git status` and `git diff` to show what will be committed.
 4. Draft a commit message per Section 1.1 and show it.
 5. Wait for explicit approval.
-6. **Present commands per Section 5.8.** In manual mode, present the git commands
-   formatted for the user's shell environment so they can run them manually; only
-   execute directly via tool calls if the user explicitly asks Claude to run them.
-   In semi-autonomous mode (Operating modes) Claude executes them itself once the
-   approval in step 5 is given — the approval covers the sequence Claude
-   described, and nothing beyond it.
+6. **Then run or present the commands per Section 5.8.** Who runs them depends
+   on the mode and environment. In semi-autonomous mode the approval covers the
+   sequence Claude described, and nothing beyond it.
 
 ### 1.1 Commit message format — Conventional Commits
 
@@ -174,40 +143,22 @@ Every commit message follows [Conventional Commits](https://www.conventionalcomm
 [optional footer(s)]
 ```
 
-**Types:** `feat` (new capability), `fix` (bug fix), `docs`, `chore`
-(tooling/config, no source behavior change), `refactor`, `perf`, `test`,
-`ci`, `build`, `style`, `revert`. Pick the one that best describes the
-*primary* effect of the commit — a fix that also updates a doc is still
-`fix:`, not `docs:`.
+**Types:** `feat` (new capability), `fix`, `docs`, `chore` (tooling/config,
+no behavior change), `refactor`, `perf`, `test`, `ci`, `build`, `style`,
+`revert`. Pick the *primary* effect: a fix that also updates a doc is `fix:`.
+**Breaking changes** get `!` after the type/scope (`feat!:`) and a `BREAKING
+CHANGE:` footer saying what breaks and how to adapt. Gate 1 reads these types
+as its bump signal (`GATE_REFERENCE.md`, Gate 1). The signal narrows the
+question for the user; it doesn't answer it.
 
-**Breaking changes** get `!` right after the type/scope (`feat!:`,
-`fix(api)!:`) and a `BREAKING CHANGE:` footer explaining what breaks and how
-to adapt. This is not decorative — Gate 1 (VERSION) uses it as the strongest
-available signal for the semver bump (below).
+This governs commit messages only. `CHANGELOG.md` stays hand-written Keep a
+Changelog prose (Gate 4); neither replaces the other.
 
-**This governs commit message text only.** It's a different convention from
-`CHANGELOG.md`'s Keep a Changelog format (Section 4 / Gate 4's `## [X.Y.Z]` /
-`### Added` structure) — that file stays hand-written prose grouped by
-change type for a human reading the release, not generated from commit
-messages. The two coexist; neither replaces the other.
-
-**Feeding Gate 1 (VERSION).** When drafting the version bump, use the
-commit types since the last tag as a signal, not a silent decision: any
-`!` or `BREAKING CHANGE:` footer → MAJOR; any `feat` with no breaking change
-→ MINOR; only `fix`/`chore`/`docs`/etc. → PATCH — the same mapping
-semver.org itself describes. State which commits drove the call and confirm
-the bump with the user (`GATE_REFERENCE.md`, Gate 1) — this narrows the
-question, it doesn't answer it for them.
-
-**When do gates apply?** By default, to every session that modified a tracked
-file. There is no "this change is too small" exemption — that judgment call is
-the single most common way gates get skipped, because a model moving fast can
-classify almost anything as trivial. A gate leaves the workflow one way only: by
-being explicitly marked ➖ N/A for a structural reason (Section 2), stated out
-loud on the tracker.
-
-Sessions that modified nothing tracked — questions, code reading, exploration —
-have no gates, because they have no changes. That is the entire exemption.
+**When do gates apply?** To every session that modified a tracked file. There
+is no "this change is too small" exemption: a model moving fast can call almost
+anything trivial. A gate leaves the workflow only by being marked ➖ N/A for a
+structural reason, stated on the tracker (Section 2). Sessions that modified
+nothing tracked have no gates. That is the entire exemption.
 
 ---
 
@@ -219,8 +170,8 @@ their GitHub MCP equivalents — **whether you execute it or present it for the
 user to run** (Section 1), STOP and do all four:
 
 1. **Read the gate state file** (`.claude/dev-skills-gates.md`). If it is missing
-   or stale, re-derive state from evidence using the table below. Unknown is
-   never "passed."
+   or stale, re-derive state from evidence (`GATE_REFERENCE.md`, "Gate state
+   file"). Unknown is never "passed."
 2. **Name the track.** Work commit, or release sequence? (below)
 3. **Show the tracker** in this message, above any command block. Show the
    full six rows at session start, when a gate changed since they were last
@@ -232,11 +183,8 @@ user to run** (Section 1), STOP and do all four:
    blocking gate by name and stop.
 
 This pre-flight is the enforcement mechanism. It fires on every git write
-operation, every time, with no exceptions. The user saying "commit", "push", or
-"merge" does not bypass it — it triggers it.
-
-A gate cannot be silently skipped. If the user tries to jump ahead, show the
-gate tracker and surface the blocking gate.
+operation, with no exceptions: "commit", "push" or "merge" from the user
+triggers it rather than bypassing it. A gate cannot be silently skipped.
 
 ```
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
@@ -251,14 +199,10 @@ Gate indicators:
 
 ### The gate pre-flight hook
 
-The repo ships an optional `PreToolUse` hook (`hooks/gate-preflight.sh`) that
-blocks git write operations whose required gates are not ✅ or ➖ N/A, reading
-`.claude/dev-skills-gates.md` for state. Where it is installed, the pre-flight
-above stops being advisory for anything Claude executes itself.
-
-**If the hook denies a call, it is telling you a gate has not run.** The correct
-response is to run the blocking gate and update the state file, then retry.
-Never:
+The optional `PreToolUse` hook (`hooks/gate-preflight.sh`) blocks executed git
+writes whose required gates are not ✅ or ➖ N/A, reading the state file.
+**If the hook denies a call, a gate has not run**: run it, update the state
+file, then retry. Never:
 - edit `.claude/dev-skills-gates.md` to mark a gate ✅ that did not run
 - mark a gate ➖ N/A to clear the block, unless the structural reason is real
   and stated on the tracker
@@ -266,19 +210,14 @@ Never:
   hook does not watch, to get around a denial
 
 Working around a gate denial is a worse failure than the skipped gate, because
-it also destroys the signal. If you believe the hook is wrong, say so to the
-user and let them decide.
-
-**The hook does not cover presented commands** — nothing intercepts the user's
-own terminal. On local sessions, where presenting is the default (Section 5.8),
-the prose pre-flight is the only enforcement there is. That is exactly why
-presenting a command counts as performing it (Section 1).
+it also destroys the signal. If you believe the hook is wrong, tell the user
+and let them decide. **The hook cannot see presented commands**, so for those
+the prose pre-flight is the only enforcement (Section 1).
 
 ### Two tracks
 
-Not every git operation is a release. Decide which track the operation is on
-before checking gates: a checklist that can't be answered tends to get dropped
-entirely, and a dropped checklist is a leak.
+Decide the track before checking gates: a checklist that can't be answered
+gets dropped, and a dropped checklist is a leak.
 
 **Work commit** — saving progress mid-session, on a branch, no version bump, no
 artifact, no publish.
@@ -286,165 +225,76 @@ Required: 🔒 SECURITY (on the changed code) and commit approval (Section 1).
 VERSION / BUILD / DOCS / RELEASE / SHIP stay ⬜ pending — not owed yet, not
 skipped.
 
-**Release sequence** — anything that bumps a version, produces an artifact,
-merges to the default branch, tags, or publishes.
-Required: all six gates, in order.
+**Release sequence** — anything with *publishing intent*: it bumps a version,
+produces an artifact, tags, or publishes. Required: all six gates, in order.
+The track follows the intent, not which branch holds the change.
 
-A work commit never becomes a release by accident. If the operation tags, merges
-to the default branch, or publishes, it is a release sequence — regardless of
-the user calling it "just a quick push."
-
-**"Default branch" is whatever the remote reports** (`git remote show origin`
-→ `HEAD branch:`, or `gh repo view --json defaultBranchRef`), never an assumed
-name. The release track is triggered by *publishing intent* (a version bump,
-an artifact, a tag, a publish), not by which branch holds the change or what it
-is called.
+A work commit never becomes a release by accident. If the operation bumps,
+tags or publishes, it is a release sequence, even if the user calls it "just a
+quick push."
 
 **A merge to the default branch with no publishing intent is a work commit.**
-Say so explicitly: a tracker update, a docs typo, a chore that bumps and tags
-nothing gets RELEASE and SHIP ➖ N/A with the reason stated ("no version/
-artifact/tag involved — bookkeeping only"). Six-gate ceremony on those is the
-friction that gets real ambiguous cases waved through. **When this repo's
-convention is genuinely unclear, ask once, at session start, with
-`AskUserQuestion`**, not mid-gate with a PR already blocked.
+Say so: a tracker update or a docs typo gets RELEASE and SHIP ➖ N/A with the
+reason stated ("no version/artifact/tag involved"). Six-gate ceremony there is
+the friction that gets real ambiguous cases waved through. **"Default branch"
+is whatever the remote reports** (`git remote show origin`), never an assumed
+name. **When this repo's convention is genuinely unclear, ask once, at session
+start**, not mid-gate with a PR already blocked.
 
 ### Gate state — must be durable
 
-The tracker is not a message you printed once; it is a file. Conversation history
-gets compacted away, and a tracker rebuilt from memory is rebuilt optimistically
-("security ran earlier, I think"). Write the state down.
+The tracker is a file, not a message: history gets compacted, and a tracker
+rebuilt from memory is rebuilt optimistically. **File:**
+`.claude/dev-skills-gates.md` in the repo root. Its format and row rules are
+in `SESSION_START.md`, where it is first written. The re-derivation table and
+resume procedure are in `GATE_REFERENCE.md`, "Gate state file": load it
+whenever the file is missing, stale or compacted away, or a user-driven action
+has to be credited.
 
-**File:** `.claude/dev-skills-gates.md` in the repo root.
-
-- **Write it** at session start, and after every gate transition.
-- **The `Mode:` row is written at session start too** — `unchosen` until the
-  user answers, then their choice, rewritten whenever it changes. Missing or
-  `unchosen` blocks every git write; it never means manual (Operating modes).
+- **Write it** at session start, and after every gate transition. **The `Mode:`
+  row** is `unchosen` until the user answers, and missing or `unchosen` blocks
+  every git write (Operating modes).
 - **Read it** before every git write operation, and whenever asked for status.
-- **It ships inside the release PR**, staged with the release commit at Gate 5
-  — gates 1–5 ✅ and SHIP ⏳, since the tag does not exist yet. The post-tag
-  SHIP ✅ line folds into the next release's PR. **Never open a PR whose only
-  content is tracker bookkeeping**: a release PR that omits the state file
-  leaves the tagged commit describing a release that had not happened
-  (`SHIP_REFERENCE.md`, step 7).
-- **Local sessions:** add it to `.gitignore` — it is session scratch.
-- **Remote containers:** commit it to the working branch instead. The container
-  is reclaimed when the session ends, and an uncommitted state file dies with it
-  (`SESSION_START.md`, step 0). If the repo already gitignores
-  the file — this one does, for local users — stage it explicitly with
-  `git add -f .claude/dev-skills-gates.md`, or accept that state will not survive
-  the session and re-derive from evidence next time. Do not silently let it
-  vanish.
+- **It ships inside the release PR** with gates 1–5 ✅ and SHIP ⏳. The
+  post-tag SHIP ✅ line folds into the next release's PR. **Never open a PR
+  whose only content is tracker bookkeeping** (`SHIP_REFERENCE.md`, step 7).
+- **Local sessions:** gitignore it. **Remote containers:** commit it to the
+  working branch (`git add -f` if gitignored), or it dies with the container.
+- **Keep it small**, one line per gate with the evidence indented below it.
+  **Close an absorbed section in the step that absorbs it**, never in a later
+  cleanup pass.
 
-Format:
+**Unknown is never "passed."** When the file cannot be trusted, re-derive each
+gate from evidence. A gate you cannot prove is ⬜ and must be run.
 
-```
-# Dev Skills gate state
-Track: release sequence
-Mode: manual
-Origin: owner/repo (not a fork)
-Version: 2.12.0
-Updated: 2026-09-07
-
-🔢 VERSION    ✅ all refs at 2.12.0
-🔨 BUILD      ➖ N/A — skill repo, no build system
-🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
-📄 DOCS       ⬜
-📦 RELEASE    ⬜
-🚀 SHIP       ⬜
-```
-
-**Row format: the status symbol and every word the hook checks go on the row's
-first line.** The hook and re-derivation both read the ✅/➖/⏳/🚫/⬜ symbol and
-annotations like `handoff` or `0 open` line by line, so a check that wraps to
-line two reads as absent. Keep line one to the symbol plus a short label, and
-put the why and the evidence on indented lines below it.
-
-**Keep the file small.** It is read in full on every gate check and every git
-write. Long write-ups belong in the commit message or `CHANGELOG.md`.
-**Close an absorbed section in the step that absorbs it** (a VERSION or SHIP
-step folding earlier work-commit entries into a release), never in a later
-cleanup pass. A stale "IN PROGRESS" reads as open work to the next session.
-
-**Never read ref state from local copies.** `git tag -l` returns empty in any
-fresh or shallow clone, and `git branch -r` lists stale cached refs. Both
-report absence that means nothing. Query the remote. Reading refs is not a
-write, so this is always safe to run:
-
-```
-git ls-remote --tags origin              # all tags
-git ls-remote --tags origin v1.2.3       # one tag
-git ls-remote --heads origin             # all branches
-git ls-remote --heads origin main        # one branch
-```
-
-**Re-derivation — when the state file is missing, stale, or the session was
-compacted.** Do not guess, and do not treat a gate as passed because it feels
-like it did. Rebuild from evidence:
-
-| Gate | Evidence that it passed |
-|---|---|
-| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git ls-remote --tags origin` shows the previous version tagged |
-| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A). **A check list with zero runs is ⬜, never ✅** — see below |
-| 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
-| 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
-| 📦 RELEASE | a PR exists for this branch (`gh pr list`, or MCP `list_pull_requests`) |
-| 🚀 SHIP | tag on remote, release exists, PR merged, expected assets attached |
-
-Any gate you cannot prove from evidence is ⬜ pending and must be run.
-"It probably ran" is ⬜.
+**Never read ref state from local copies.** `git tag -l` and `git branch -r`
+report absence that means nothing in a fresh or stale clone. Query the remote
+with `git ls-remote --tags origin` or `git ls-remote --heads origin`. It is a
+read, so it is always safe.
 
 **Absence of a verdict is not a verdict.** "No runs", "no findings", "no
-alerts", "no output" are all ⬜ until you have established *why* they are
-empty. Confirm the mechanism actually ran before reading its silence as a
-pass: an empty CI check list, a scanner that never executed, and a Dependabot
-feed that is disabled rather than clean all look like success.
+alerts" are ⬜ until you know *why* they are empty. An empty CI check list, a
+scanner that never ran and a disabled Dependabot feed all look like success.
 
-**Marking a gate N/A:** Some gates don't apply to every project (e.g. no build
-step for a docs-only or config repo). When a gate genuinely doesn't apply:
-1. State why it doesn't apply (e.g. "no build step — this is a skill/config repo")
-2. Mark it ➖ N/A on the tracker
-3. Move to the next gate
+**Marking a gate ➖ N/A:** state the structural reason on the tracker, then move
+on. A gate can only be N/A for structural reasons (no build system, no compiled
+artifacts, no app UI). "We'll do it later" is a skip attempt, and skips are
+blocked.
 
-A gate can only be N/A for structural reasons (the project has no build system,
-no compiled artifacts, no app UI). "We'll do it later" or "it's not important
-this time" is not N/A — that's a skip attempt, and skips are blocked.
-
-**User-driven operations.** The gates track the state of the work, not who typed
-the command.
-
-**What a user-driven git action satisfies: the mechanical step itself, and
-nothing more.** If the user committed, pushed, opened a PR, or merged outside of
-Claude — in their terminal, the GitHub UI, or another tool — do not re-do that
-action. Credit it on the tracker (✅ "user-driven").
-
-**What it never satisfies: Gates 1–4.** VERSION, BUILD, SECURITY, and DOCS are
-statements about the state of the *code*, not about git. A commit existing is not
-evidence that anything was scanned, built, or documented. If the user merged to
-the default branch without security (Gate 3) or docs (Gate 4), those gates are
-still owed — run them on the merged code and surface what you find.
-
-When resuming work or checking gate status, detect what's already done:
-1. Run `git log`, `git ls-remote --heads origin`, `git ls-remote --tags origin`, and `gh pr list` / `gh pr view`
-   — or the GitHub MCP equivalents when `gh` is unavailable (`SESSION_START.md`, step 0)
-2. Credit completed steps on the tracker (✅ with "user-driven" or "already done")
-3. Re-derive Gates 1–4 from evidence (table above) — never from the presence of
-   a commit
-4. Continue from the first gate that is not ✅ or ➖ N/A
+**User-driven operations.** A commit, push, PR or merge the user did outside
+Claude satisfies that mechanical step, and nothing more: credit it (✅
+"user-driven") and do not redo it. **What it never satisfies: Gates 1–4.**
+VERSION, BUILD, SECURITY and DOCS describe the code, not git. If the user
+merged without them, they are still owed on the merged code.
 
 ### Running a gate
 
 **Before running, passing, or marking ➖ N/A on any gate, read that gate's
-reference file** from this skill's base directory (shown when the skill loaded,
-e.g. "Base directory for this skill: ..."). Gates 1–5 are in
-`GATE_REFERENCE.md`, except **Gate 3, which is in `SECURITY_GATE.md`** and
-**Gate 6, in `SHIP_REFERENCE.md`**. Each holds its gates' checks, pass criteria, blocked-output format, and the CI-versus-manual
-paths. Do not run a gate from memory of this summary — the summary says what
-each gate is *for*, not what makes it pass.
-
-**Read the one the gate you are running is in, not both.** The ship path is the
-largest of the six and fires once, at the end; loading it during Gate 1 costs
-the tokens without the content ever being used.
+reference file** from this skill's base directory: Gates 1, 2, 4 and 5 are in
+`GATE_REFERENCE.md`, **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
+`SHIP_REFERENCE.md`**. Read only the one the gate you are running is in. This
+table says what each gate is *for*, not what makes it pass, so never run a
+gate from memory of it:
 
 | Gate | Passes when |
 |---|---|
@@ -454,10 +304,6 @@ the tokens without the content ever being used.
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
 | 🚀 **SHIP** | merged, tagged, published, and all four post-ship checks verified |
-
-Gate 3 (`SECURITY_GATE.md`) additionally loads `SECURITY_REFERENCE.md` and
-`QUALITY_REFERENCE.md`; Gate 6's ship path depends on whether a CI release workflow exists, and both of
-its paths are in `SHIP_REFERENCE.md`.
 
 ---
 
@@ -536,26 +382,16 @@ version stands still while the CVEs accumulate against it.
 7. **Transitive risk** — safe direct code with dangerous transitive deps is
    still dangerous. Audit tools report the whole tree; read the whole report.
 
-**For the life of the project** — the manifest is re-audited on every security
-gate, not just when it changes:
-
-- Run the ecosystem's audit tool against the **current** lockfile at Gate 3.
-  Critical/High blocks; Medium/Low is surfaced for the user to accept.
-- Treat a dependency with no upstream fix available as a finding to raise, not
-  to swallow: report the advisory, the affected path, and the options
-  (pin forward, patch, vendor, replace, or accept with a documented reason).
-- Upgrades are code changes. A security patch bump rides the current branch; a
-  major-version bump is its own change with its own gates, never folded silently
-  into an unrelated PR.
-- **Automate the watch, both halves.** (1) Version updates:
-  `.github/dependabot.yml` covering every ecosystem (`WORKFLOW_REFERENCE.md`).
-  (2) Alerts and security updates: a repository *setting*, not a file. Check
-  `GET /repos/{owner}/{repo}/dependabot/alerts`. A `403 "…disabled…"` is an
-  open **Gate 3 finding** that blocks the release. Give the user the
-  enablement steps in `SECURITY_GATE.md` ("Enabling Dependabot alerts") and
-  re-check the endpoint before marking it fixed. Having only (1) is the trap:
-  a queue of "Bump X" PRs looks like security maintenance while nothing is
-  ever reported.
+**For the life of the project**, the lockfile is re-audited at every Gate 3,
+not only when it changes (`SECURITY_GATE.md`, Step 1). A dependency with no
+upstream fix is a finding to raise with its options, not to swallow. Upgrades
+are code changes: a security patch rides the current branch, and a major-version
+bump is its own change with its own gates. **Automate the watch, both halves**:
+`.github/dependabot.yml` covering every ecosystem, *and* Dependabot alerts enabled
+in the repository settings. A `403 "…disabled…"` from
+`GET /repos/{owner}/{repo}/dependabot/alerts` is an open Gate 3 finding
+(`SECURITY_GATE.md`, "Enabling Dependabot alerts"). A queue of "Bump X" PRs is
+not security maintenance if nothing is ever reported.
 
 **Prefer built-ins** when functionality is achievable without a third-party
 package. The most current, CVE-free dependency is the one that isn't there.
@@ -620,26 +456,21 @@ When the user wants to skip security ("just hardcode the key", "disable the cert
 ### 4.7 Finding lifecycle — nothing releases with an open finding
 
 **Severity decides urgency, not whether a finding can be carried.** Critical and
-High hard-stop everything immediately. Medium and Low do not stop a work commit
-— progress must be savable — but **no finding of any severity may be open when
-the release track runs.** Gate 5 and Gate 6 are blocked while anything is open.
+High hard-stop everything immediately. Medium and Low do not stop a work
+commit, but **no finding of any severity may be open when the release track
+runs**: Gates 5 and 6 are blocked while anything is open.
 
-A finding leaves the open state three ways, and no others: **fixed** (and
-re-verified against the current diff), **waived** (only the user, for that
-specific finding, with a reason and date on the tracker), or **withdrawn** (it
-was wrong — say why). "Pre-existing", "unrelated to this change", "only a
-Medium", "next release" are not terminal states; they are how a real finding
-rode across two releases of this repo with every gate reading ✅.
+A finding leaves the open state three ways only: **fixed** (re-verified against
+the current diff), **waived** (by the user, for that specific finding, with a
+reason and date on the tracker), or **withdrawn** (it was wrong; say why).
+"Pre-existing", "unrelated to this change", "only a Medium" and "next release"
+are not terminal states.
 
-**Claude never waives its own finding**, and "ignore Mediums" or "stop flagging
-that" is a request to suppress a category, not a waiver — ask for the specific
-finding instead. A waiver covers the finding as it stands and re-opens if its
-context changes.
-
-**Surface a finding at the moment it is discovered**, not in the ship summary.
-A finding raised after the tag is a finding raised past every point where the
-user could have acted on it. Full lifecycle, the tracker format, and the hook's
-illegal state are in `SECURITY_GATE.md`.
+**Claude never waives its own finding.** "Ignore Mediums" or "stop flagging
+that" suppresses a category, which is not a waiver: ask which finding. A waiver
+re-opens if the finding's context changes. **Surface a finding at the moment it
+is discovered**, not in the ship summary. The full lifecycle is in
+`SECURITY_GATE.md`.
 
 ### 4.8 Security summary
 
@@ -664,35 +495,30 @@ Cost suggestions are one or two sentences, woven into normal responses — never
 a lecture or checklist dump. Once per session per topic. If the user declines,
 drop it.
 
-The big cost drivers, in rough order of impact:
-1. **Long sessions** — the whole history is resent every request (~6x cost difference)
-2. **Model choice** — Opus everywhere is ~3x the cost of Sonnet
-3. **Effort level** — xhigh vs medium is ~2.3x per request
-4. **Output length** — doubling output is ~2.2x per request
-5. **Context size** — every MCP server, skill, and rule is injected into every request
+Cost drivers, roughly by impact: long sessions (history resent every request,
+~6x), model choice (Opus ~3x Sonnet), effort level (xhigh ~2.3x medium),
+output length, and context injected on every request (MCP servers, skills,
+rules).
 
 ### 5.1 Behaviors you control directly
 
-**Bounded output.** Lead with the answer. No preamble, no recaps. Show diffs, not
-whole files. If three sentences suffice, use three sentences.
-
-**Minimal context.** Read only what the task needs. Use offset/limit and targeted
-grep. Don't re-read files already seen.
-
-**No redundant verification.** Don't re-run tests or re-read files when the tool
-result already confirmed success.
-
-**Batch tool calls.** Independent calls go in parallel — each sequential round trip
-resends the full conversation history. Five parallel calls cost the same as one.
+- **Bounded output.** Lead with the answer; no preamble or recaps. Diffs, not
+  whole files.
+- **Minimal context.** Grep first, then read with offset/limit. Prefer
+  `git diff` to reading modified files. Don't re-read what you've seen, or
+  re-verify what a tool result already confirmed.
+- **Batch tool calls.** Independent calls go in parallel: each sequential round
+  trip resends the whole history.
+- **Minimize agent spawns**, since each starts cold, and prefer page text to
+  screenshots.
 
 **Chain shell commands into one invocation — in every mode.** Session-start
 reads, gate evidence, the session-end checkpoint, and any step that is several
 commands which must all succeed are one call, not one per command. `&&` them
-so the first failure stops the chain; `;` only for independent read-only
-commands whose output you want even if one fails. Examples:
+so the first failure stops the chain; `;` only for independent reads whose
+output you want even if one fails:
 
 ```
-git status -sb && git diff --stat && git ls-remote --tags origin
 git add -A && git commit -m "<message>" && git push -u origin <branch>
 ```
 
@@ -700,77 +526,41 @@ This governs the commands Claude runs. A block presented to the user chains
 with that shell's syntax (`;` in Windows PowerShell, `SHELL_REFERENCE.md`).
 Chaining changes the number of round trips, never the checks: the pre-flight
 runs before the line is written, and the pre-flight hook scans every command in
-a chain, not only the first.
+a chain.
 
 **Do not chain across a stop.** Anything the user must see or decide between
-two commands is a boundary the chain does not cross: the commit approval, the
-tag block, a gate that has not passed, a failed command whose output changes
-what comes next. When in doubt, split — a wasted round trip is cheaper than an
-action the user did not approve.
-
-**Grep before reading.** Find the right lines first, then read with offset/limit.
-Never read a 2000-line file to check one function.
-
-**Git diff over full reads.** When reviewing changes, `git diff` is far cheaper
-than reading every modified file end to end.
-
-**Minimize agent spawns.** Each subagent starts cold with full context re-injection.
-Only spawn when the work justifies it — not for a single grep or file read.
-
-**Text over screenshots.** `read_page` / `get_page_text` costs a fraction of a
-screenshot when you only need to verify text content or structure.
+two commands is a boundary: the commit approval, the tag block, a gate that
+has not passed, a failure that changes what comes next. When in doubt, split.
 
 ### 5.2 Model gating — Sonnet ceiling
 
-Treat Sonnet as the maximum model for the session unless the user has explicitly
-approved something stronger. Concretely:
-
-- At the start of work, check which model is powering the session (stated in the
-  system prompt). If it's above Sonnet — Opus or Fable — tell the user immediately:
-  "This session is running on [model], which exceeds the Sonnet cost ceiling.
-  Run `/model sonnet` to switch down, or tell me you want to stay on [model]
-  for this task."
-- Do not proceed with substantial work on an above-ceiling model until the user
-  either switches down or explicitly approves staying. A simple "yes, stay on Opus"
-  counts — but it applies to the current task only. Re-raise if work moves to a
-  new task.
-- If a task genuinely warrants a stronger model (architecture, nasty root-cause
-  debugging, security analysis), say so and ask for approval rather than silently
-  accepting the expensive model.
-- You cannot switch the model yourself — only the user can, via `/model`. What you
-  *can* do is set `"model": "sonnet"` in `~/.claude/settings.json` so every new
-  session starts on Sonnet. Offer this once if the user keeps landing on expensive
-  models unintentionally.
+**Treat Sonnet as the maximum model for the session** unless the user has
+explicitly approved something stronger. If the system prompt names a model
+above Sonnet (Opus, Fable), say so at the start of work: "This session is
+running on [model], which exceeds the Sonnet cost ceiling. Run `/model sonnet`
+to switch down, or tell me you want to stay on [model] for this task." Do not
+proceed with substantial work on an above-ceiling model until the user switches
+or approves. Approval covers the current task only; re-raise on a new one. If
+a task genuinely warrants a stronger model (architecture, root-cause debugging,
+security analysis), say so and ask. Only the user can switch (`/model`); offer
+once to set `"model": "sonnet"` in `~/.claude/settings.json` if they keep
+landing on expensive models.
 
 ### 5.3 Effort fit
 
-Recommend `/effort` changes when the task doesn't match the current level:
-- **high/xhigh**: only for architecture decisions, root-cause debugging, security review
-- **medium**: routine edits, mechanical refactors, running tests, writing boilerplate
-- Remind the user to switch back down after a high-effort stretch
+Suggest `/effort` changes when the task doesn't fit: high/xhigh only for
+architecture, root-cause debugging and security review; medium for routine
+edits, refactors, tests and boilerplate. Suggest switching back down after a
+high-effort stretch.
 
 ### 5.4 Subagent model delegation
 
-When spawning a subagent (the Agent tool), use the cheapest model that can
-handle the task. Each spawn starts cold with full context re-injection — the
-model tier on top of that is the lever you control.
-
-| Tier | Model | Use for |
-|---|---|---|
-| **Cheap** | Haiku | single-target lookups, grep/glob searches, reading one file, mechanical checks, simple Q&A |
-| **Standard** | Sonnet | multi-step research, code implementation, refactoring, code review, test writing |
-| **Expensive** | Opus / Fable | complex architecture, deep root-cause debugging, security analysis — only when the main session is already approved above the Sonnet ceiling |
-
-**Rules:**
-- Never spawn a subagent on a more expensive model than the main session is
-  approved for. If the session is on Sonnet, subagents are Sonnet or Haiku.
-- Default to Haiku for any task that is essentially "find X and report back."
-  The Explore agent type is already read-only — pairing it with Haiku is the
-  cheapest delegation available.
-- Use Sonnet for subagents that write code, review code, or need multi-step
-  reasoning across files.
-- Escalate to the main session's model only when the subagent's task is the
-  kind that justified the main session's model in the first place.
+Use the cheapest model that can do the subagent's task: **Haiku** for "find X
+and report back" (lookups, grep, one file, mechanical checks; the read-only
+Explore agent on Haiku is the cheapest delegation there is), **Sonnet** for
+writing or reviewing code and multi-step reasoning, and **Opus/Fable** only for
+the work that justified an above-ceiling main session. Never spawn a subagent
+on a more expensive model than the main session is approved for.
 
 ### 5.5 MCP server and connector awareness
 
@@ -783,70 +573,44 @@ after-`/mcp` re-check are in `SESSION_START.md`, "MCP check".
 
 ### 5.6 Phase transitions → fresh session
 
-A long session resends its entire history on every request, so a fresh start is
-often the largest saving available. Offer a handoff at any of these points.
-**Each is an observable event, not a judgment call** — "work shifted phase" was
-the old trigger, and a model biased toward continuing never once decided that it
-had:
+A long session resends its whole history on every request, so a fresh start is
+often the largest saving available. Offer a handoff at these points. **Each is
+an observable event, not a judgment call**, because a model biased toward
+continuing never decides that "the work shifted phase":
 
-1. **A release sequence finished.** The tracker reads ✅ or ➖ N/A across all six
-   gates. The work shipped; nothing in the history is load-bearing any more.
-2. **The user opens work unrelated to the current tracker** — a different
-   feature, a different area of the repo — while no release is mid-flight.
-3. **The conversation was compacted.** History is now both expensive enough to
-   matter and lossy enough that a written handoff beats scrolling it.
+1. **A release sequence finished**: every gate reads ✅ or ➖ N/A.
+2. **The user opens unrelated work** while no release is mid-flight.
+3. **The conversation was compacted.**
 
-State the observation and the reason in one line. Do not phrase it as an
-open-ended question, which is easy to drop:
+Say it in one line, not as an open question that is easy to drop:
 
 > This session is carrying [N] turns and the release is done — a fresh one would
 > be cheaper. Want a handoff summary?
 
-**Handoff format** (also used by Section 5.9):
+**Handoff format** (also used by Section 5.9). Keep it under ~30 lines:
 
 ```
 ## Handoff: [task name]
 **Goal:** one sentence
 **Current state:** what's done, what's verified
 **Gate status:** the tracker, with current state
-**Mode:** manual / semi-autonomous — what *this* session ran in. The next session
-asks again at its start (Operating modes)
+**Mode:** what *this* session ran in; the next session asks again (Operating modes)
 **Key files:** path:line — why it matters
 **Decisions made:** constraints the next session must respect
 **Shell environment:** [user's shell from session start, step 2]
 **Next step:** the single concrete next action
 ```
 
-Keep it under ~30 lines. The point is to replace a long history with a cheap
-restart. Include the gate tracker so the next session knows where to resume, and
-the shell environment so it doesn't have to re-ask.
-
 ### 5.7 Token impact estimate
 
-**Two triggers, both firm:**
+**Fires at every session-end checkpoint (Section 8) and on request** ("how did
+we do?"). The only skip condition is the one gates use: the session modified no
+tracked file. "This felt like a small task" is *not* a skip condition.
 
-1. **The session-end checkpoint** (Section 8). Include the estimate every time
-   that checkpoint runs — it already has a reliable trigger, this section did
-   not.
-2. **On request** — "how did we do?", "what did that cost?".
-
-**The only skip condition is the one Section 1 already uses for gates: the
-session modified no tracked file.** An exploratory or advisory session has no
-token story worth telling. "This felt like a small task" is *not* a skip
-condition — that judgment call is precisely what kept this section from ever
-firing.
-
-You can't see billing data, so be clear it's approximate. Build it from what you
-can observe:
-
-- **Per-request overhead**: MCP tool definitions, skills, rules on every request
-- **Conversation growth**: each turn resends the whole history
-- **Context loaded**: files read, their approximate sizes, unused reads
-- **Model multiplier**: if part of the session ran above Sonnet ceiling
-
-Present as a header and at most 3 lines. Include the MCP line only when
-connections changed since the session-start MCP check. Otherwise that check
-already said it:
+It is approximate, since billing data is not visible. Build it from per-request
+overhead (MCP tools, skills), conversation growth, files loaded, and any time
+spent above the Sonnet ceiling. A header and at most 3 lines. Include the MCP
+line only when connections changed since the session-start MCP check:
 
 ```
 Token impact (rough estimate):
@@ -859,79 +623,53 @@ Never let the report become longer than the savings it describes.
 
 ### 5.8 Git command presentation
 
-**Fires whenever git write operations are needed**: any gate, handoffs,
-troubleshooting. **Before composing any command block, load
-`SHELL_REFERENCE.md`** (`cd` formats per shell, the one-block rule, remote
-verification, forks, the Termux clone flow, the 403 rationale, examples). Do
-not build a block from memory of this summary.
+**Before composing any command block, load `SHELL_REFERENCE.md`** (`cd`
+formats per shell, the one-block rule, remote verification, forks, the Termux
+clone flow, examples). Do not build a block from memory of this summary.
 
-**In semi-autonomous mode Claude runs the commands** (Operating modes), and the
-table below is only the fallback shape for an operation that fails. Say the
-cost trade once, when the user opts in: executed git resends the conversation
-on every round trip, where a pasted block costs nothing.
-
-**In manual mode, direction depends on the environment** (`SESSION_START.md`,
-step 0). The deciding question is whether Claude's working tree and the
-user's terminal are the same clone:
+**Who runs git.** In semi-autonomous mode, Claude does (Operating modes), and
+presenting is only the fallback when an operation fails. In manual mode it
+depends on whether Claude's working tree and the user's terminal are the same
+clone (`SESSION_START.md`, step 0):
 
 | Environment | Git operations |
 |---|---|
-| **Local** | Same clone — **present** the commands for the user to run. A block costs zero tool-call tokens |
-| **Remote container** | A throwaway container the user's terminal never sees — **Claude executes** git directly, after approval (Section 1). A block handed over commits nothing |
-| **Termux** | Present, and the repo may not be on the device at all — clone flow in `SHELL_REFERENCE.md` |
+| **Local** | Same clone: **present** the commands for the user to run |
+| **Remote container** | A throwaway clone the user never sees: **Claude executes**, after approval (Section 1) |
+| **Termux** | Present; the repo may not be on the device (clone flow in `SHELL_REFERENCE.md`) |
 
 **Tag pushes and ref deletions are the exceptions: they always go to the user,
-in both modes and every environment, remote containers included.** Creating a tag (`git tag`,
-`git push origin v<X.Y.Z>`) and deleting any ref, whether a branch
-(`git push origin --delete <branch>`) or a tag
-(`git push origin :refs/tags/v<X.Y.Z>`), is presented as a block. Never run
-either through a tool call or a GitHub MCP tool. Re-pushing a tag is a delete
-plus a create, so both halves go to the user. Claude's credentials are
-routinely denied on exactly these while branch pushes succeed, and a denied tag
-push strands a merged, bumped default branch with no release. No mode lifts
-this, because the denial comes from the remote. On a `403`, do not retry,
-re-route, or act on a different ref.
-
-🚀 SHIP stays ⏳ until the tag is confirmed on the remote
-(`git ls-remote --tags origin v<X.Y.Z>`; a branch deletion by
-`git ls-remote --heads origin <branch>` returning nothing) **and** it points at
-the merged commit. A tag pushed early still exists, on the wrong commit
-(`SHIP_REFERENCE.md`).
+in both modes and every environment.** Creating a tag and deleting any ref (a
+branch or a tag) is presented as a block, never run through a tool call or a
+GitHub MCP tool. Re-pushing a tag is a delete plus a create, so both halves go
+to the user. Claude's credentials are routinely denied (`403`) on exactly these
+while branch pushes succeed, and no mode can lift a denial that comes from the
+remote. On a `403`, do not retry, re-route, or act on a different ref.
+🚀 SHIP stays ⏳ until Claude has confirmed on the remote that the tag exists
+**and** points at the merged commit (`SHIP_REFERENCE.md`, step 3).
 
 **The gates are identical either way.** Presenting a command is performing it
-(Section 1): the pre-flight runs, and the tracker goes in the same message,
-above the block.
+(Section 1): the pre-flight runs, and the tracker goes above the block.
 
 **Forks: `origin` is the fork, and nothing targets upstream.** Every push, PR,
-merge, release and tag block goes to the fork. The user does anything upstream
-on GitHub directly. Every `gh` write passes `--repo <fork>`, because a bare
-`gh pr create` in a fork opens on the parent. Rules: `SHELL_REFERENCE.md`,
-"Forks".
+merge, release and tag block goes to the fork, and every `gh` write passes
+`--repo <fork>`, because a bare `gh pr create` in a fork opens on the parent.
+The user does anything upstream on GitHub directly (`SHELL_REFERENCE.md`,
+"Forks").
 
 ### 5.9 Usage limit handoff
 
-**Trigger on any of these. All three are things you can actually observe:**
-
-- The system prompt or a system message mentions overage, rate limits, or a
-  usage cap being approached
-- The user says they are running low, near a limit, or about to be cut off
-- The conversation has been compacted (also a Section 5.6 trigger)
-
-**Do not gate this on a numeric token budget.** Earlier versions watched for a
-context budget below ~2M. On Claude Code for web that figure starts at 15M every
-session and effectively never falls, so the check never fired once. A visible
-number that is genuinely low still counts — but it is not the condition, and its
-absence is not a reason to stay quiet.
+**Offer a handoff (format in 5.6) when** a system message mentions overage,
+rate limits or a usage cap; the user says they are running low; or the
+conversation was compacted. **Do not gate this on a numeric token budget.** On
+Claude Code for web it starts at 15M and never visibly falls, so a budget
+check never fires. A genuinely low number still counts, but its absence is not
+a reason to stay quiet.
 
 > ⚠️ **Heads up — this session looks close to a limit.** If it cuts off mid-task
-> you lose the working context. Want a handoff summary now, so you can resume in
-> a fresh session without losing progress?
+> you lose the working context. Want a handoff summary now?
 
-Use the handoff format in Section 5.6 — it carries the gate tracker and the
-shell environment, which is exactly what a resumed session would otherwise have
-to rediscover.
-
-Don't nag. Once offered, drop it unless the user asks.
+Offer once. Don't nag.
 
 ---
 

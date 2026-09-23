@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.31.0] — 2026-09-22
+
+**`SKILL.md` is about a quarter smaller (~54KB → ~40KB), with every rule
+intact and a check that keeps it that way.** `SKILL.md` stays in context for
+every request once the skill loads, so its size is the skill's largest fixed
+cost: about 3.5k fewer tokens per request. Rules and triggers stay in
+`SKILL.md`. Formats, tables and procedures move to the file that is already
+loaded when they are needed.
+
+### Added
+- **Rule-phrase manifest (`scripts/rule-phrases.txt`), checked by
+  `scripts/validate.sh`.** 53 phrases, each either required in `SKILL.md`
+  (triggers and hard rules that must fire without loading anything) or
+  required somewhere in the skill (procedures that load on demand). Whitespace
+  is collapsed, so wrapping doesn't matter. Removing a rule now fails
+  validation unless the manifest is changed too, on the record.
+
+### Changed
+- **Gate state file:** the rules stay in `SKILL.md` Section 2. The format and
+  row rules moved to `SESSION_START.md`, where the file is first written. The
+  re-derivation table and the resume procedure moved to `GATE_REFERENCE.md`,
+  "Gate state file".
+- **Tighter wording, same rules:** Operating modes, §1, §1.1 (the bump
+  mapping lives in Gate 1), §2, §4.1, §4.7 (the full lifecycle is in
+  `SECURITY_GATE.md`) and §5.1–5.9. The section numbers are unchanged.
+- **The release track is defined by publishing intent** (a bump, an artifact,
+  a tag, a publish). Before, Section 2 said both that any merge to the default
+  branch was a release and that a merge with no publishing intent was a work
+  commit.
+- **Details kept where they are used:** the cost-trade note moved to
+  `AUTO_MODE.md` "Entering the mode". The check that a handed-over branch
+  deletion landed (`git ls-remote --heads origin <branch>` returning nothing)
+  moved to `SHIP_REFERENCE.md`.
+- `validate.sh` size ceiling for `SKILL.md`: 64KB → 44KB, so the saving can't
+  drift back unnoticed. README size table updated.
+
+### Fixed
+- **`AUTO_MODE.md` said Claude commits the SHIP ✅ record after the tag.**
+  Since 2.28.0 that line rides in the next release's PR (`SHIP_REFERENCE.md`,
+  step 7). The checkpoint 2 text and the per-step table now say so.
+- **README brought in line with current behavior:**
+  - A merge to the default branch is no longer listed as a release.
+  - The merged PR's own branch is no longer "Claude's to delete". Since 2.29.0
+    that deletion is yours.
+  - The SHIP record ships in the next release's PR.
+  - Gate 3 passes at 0 *open* findings, not only 0 Critical/High.
+  - The example gate file carries `0 open`.
+  - The cost section's heading no longer reads "Semi-autonomous".
+  - The hook's stricter handling of a bookkeeping merge is documented.
+  - Added: the "delete that branch" shortcut, the rule-phrase guard under For
+    maintainers, and 2.30/2.31 highlights.
+
 ## [2.30.0] — 2026-09-22
 
 **Fewer round trips and shorter routine output, in every mode.** Every tool call

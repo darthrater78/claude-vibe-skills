@@ -64,6 +64,31 @@ else
   echo "  OK: probe and self-check name the same $(echo "$probe_list" | wc -l) files"
 fi
 
+# Rule phrases (scripts/rule-phrases.txt) must survive every edit: SKILL|
+# phrases in SKILL.md, ANY| phrases in some skill file. Whitespace is
+# collapsed first, so a phrase may wrap across lines in the source.
+echo ""
+echo "=== Rule phrases ==="
+skill_flat=$(tr -s '[:space:]' ' ' < skills/dev-skills/SKILL.md)
+all_flat=$(cat skills/dev-skills/*.md | tr -s '[:space:]' ' ')
+phrases=0
+while IFS= read -r line; do
+  case "$line" in ''|'#'*) continue ;; esac
+  tier=${line%%|*}; phrase=${line#*|}
+  case "$tier" in
+    SKILL) hay=$skill_flat; where="SKILL.md" ;;
+    ANY) hay=$all_flat; where="any skill file" ;;
+    *) echo "  FAIL: bad tier in rule-phrases.txt: $line"; errors=$((errors + 1)); continue ;;
+  esac
+  if grep -qF -- "$phrase" <<< "$hay"; then
+    phrases=$((phrases + 1))
+  else
+    echo "  FAIL: rule phrase missing from $where: $phrase"
+    errors=$((errors + 1))
+  fi
+done < scripts/rule-phrases.txt
+echo "  OK: $phrases rule phrases present"
+
 # Check required skill files exist
 echo ""
 echo "=== Required files ==="
@@ -117,8 +142,10 @@ echo ""
 echo "=== Size ceilings ==="
 ceiling_for() {
   case "$1" in
-    # Billed every request. Deliberately the tightest number here.
-    SKILL.md) echo 64 ;;
+    # Billed every request. Deliberately the tightest number here: 2.31.0
+    # trimmed it from ~54KB to ~40KB, and this keeps the saving from drifting
+    # back without a decision on the record.
+    SKILL.md) echo 44 ;;
     # Still carries the best-practices and Dependabot sections; it is the next
     # extraction candidate, and this number comes down when they move.
     WORKFLOW_REFERENCE.md) echo 44 ;;

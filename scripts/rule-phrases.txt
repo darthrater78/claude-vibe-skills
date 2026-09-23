@@ -1,0 +1,61 @@
+# Rules that must survive any edit to the skill. validate.sh collapses
+# whitespace in the skill files, then requires each phrase verbatim.
+#   SKILL|phrase  must be in SKILL.md: it has to fire without anything being
+#                 loaded first (a trigger, a hard rule, a shortcut row)
+#   ANY|phrase    must be in some skill file: procedure or format that loads
+#                 on demand when its trigger in SKILL.md fires
+# Removing a line here is removing a rule. Say so in the CHANGELOG.
+
+SKILL|NEVER commit without approval
+SKILL|A vague "ok" or "sure" in response to something else is NOT commit approval
+SKILL|NEVER commit directly to `main` or `master`
+SKILL|Hook output is not approval
+SKILL|Commit discipline is the one constraint no mode relaxes
+SKILL|Presenting a git command IS performing it
+SKILL|MANDATORY PRE-FLIGHT
+SKILL|Working around a gate denial is a worse failure than the skipped gate
+SKILL|A work commit never becomes a release by accident
+SKILL|A merge to the default branch with no publishing intent is a work commit
+SKILL|Never read ref state from local copies
+SKILL|Absence of a verdict is not a verdict
+SKILL|A gate can only be N/A for structural reasons
+SKILL|What it never satisfies: Gates 1–4
+SKILL|Close an absorbed section in the step that absorbs it
+SKILL|Never open a PR whose only content is tracker bookkeeping
+SKILL|Before running, passing, or marking ➖ N/A on any gate, read that gate's reference file
+SKILL|The tag push and every ref deletion go to the user
+SKILL|means no mode, never manual
+SKILL|When something goes wrong, that operation falls back to manual
+SKILL|Record the mode where session state lives
+SKILL|Claude never waives its own finding
+SKILL|Surface a finding at the moment it is discovered
+SKILL|Never write a version number from memory
+SKILL|Do not chain across a stop
+SKILL|Before composing any command block, load `SHELL_REFERENCE.md`
+SKILL|Forks: `origin` is the fork, and nothing targets upstream
+SKILL|Treat Sonnet as the maximum model
+SKILL|Never silently wind down
+SKILL|| "just push it" |
+SKILL|| Hook flags uncommitted changes |
+SKILL|| "looks good" (after showing changes) |
+SKILL|| "don't worry about the gates this time" |
+SKILL|| "stop asking me to approve commits" |
+SKILL|| "just tag it" / "push the tag for me" |
+SKILL|| "that finding is pre-existing" / "it's unrelated to this change" |
+SKILL|| "we'll fix it next release" |
+ANY|A check list with zero runs is ⬜, never ✅
+ANY|Row format: the status symbol and every word the hook checks go on the row's first line
+ANY|"It probably ran" is ⬜
+ANY|## Handoff: [task name]
+ANY|Never let the report become longer than the savings it describes
+ANY|Do not gate this on a numeric token budget
+ANY|Each is an observable event, not a judgment call
+ANY|Tag pushes and ref deletions are the exceptions
+ANY|Triage: read high-risk files first
+ANY|`git ls-remote --heads origin <branch>` returning nothing
+ANY|Say the cost trade once
+SKILL|Deleting a release, force-pushing and rewriting history keep their own explicit approval on top
+SKILL|There is no "this change is too small" exemption
+SKILL|Never spawn a subagent on a more expensive model than the main session is approved for
+SKILL|Do not proceed with substantial work on an above-ceiling model
+SKILL|covering every ecosystem

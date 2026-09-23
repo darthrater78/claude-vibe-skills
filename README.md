@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.30.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.31.0`
 
 ---
 
@@ -42,8 +42,8 @@ session start the skill finds the repo, offers to sync with origin, and flags
 you if you're sitting on the default branch.
 
 **3. Gates run before anything ships.** A work commit needs the security gate
-and your approval. Anything that bumps a version, builds an artifact, merges,
-tags, or publishes runs all six, in order. **Presenting a git command for you
+and your approval. Anything that bumps a version, builds an artifact, tags, or
+publishes runs all six, in order. **Presenting a git command for you
 to paste counts as running it** — the same pre-flight fires either way.
 
 **4. Security and quality get scanned.** After every build, a full scan checks
@@ -144,9 +144,8 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   absent and block real work over formatting. Plus: rows stay short (link to
   the commit/changelog instead of duplicating detail), a section closes when
   the release step that absorbs it runs rather than in a separate cleanup
-  pass, and the SHIP record itself must be committed and pushed as Gate 6's
-  last action — a tracker that says SHIP ✅ only locally hasn't actually
-  shipped. *(2.25.0)*
+  pass. *(2.25.0)* The SHIP ✅ record now rides in the next release's PR
+  rather than a PR of its own. *(2.28.0)*
 - **Three release-workflow templates stopped re-proving what CI already
   proved.** The Linux and script-collection release jobs were re-running
   shellcheck even though their own gate job already required it to have
@@ -175,6 +174,19 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   `gh pr create` in a fork opens the PR upstream. Anything upstream, you do on
   GitHub yourself. The hook blocks `gh` writes in a fork that lack `--repo` or
   point anywhere else. *(2.29.0)*
+- **[Fewer round trips, shorter output.](#cost-discipline)** Session start
+  runs one read-only probe instead of about ten separate calls, and the
+  session-end checkpoint reads its evidence in one call. Chaining a step's
+  commands is now the rule in every mode, not just semi-autonomous, and never
+  crosses an approval or a failed gate. The tracker is one line unless a gate
+  changed, and the banner folds its all-clear checks into one row. *(2.30.0)*
+- **[The every-turn file is a quarter smaller, with its rules
+  guarded.](#for-maintainers)** `SKILL.md` went from ~54KB to ~40KB, about 3.5k
+  fewer tokens on every request. Rules and triggers stayed; formats, tables and
+  procedures moved to the file already loaded when they are needed. A
+  53-phrase manifest checked by `validate.sh` fails the build if a rule goes
+  missing, and the size ceiling dropped to 44KB so the saving can't drift
+  back. *(2.31.0)*
 
 ---
 
@@ -206,7 +218,7 @@ Version: 2.18.0
 
 🔢 VERSION    ✅ all refs at 2.18.0; prev v2.17.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
-🔒 SECURITY   ✅ 0 Critical, 0 High
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
 📦 RELEASE    ⬜
 🚀 SHIP       ⬜
@@ -312,8 +324,10 @@ blocking I/O · unbounded caches · missing indexes · premature abstraction ·
 container dependency drift (Dockerfiles hardcoding packages instead of
 installing from dependency files; imports missing from declared dependencies).
 
-Critical and High must be fixed. Medium and Low are surfaced for your decision.
-**Passes at zero Critical, zero High.**
+Critical and High must be fixed before anything else happens. Medium and Low
+don't stop a work commit, but every finding has to be fixed, waived by you, or
+withdrawn before the release track runs. **Passes at 0 open findings (0
+Critical, 0 High).**
 
 ### Gate 4 — Docs 📄
 
@@ -335,7 +349,8 @@ tag block, tags the merge commit, creates a GitHub release with artifacts,
 then verifies all four post-ship conditions (tag on remote — pointing at the
 merge commit, not just present by name — release exists, PR merged, assets
 attached). Shows the full ship summary and waits for explicit confirmation —
-"yeah" is not enough; type "ship" or "confirm ship".
+"yeah" is not enough; type "ship" or "confirm ship". In semi-autonomous mode
+that confirmation is the full pre-tag report.
 
 The tag push itself always comes back to you — see
 [Execution environments](#execution-environments).
@@ -343,11 +358,10 @@ The tag push itself always comes back to you — see
 Before a tag exercises a release-workflow step that's never actually run in
 this repo (a first registry login, a first signing step), it's worth
 dry-running that step locally against the built artifact first — cheaper
-than discovering it fails during a live release. And the gate's own record
-isn't done at "tag pushed" — committing and pushing the gate-state file's
-SHIP ✅ update is the last action, when that file is tracked in the repo
-(remote-container convention, or a local repo that force-adds it, like this
-one). *(2.25.0)*
+than discovering it fails during a live release. The gate-state file ships inside
+the release PR with SHIP ⏳; the SHIP ✅ line, which can only exist after the
+tag, rides in the *next* release's PR. There is never a PR whose only content
+is tracker bookkeeping. *(2.25.0, 2.28.0)*
 
 <details>
 <summary><b>The git flow is identical across platforms — only the CI build differs</b></summary>
@@ -377,18 +391,20 @@ entirely — and a dropped checklist is a leak.
 | Track | What it covers | Gates required |
 |---|---|---|
 | **Work commit** | saving progress mid-session, on a branch | Security (on the changed code) + commit approval |
-| **Release sequence** | version bump, artifact, merge to default branch, tag, or publish | all six, in order |
+| **Release sequence** | anything with publishing intent: a version bump, an artifact, a tag, or a publish | all six, in order |
 
-A work commit never becomes a release by accident. If the operation tags, merges
-to the default branch, or publishes, it's a release sequence — regardless of it
-being called "just a quick push".
+A work commit never becomes a release by accident. If the operation bumps a
+version, tags, or publishes, it's a release sequence — regardless of it being
+called "just a quick push".
 
 The test is *publishing intent*, not the branch a commit lands on. A merge
 to the default branch that bumps nothing, tags nothing, and publishes
 nothing — a tracker-bookkeeping commit, a docs typo fix — is still a work
 commit, with RELEASE/SHIP marked ➖ N/A and the reason stated. Treating every
 default-branch merge as release-track by default is what turns a five-line
-housekeeping commit into a six-gate ceremony. When a repo's own convention
+housekeeping commit into a six-gate ceremony. (If the [enforcement
+hook](#enforcement-hook-optional) is installed, it is stricter here: see its
+table.) When a repo's own convention
 here is genuinely unclear, the skill asks once at session start rather than
 discovering it mid-PR.
 
@@ -488,8 +504,8 @@ Tell me when it's done and I'll take it from there.
 Failures, retries and deviations are the part of that report that matters most —
 a report listing only successes is the one nobody needed. Afterwards Claude
 confirms the tag on the remote itself rather than taking "done" at face value,
-then finishes the release: watch the run, add the notes, verify, commit the SHIP
-record.
+then finishes the release: watch the run, add the notes, verify, and record SHIP
+✅, which ships in the next release's PR.
 
 **It is semi-autonomous, not hands-off.** Beyond those two checkpoints, a
 blocked gate, a Critical or High security finding, an ambiguous requirement, a
@@ -573,6 +589,10 @@ stops being advisory for anything Claude runs itself.
 | `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
 | `gh pr merge`, `gh release create`, `git push origin main`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
 | Creating or pushing a tag, deleting any ref (`git push --delete`, `:<ref>`, `gh pr merge --delete-branch`, …) | **Always denied.** These are yours to run in both modes |
+
+The hook reads any `gh pr merge` as release-level, so it is stricter than
+[Two tracks](#two-tracks) for a bookkeeping merge: with the hook installed,
+Version, Build and Docs must also read ✅ or ➖ N/A before such a merge runs.
 
 On top of the gates, every git write is denied until the gate file's `Mode:`
 row names `manual` or `semi-autonomous`, so an unanswered mode question
@@ -661,8 +681,9 @@ a ref through a GitHub MCP tool.
 [Semi-autonomous mode](#manual-and-semi-autonomous-mode) does not change this.
 The denial comes from the remote, not from the skill, so no mode can hand Claude
 a credential it doesn't have — what that mode adds is a full report of
-everything it did, above the block, instead of a bare set of commands. Ref *deletions* stay yours in both modes, apart from
-the source branch of a PR Claude just merged. Everything below still applies:
+everything it did, above the block, instead of a bare set of commands. Ref *deletions* stay yours in both modes, including
+the source branch of a PR Claude just merged, so Claude never merges with
+`--delete-branch`. Everything below still applies:
 the permission risk doesn't go away, it just becomes a failure to report rather
 than a rule to obey, and a `403` is exactly where semi-autonomous mode hands the block
 back to you.
@@ -724,7 +745,7 @@ release breaks.
 
 ## Cost discipline
 
-**Semi-autonomous — these fire on their own:**
+**Automatic — these fire on their own:**
 
 - **Sonnet ceiling** — flags a session running on an expensive model and asks
   before proceeding
@@ -737,8 +758,8 @@ release breaks.
   shows how to disable them
 - **Git command presentation** — on local sessions, presents git as a single
   copy-once block per operation rather than several, formatted for your shell
-  (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and always starting with the
-  right `cd`. Remote container sessions execute directly instead, since a
+  (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and starting with the right
+  `cd` (tag and ref-deletion blocks carry none). Remote container sessions execute directly instead, since a
   presented block would operate on the wrong clone
 - **Fewer round trips** — session start is one read-only probe call instead of
   about ten, the session-end checkpoint reads its evidence in one call, and any
@@ -794,6 +815,7 @@ template you review before anything is written.
 | "looks good" | That's feedback on the diff, not commit approval — Claude asks explicitly |
 | "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A, for structural reasons |
 | "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it) |
+| "just delete that branch for me" | Ref deletions are yours in both modes — the block is presented, not executed |
 | "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands. Commit approval stays, and the tag push and ref deletions stay yours |
 | "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
 | "that finding is pre-existing" | Provenance, not a verdict — it stays open and blocks the release until fixed, waived or withdrawn |
@@ -808,12 +830,12 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~53KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~28KB | Once, at session start — the one-call probe, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `GATE_REFERENCE.md` | ~22KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
+| `SKILL.md` | ~40KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `SECURITY_GATE.md` | ~15KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
-| `SHIP_REFERENCE.md` | ~22KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
-| `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, round-trip rules, stop conditions |
+| `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
+| `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -864,8 +886,17 @@ Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md). Build and check with:
 
 ```bash
 bash scripts/build-skill.sh   # rebuild dev-skills.skill from source
-bash scripts/validate.sh      # version consistency, size table, bundle-vs-source
+bash scripts/validate.sh      # versions, changelog, size table and ceilings,
+                              # rule phrases, bundle-vs-source
 ```
+
+**Rules are guarded, not just written.** `scripts/rule-phrases.txt` lists the
+phrases that carry the skill's rules. Each is either required in `SKILL.md`
+(`SKILL|`: triggers and hard rules that must fire without anything being
+loaded) or required somewhere in the skill (`ANY|`: procedures that load on
+demand). `validate.sh` fails if one goes missing, so trimming or rewording
+can't silently drop a rule. Removing a line from that file is removing a rule;
+say so in the CHANGELOG.
 
 Releases are published by CI: pushing a `v*` tag runs
 `.github/workflows/release.yml`, which verifies the tagged commit is on the
@@ -900,4 +931,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.30.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.31.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
