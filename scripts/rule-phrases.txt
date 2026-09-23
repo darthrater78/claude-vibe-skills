@@ -71,3 +71,4 @@ SKILL|trust this device for 30 days
 SKILL|Docker projects document a compose quickstart
 SKILL|Every volume is a bind mount under
 SKILL|The image tag is pinned to the current version
+ANY|Reachable on the network, always

@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.36.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.36.1`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.36.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.36.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.1)
 
 ---
 
@@ -220,6 +220,9 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   compose block with its notes as `#` comments at the bottom of the YAML,
   then the `compose.yaml` filename. Every volume is a bind mount under
   `/opt/docker/<name>/`, and the image tag follows the version. *(2.36.0)*
+- **[Test containers you can reach.](#gate-2--build-)** Docker test runs
+  publish on the network, and the login URL uses the host's LAN IP (checked
+  to answer before it's handed over), never `127.0.0.1`. *(2.36.1)*
 
 ---
 
@@ -332,7 +335,9 @@ built from the exact commit being merged, in every environment: remote
 container and Termux sessions get theirs from CI (a PR build artifact or a
 dev pre-release) instead of skipping it. Every Docker test run gets a freshly
 generated throwaway username and password, shown to you with the run
-command, and the container is bound to `127.0.0.1`. *(2.33.0)* The login
+command. *(2.33.0)* The container is published on the network, and its URL
+uses the host's LAN IP (checked to answer), never `127.0.0.1`. It binds to
+that private IP only, never a public interface. *(2.36.1)* The login
 is repeated at the bottom of every message after the test container is
 started, rebuilt or restarted, never just "see above". *(2.34.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
@@ -1000,4 +1005,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.36.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.36.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
