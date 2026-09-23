@@ -15,5 +15,5 @@ Previous: v2.32.0 SHIP ✅ — tag at 18d4246, release run ✅, asset dev-skills
   install block path-guarded + version-checked, tested; hook merge checks tested (7 cases);
   test creds from /dev/urandom, 127.0.0.1-bound, never persisted; shellcheck not installed here (CI lints)
 📄 DOCS       ✅ CHANGELOG 2.33.0, README what's-new, Gate 2, install, hook README
-📦 RELEASE    ⏳ awaiting commit approval
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR #59, commit + notes approved 2026-09-23
+🚀 SHIP       ⏳ merge #59 → user tags v2.33.0 → release.yml publishes → verify
