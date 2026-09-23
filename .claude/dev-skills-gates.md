@@ -15,5 +15,5 @@ Previous: v2.33.0 SHIP ✅ — tag at 17a8bd2, release run ✅, asset verified
   prose-only change; creds echo is throwaway, 127.0.0.1-bound, never persisted;
   no package manifest; Dependabot alerts API 200, 0 open
 📄 DOCS       ✅ CHANGELOG 2.34.0, README what's-new + Gate 2 section
-📦 RELEASE    ⏳ awaiting commit + release-notes approval
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR #61, commit + notes approved 2026-09-23
+🚀 SHIP       ⏳ merge PR #61, user pushes tag v2.34.0, release run, verify asset
