@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.30.0] — 2026-09-22
+
+**Fewer round trips and shorter routine output, in every mode.** Every tool call
+resends the whole conversation, and the skill was spending them one command at
+a time: about ten separate reads at session start, four or five at the
+session-end checkpoint. The rule for chaining commands lived only in
+`AUTO_MODE.md`, which manual sessions never load.
+
+### Added
+- **One-call session-start probe (`SESSION_START.md`, top of "Session
+  start").** A single read-only Bash block answers the self-check, the version
+  check, the environment signals and steps 1, 1a, 4, 6 and 7 as `key=value`
+  lines. Every key always prints. A failed command prints `key=ERROR <message>`
+  instead of being skipped, and pipelines run under `pipefail`, so a failure
+  mid-pipe is never hidden. Credentials embedded in the `origin` URL are
+  stripped before printing, so a token never reaches the transcript.
+  The probe moves to the repo root itself, so it answers correctly from any
+  subdirectory. It passes the `origin` URL to `gh repo view` explicitly, so a
+  fork resolves to the fork and not to its parent.
+- **One-call session-end evidence (`SKILL.md` §8).** Status, diff, unmerged
+  commits, the current version's tag, the state file and test containers are
+  read together, `;`-separated so one failure does not hide the rest.
+
+### Changed
+- **The chaining rule moved to `SKILL.md` §5.1 and applies in every mode.**
+  `&&` a step's commands, and do not chain across a stop (commit approval, the
+  tag block, an unpassed gate, a failure that changes what comes next).
+  `AUTO_MODE.md` now points to it instead of holding its own copy. The
+  pre-flight hook already scans every command in a chain, so chaining does not
+  get past it.
+- **Compact tracker.** The full six rows show at session start, on a gate
+  change, on "status" and in handoffs. Otherwise the tracker is one line
+  (`🔢✅ 🔨✅ 🔒⏳ 📄⬜ 📦⬜ 🚀⬜ · track · mode`). Blocking gates are still named
+  in full, and the pre-tag report is never compacted.
+- **Banner folds all-clear rows** into one `Checks: ✅ …` line. Only rows that
+  need attention print on their own.
+- **Token impact estimate capped** at a header and three lines. The MCP line
+  appears only when connections changed since session start.
+- **`scripts/validate.sh` checks the probe against the self-check.** Both
+  name the reference files that must exist, written separately, so validation
+  fails if they drift. It also drops an unused variable that shellcheck
+  flagged (SC2034).
+- **Session-start ordering stated once.** The probe is the first action, the
+  version check is the first thing reported, and step 0 is the first decision.
+  Before, the version check and step 0 each claimed "before anything else".
+- README size table: `SKILL.md` ~53KB (was ~51KB), `SESSION_START.md` ~28KB
+  (was ~25KB).
+
+### Fixed
+- **`scripts/validate.sh` could fail at random with "missing from
+  dev-skills.skill".** Under `set -o pipefail` it piped `unzip -l` straight
+  into `grep -q`. When grep exited on its first match, unzip took SIGPIPE and
+  the pipeline reported a bundled file as missing. The listing is now read
+  once and grepped from a variable.
+
 ## [2.29.0] — 2026-09-22
 
 **You choose the operating mode at the start of every session, and forks

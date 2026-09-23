@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.29.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.30.0`
 
 ---
 
@@ -740,9 +740,16 @@ release breaks.
   (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and always starting with the
   right `cd`. Remote container sessions execute directly instead, since a
   presented block would operate on the wrong clone
+- **Fewer round trips** — session start is one read-only probe call instead of
+  about ten, the session-end checkpoint reads its evidence in one call, and any
+  step made of several commands is chained into one invocation in every mode
+  (never across an approval or a failed gate)
+- **Short routine output** — the full gate tracker shows at session start, on a
+  gate change, on "status" and in handoffs; otherwise it is one line. The banner
+  folds all-clear checks into one row
 - **Token impact estimate** — part of the session-end checkpoint whenever the
   session modified a tracked file: what was saved, what was wasted, the biggest
-  win next time
+  win next time, in at most three lines
 - **Handoff offers** — proposed at three observable points: a release sequence
   finished, you opened unrelated work with no release in flight, or the
   conversation was compacted. Also when a usage limit is actually signalled
@@ -801,8 +808,8 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~51KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~25KB | Once, at session start — self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `SKILL.md` | ~53KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SESSION_START.md` | ~28KB | Once, at session start — the one-call probe, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
 | `GATE_REFERENCE.md` | ~22KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria |
 | `SECURITY_GATE.md` | ~15KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~22KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
@@ -893,4 +900,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.29.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.30.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

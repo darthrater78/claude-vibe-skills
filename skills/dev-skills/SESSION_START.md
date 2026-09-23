@@ -18,6 +18,59 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 When the skill loads:
 
+**Probe first: one read-only call answers every check below.** It is the
+first action of the session; the version check below is the first thing
+*reported*, and step 0 is the first *decision*. The self-check,
+the version check, step 0's environment signals and steps 1, 1a, 4, 6 and 7
+used to be separate calls, and each one resent the whole conversation. Run this
+block once from anywhere in the project (it moves to the repo root itself), as a single Bash call, with `B` set to this skill's base directory,
+then read every step's answer from its `key=value` output:
+
+```bash
+export B="<this skill's base directory>"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
+p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
+p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
+p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
+p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
+p repo_root git rev-parse --show-toplevel
+p origin bash -o pipefail -c "git remote get-url origin | sed -E 's#://[^/@]+@#://#'"
+p branch git branch --show-current
+p status git status -sb
+p gh_installed bash -o pipefail -c 'command -v gh || echo no'
+p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission,defaultBranchRef'
+p gh_login gh api user -q .login
+p default_branch bash -o pipefail -c "git remote show origin | sed -n 's/.*HEAD branch: //p'"
+p latest_tag bash -o pipefail -c "git ls-remote --tags origin | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
+p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | grep -v '\^{}'); grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
+p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
+p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
+p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
+```
+
+Reading it:
+
+- **`key=ERROR …` is a finding, not a blank.** Every key prints every time, and
+  a failed command prints `ERROR` with its message. It is never skipped. Handle
+  it the way the step it answers says to, for example
+  `skill_latest=ERROR` → "version check skipped — no network access".
+- **Git keys with `ERROR` when `repo_root=ERROR`** mean no git repo. The git
+  steps do not apply.
+- **`gh_installed=no` or `gh_repo=ERROR`** → use the GitHub MCP equivalents
+  (step 0) for step 1a, and for anything the probe could not answer.
+- **`untagged` lists changelog versions with no remote tag.** The version being
+  built right now shows there too, and that is expected. Step 7 is about the
+  versions before it.
+- **`origin` has any credentials in the URL stripped** (`https://user:token@…`
+  becomes `https://…`) so a token never lands in the transcript.
+- **The probe only reads.** It fetches nothing, so `status`'s ahead/behind
+  counts are as of the last fetch, and step 3's sync offer still stands.
+
+Steps 2 and 3 are questions for the user, not reads. Every step below still
+applies: the probe changes how many calls it takes, never what gets checked.
+
 **Self-check:** Verify that `GATE_REFERENCE.md`, `SECURITY_GATE.md`,
 `SHIP_REFERENCE.md`,
 `AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
@@ -29,7 +82,7 @@ warn immediately:
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
 
-**Version check — run every time the skill loads, before anything else.**
+**Version check — run every time the skill loads, and report it before anything else.**
 Running an outdated copy means gates in this session can be missing fixes,
 tightened checks, or corrected mistakes that already shipped upstream — this
 is not optional and does not wait for the user to ask.
@@ -82,8 +135,8 @@ is not optional and does not wait for the user to ask.
    repo; this check targets the skill's own upstream repo, which is unrelated
    and always checked the same way).
 
-**Step 0 — Execution environment detection. Run this before anything else; it
-changes how git works for the rest of the session.**
+**Step 0 — Execution environment detection. Decide this before any other step;
+it changes how git works for the rest of the session.**
 
 The skill's git behavior hinges on one question: **is Claude's working tree the
 same clone as the user's terminal?** Resolve it into one of three environments:
@@ -130,7 +183,8 @@ Claude Code admin settings.
    > when the session ends, so anything uncommitted is lost. I'll commit and
    > push from here once you approve.
 
-3. **`gh` is typically not installed.** Verify with `which gh`. If absent, every
+3. **`gh` is typically not installed.** The probe's `gh_installed` and
+   `gh_repo` keys say whether it is there and whether it works. If absent, every
    `gh` command in Gates 5 and 6 maps to a GitHub MCP tool (`mcp__github__*`):
 
    | `gh` command | MCP equivalent |
@@ -199,14 +253,9 @@ session or handoff describes *that* context, not this one.
 directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
 If yes:
 
-**Batch the reads.** Steps 1, 1a, 4, 5 and 7 are independent read-only commands,
-and every one of them run as its own call resends the whole conversation
-again. Chain them into one invocation and read the combined output — for
-example `git rev-parse --is-inside-work-tree && git remote -v && git status
--sb && git ls-remote --heads origin && git ls-remote --tags origin`. Steps 2
-and 3 are questions for the user and are not part of that chain. This changes
-nothing about what gets checked; a step that is skipped is still a step that
-was skipped.
+**Every read in steps 1, 1a, 4, 6 and 7 comes from the probe** (top of this
+section). Run a command below separately only when the probe printed `ERROR`
+for it or it needs something the probe does not read.
 
 1. **Detect and store the repo URL.** Run `git remote -v` to capture the origin
    URL. Store it for the session — this URL is used in clone commands (Termux),
@@ -222,8 +271,8 @@ was skipped.
    command block presented to the user.
 
 1a. **Fork check: `origin` must be the fork, never upstream.** Resolve what
-   `origin` points at and whether a fork is involved. Fold these into the
-   batched read below:
+   `origin` points at and whether a fork is involved. The probe already ran both
+   of these (`gh_repo`, `gh_login`):
 
    ```
    gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission
@@ -395,7 +444,7 @@ state and mode for the rest of the session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.29.0 active.
+Dev Skills v2.30.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -418,12 +467,18 @@ Commits require explicit approval. Security scan runs after every build.
 All work on branches — merge to default branch via PR only.
 ```
 
+**Fold the all-clear rows.** `Origin`, `CI`, `Local dev`, `Releases` and
+`Skill version` get their own line only when they need attention (⚠️, ❌, 🚫,
+🚨). The ones that read ✅ collapse into one line, for example
+`Checks: ✅ origin, CI, local dev, releases, skill version`. `Repo`, `Mode`,
+`Env` and `Shell` always print. They are this session's settings, not checks.
+
 **Important:** The version shown must match the `version` field in `SKILL.md`'s
 frontmatter. If they differ, the skill was not repackaged after a version bump —
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.29.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.30.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

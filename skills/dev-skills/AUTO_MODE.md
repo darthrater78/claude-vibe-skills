@@ -213,34 +213,15 @@ split across. That is the trade the user accepted when they opted in
 (`SKILL.md` §5.8) — it is not a reason to talk them out of the mode, and not a
 reason to skip a check. It is a reason not to spend calls carelessly.
 
-**Chain a step's commands into one invocation.** The commit-and-push step is
-one call, not three:
-
-```
-git add -A && git commit -m "<message>" && git push -u origin <branch>
-```
-
-The gates are unchanged by this — the pre-flight ran before the first
-character of that line was written, and the approval covers the sequence it
-described. What changes is that three round trips become one. The same applies
-anywhere a step is several commands that must all succeed: `&&` them, and let
-the first failure stop the chain.
-
-**Gather evidence in one call, not one per source.** Checkpoint 2's report is
-reconstructed from `git log`, `gh pr view`, `gh run list` and the gate file.
-Read them together:
+**Chain each step's commands, and stop at every stop** — the rule is
+`SKILL.md` §5.1, and it applies in every mode. The commit approval covers the
+chained commit-and-push line it described. In this mode it matters most for
+checkpoint 2's evidence, which is one read, not one per source:
 
 ```
 git log --oneline <base>..HEAD && gh pr view --json state,mergeCommit,url \
   && gh run list --limit 5 && cat .claude/dev-skills-gates.md
 ```
-
-**Do not chain across a stop.** Anything the user must see or decide between
-two commands is a boundary the chain does not cross: the commit approval, the
-tag block, a gate that has not passed, a failed command whose output changes
-what comes next. Chaining is for commands that were always going to run in
-sequence with no judgment between them. When in doubt, split — a wasted round
-trip is cheaper than an action the user did not approve.
 
 ### When it stops
 
