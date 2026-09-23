@@ -433,7 +433,7 @@ the user wanted that. Now it is asked every time:
 
 **Write the gate state file.** Create `.claude/dev-skills-gates.md` with all
 six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
-(format in Section 2). Replace `unchosen` with the user's answer as soon as it
+(format below). Replace `unchosen` with the user's answer as soon as it
 arrives. Where the pre-flight hook is installed, it denies every git write
 while the row reads `unchosen`. A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
@@ -441,10 +441,40 @@ sessions add the file to `.gitignore`; on remote containers it is committed
 with the work. This file, not the conversation, is the source of truth for gate
 state and mode for the rest of the session.
 
+**Format:**
+
+```
+# Dev Skills gate state
+Track: release sequence
+Mode: manual
+Origin: owner/repo (not a fork)
+Version: 2.12.0
+Updated: 2026-09-07
+
+🔢 VERSION    ✅ all refs at 2.12.0
+🔨 BUILD      ➖ N/A — skill repo, no build system
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
+📄 DOCS       ⬜
+📦 RELEASE    ⬜
+🚀 SHIP       ⬜
+```
+
+**Row format: the status symbol and every word the hook checks go on the row's
+first line.** The hook and re-derivation both read the ✅/➖/⏳/🚫/⬜ symbol and
+annotations like `handoff` or `0 open` line by line, so a check that wraps to
+line two reads as absent. Keep line one to the symbol plus a short label, and
+put the why and the evidence on indented lines below it.
+
+**Keep the file small.** It is read in full on every gate check and every git
+write. Long write-ups belong in the commit message or `CHANGELOG.md`. Close an
+absorbed section (a VERSION or SHIP step folding earlier work-commit entries
+into a release) in the step that absorbs it. A stale "IN PROGRESS" reads as
+open work to the next session.
+
 Then show the gate tracker:
 
 ```
-Dev Skills v2.30.0 active.
+Dev Skills v2.31.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -478,7 +508,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.30.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.31.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

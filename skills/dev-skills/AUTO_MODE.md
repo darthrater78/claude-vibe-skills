@@ -43,6 +43,10 @@ require the user's approval` into
 conversation and not written down is a mode that disappears at the next
 compaction.
 
+Say the cost trade once, in that confirmation or right after it: on a local
+session every executed git command is a round trip that resends the
+conversation, where a pasted block costs nothing.
+
 On a remote container, nothing extra needs asking: the tag block this mode still
 hands over carries no `cd` and no shell-specific syntax (`SESSION_START.md`, step 0,
 item 4).
@@ -130,7 +134,7 @@ hand over the block:
 > ```
 >
 > Tell me when it's done and I'll take it from there — watch the run, add the
-> notes, verify, and commit the SHIP record. The branch deletion is yours too;
+> notes, verify, and record SHIP ✅ (it ships in the next release's PR). The branch deletion is yours too;
 > I'll give you that block at the end.
 
 **Rules for this report:**
@@ -174,7 +178,7 @@ What changes is only the execution:
 | Tag + tag push | **the user's, in every environment** | **the user's, in every environment** |
 | Watch CI, add notes, verify | Claude, either way | Claude, either way |
 | Branch cleanup (a ref deletion) | presented | presented — the user's in both modes |
-| Tracker SHIP ✅ commit | presented | Claude runs it |
+| Tracker SHIP ✅ | held in the working tree; ships in the next release's PR (`SHIP_REFERENCE.md`, step 7) | same |
 
 **The last column is where the mode's value is, and the two rows that don't move
 are why it is still called semi-autonomous.** Everything Claude can actually do
@@ -210,7 +214,7 @@ This mode's one real cost is tool-call round trips. A presented block costs
 nothing to produce; a chain of executed commands resends the whole conversation
 on every call, so the same sequence gets more expensive the more calls it is
 split across. That is the trade the user accepted when they opted in
-(`SKILL.md` §5.8) — it is not a reason to talk them out of the mode, and not a
+("Entering the mode") — it is not a reason to talk them out of the mode, and not a
 reason to skip a check. It is a reason not to spend calls carelessly.
 
 **Chain each step's commands, and stop at every stop** — the rule is

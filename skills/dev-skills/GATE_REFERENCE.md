@@ -30,10 +30,57 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 ---
 
+## Gate state file — re-derivation and resuming
+
+The rules for `.claude/dev-skills-gates.md` are in `SKILL.md` Section 2 ("Gate
+state"). This is the detail: load it when the file is missing, stale or
+compacted away, or when a user-driven action has to be credited.
+
+The file's format and row rules are in `SESSION_START.md`, where it is first
+written ("Write the gate state file").
+
+**Remote refs, never local ones.** Reading refs is not a write:
+
+```
+git ls-remote --tags origin              # all tags
+git ls-remote --tags origin v1.2.3       # one tag
+git ls-remote --heads origin             # all branches
+git ls-remote --heads origin main        # one branch
+```
+
+**Re-derivation — when the state file is missing, stale, or the session was
+compacted.** Do not guess, and do not treat a gate as passed because it feels
+like it did. Rebuild from evidence:
+
+| Gate | Evidence that it passed |
+|---|---|
+| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git ls-remote --tags origin` shows the previous version tagged |
+| 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A). **A check list with zero runs is ⬜, never ✅** (`SKILL.md` Section 2, "Absence of a verdict") |
+| 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
+| 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |
+| 📦 RELEASE | a PR exists for this branch (`gh pr list`, or MCP `list_pull_requests`) |
+| 🚀 SHIP | tag on remote, release exists, PR merged, expected assets attached |
+
+Any gate you cannot prove from evidence is ⬜ pending and must be run.
+"It probably ran" is ⬜.
+
+**Resuming, or crediting user-driven work:**
+1. Run `git log`, `git ls-remote --heads origin`, `git ls-remote --tags
+   origin`, and `gh pr list` / `gh pr view` (or the GitHub MCP equivalents when
+   `gh` is unavailable, `SESSION_START.md` step 0). Chain them into one call
+   (`SKILL.md` §5.1).
+2. Credit completed mechanical steps on the tracker (✅ "user-driven" or
+   "already done").
+3. Re-derive Gates 1–4 from evidence (table above), never from the presence of
+   a commit.
+4. Continue from the first gate that is not ✅ or ➖ N/A.
+
+---
+
 ## Gates 1–5 — execution detail
 
-The pre-flight, the two tracks, the gate state file, and the re-derivation
-table live in `SKILL.md` Section 2. What follows is how each of gates 1 through
+The pre-flight, the two tracks and the gate state rules live in `SKILL.md`
+Section 2; the re-derivation table is above. What follows is how each of gates 1 through
 5 is actually run and what makes it pass. **Gate 3 is in `SECURITY_GATE.md`**
 and **Gate 6 is in `SHIP_REFERENCE.md`**
 — read that file when the ship gate is the one that is owed, not before.

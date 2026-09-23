@@ -8,8 +8,9 @@ gates 1–5 have no use for it.
 It holds the CI-driven ship path, the manual path for repos with no release
 workflow, the wrong-commit tag recovery, and the post-ship verification.
 
-Gates 1–5 are in `GATE_REFERENCE.md`. The pre-flight, the two tracks, the gate
-state file, and the re-derivation table are in `SKILL.md` Section 2.
+Gates 1–5 are in `GATE_REFERENCE.md`. The pre-flight, the two tracks and the gate
+state rules are in `SKILL.md` Section 2; the re-derivation table is in
+`GATE_REFERENCE.md`, "Gate state file".
 
 Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
@@ -101,6 +102,8 @@ looks fine and is not:
    permission, denied (`403`) independently of the merge itself (Section 5.8),
    so a merge that carries the flag can succeed at merging and still fail at
    deleting, or fail as a whole. The flag is fine in a block the user runs.
+   A handed-over deletion is confirmed like a tag: `git ls-remote --heads
+   origin <branch>` returning nothing.
 
    **Confirm the merge actually landed before doing anything else.** A
    request to merge is not a merged commit — don't treat "I ran the command"
@@ -258,7 +261,7 @@ looks fine and is not:
 
    **Between the tag and the next release, the durable record is the tag, the
    GitHub release and the `CHANGELOG.md` entry.** Those are on the default
-   branch, they are what the next session's re-derivation (Section 2) actually
+   branch, they are what the next session's re-derivation (`GATE_REFERENCE.md`) actually
    reads, and they prove the ship far better than a tracker line does. A
    tracker committed at ⏳ is not stale — it is accurate as of the commit it
    is in, which is the last commit that existed before the tag.
