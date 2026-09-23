@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.33.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.34.0`
 
 ---
 
@@ -203,6 +203,10 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   now offers to install the new release for you, or gives you one command
   (bash or PowerShell). The whole skill is replaced from the release file,
   and nothing changes if the download isn't the expected version. *(2.33.0)*
+- **[The test login stays in view.](#gate-2--build-)** Every message in which
+  a Docker test container was started, rebuilt or restarted ends with its
+  full login (URL, user, password), so it doesn't get lost in the scroll
+  between test rounds. *(2.34.0)*
 
 ---
 
@@ -312,7 +316,9 @@ built from the exact commit being merged, in every environment: remote
 container and Termux sessions get theirs from CI (a PR build artifact or a
 dev pre-release) instead of skipping it. Every Docker test run gets a freshly
 generated throwaway username and password, shown to you with the run
-command, and the container is bound to `127.0.0.1`. *(2.33.0)* Where the [pre-flight
+command, and the container is bound to `127.0.0.1`. *(2.33.0)* The login
+is repeated at the bottom of every message after the test container is
+started, rebuilt or restarted, never just "see above". *(2.34.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
 a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
 repo with a Docker/.exe/.apk build signal, is denied — reading the tracker
@@ -958,4 +964,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.33.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.34.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

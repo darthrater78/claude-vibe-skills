@@ -63,3 +63,4 @@ ANY|The cost line is part of each option and is shown every time
 ANY|the install always comes whole from the release
 SKILL|Nothing merges to the default branch without a test artifact
 ANY|Docker test runs get fresh credentials, every run
+ANY|Echo the login every time the test container changes

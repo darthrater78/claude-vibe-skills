@@ -319,6 +319,20 @@ docker run -d --rm --name <app>-test -p 127.0.0.1:8080:8080 \
 - **An app with no login** needs none: say so, and record `test creds n/a (no
   login)`.
 
+**Echo the login every time the test container changes, as the last thing in
+the message.** Testing is iterative: fix, rebuild, restart, re-check. A login
+shown once scrolls out of sight after the first round. So the 🔑 block above is
+repeated, in full (URL, user and password), at the **bottom** of every message
+in which the test container was started, rebuilt, restarted or recreated, or
+in which the user is asked to try it again. That includes a rebuild after a
+one-line fix. The bottom of the message is where the user's eye lands, so
+nothing goes below it. A pointer such as "same login as before" or "see
+above" does not count. When the credentials changed with the new container,
+say so on the block's first line (`🔑 **New test login, the previous one no
+longer works**`). If the current credentials are no longer in context, for
+example after compaction, never reconstruct them from memory. Recreate the
+container with fresh ones and show those.
+
 **Tear it down once its purpose is served.** A container started here — or for
 the "prove a never-run release step" check above, or for any other Gate 2
 testing — is a running resource, not a fire-and-forget check. Stop and remove

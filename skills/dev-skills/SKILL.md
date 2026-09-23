@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.33.0
+version: 2.34.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -301,7 +301,7 @@ gate from memory of it:
 | Gate | Passes when |
 |---|---|
 | 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
-| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get fresh throwaway credentials, shown to the user) |
+| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get fresh throwaway credentials, re-shown at the bottom of every message after the container changes) |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.34.0] — 2026-09-23
+
+**The Docker test login is repeated every time the test container changes,
+so it no longer gets lost in the scroll.**
+
+### Changed
+- **The test login is echoed at the bottom of every message after the test
+  container changes.** Testing is iterative, and a login shown once scrolled
+  out of sight after the first rebuild. Now the full 🔑 block (URL, user,
+  password) is repeated as the last thing in every message in which the test
+  container was started, rebuilt, restarted or recreated, or in which the
+  user is asked to try it again. "Same login as before" or "see above" does
+  not count. When the credentials changed with the new container, the block
+  says so. If the current credentials are no longer in context (after
+  compaction), Claude recreates the container with fresh ones instead of
+  reconstructing them from memory. A rule-phrase guard keeps the rule from
+  being trimmed away.
+
 ## [2.33.0] — 2026-09-23
 
 **Nothing merges without a test artifact, Docker test runs get a fresh
