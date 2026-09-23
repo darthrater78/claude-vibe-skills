@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.34.0
+version: 2.35.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -782,3 +782,38 @@ every configuration question in one turn, generate from the matching template,
 validate against best practices. Generated workflows are SHA-pinned,
 least-privilege, and concurrency- and timeout-guarded by default. Recommend
 Dependabot for action SHAs whenever creating or auditing workflows.
+
+---
+
+## 10. Project standards — every project
+
+The user's standing requirements for every project this skill touches. Raise
+each one **when the project or feature it applies to is being designed**, not
+first at a gate. Record the user's answer on the tracker's `Standards:` row, so
+a declined item is a decision on the record and not a gap.
+
+1. **Encryption at rest is always considered.** The security section of every
+   project (design notes, README "Security", Gate 3 output) states what is
+   stored (database, config, uploads, tokens, backups), whether each is
+   encrypted at rest, how, and where the key lives. "Not needed, because …" is
+   an answer. Silence is not.
+2. **Login means TOTP, 30-day trust, and a rescue path, offered.** Any project
+   with user authentication gets all three offered: **TOTP 2FA** (RFC 6238,
+   secrets encrypted at rest), a **"trust this device for 30 days"** option (a
+   signed, `HttpOnly`/`Secure` cookie or token with a 30-day hard expiry,
+   revoked on password or 2FA change, with trusted devices listed and
+   revocable), and an **unlock / rescue feature** for a locked-out user
+   (single-use hashed recovery codes plus an admin or CLI unlock that is logged).
+   The user decides. Record which were accepted or declined.
+3. **The main page links to GitHub and the latest release notes, without
+   exception.** The README's top section, and the app's main page or screen
+   when it has a UI, links to the GitHub repo and to the release notes for the
+   current version (`GATE_REFERENCE.md`, Gate 1, checks 5–6). Gate 1 blocks
+   without both.
+4. **Docker projects offer Apprise notifications.** When the project ships as
+   a Docker container, offer notifications through
+   [Apprise](https://github.com/caronc/apprise): an `APPRISE_URLS` setting
+   (env var or settings page, treated as a secret and never logged), the
+   events worth sending (errors, updates, security events such as lockouts
+   and new-device logins), and a "send test notification" action. The user
+   decides. Record it.

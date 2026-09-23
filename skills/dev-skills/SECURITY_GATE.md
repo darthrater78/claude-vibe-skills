@@ -109,6 +109,26 @@ move on":**
   dependencies several majors behind current with no advisory yet
 - 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
 
+#### Project standards check (`SKILL.md` §10)
+
+Part of every scan. Read the tracker's `Standards:` row, and check the code
+against it:
+
+- **Encryption at rest:** the project's security section names what is
+  stored and whether each store is encrypted at rest. A missing statement is
+  a 📝 Medium finding. Sensitive data (credentials, TOTP secrets, tokens,
+  personal data) stored in plaintext with no recorded decision is ⚠️ High.
+- **Login projects:** TOTP, 30-day trusted device, and unlock/rescue each
+  read *accepted* or *declined* on the row. An item never offered is a
+  📝 Medium finding: offer it now. An accepted item is checked like any other
+  auth code: TOTP secrets encrypted, trust tokens signed with a hard 30-day
+  expiry and revoked on credential change, recovery codes hashed and
+  single-use, the admin unlock logged.
+- **Docker projects:** Apprise reads offered, *accepted* or *declined*. An
+  accepted `APPRISE_URLS` is a secret: never logged, never in the image.
+
+A declined item is not a finding. The user decided on the record.
+
 ### Finding lifecycle — nothing releases with an open finding
 
 **Severity decides how urgent the conversation is. It does not decide whether
