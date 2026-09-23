@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.32.0] — 2026-09-23
+
+**The session-start mode question now says what each mode costs, and the MCP
+check gives a real command for each server.**
+
+### Changed
+- **Mode choice (`SESSION_START.md`):** each option carries one short cost
+  line on how it processes. Manual: the commands run outside Claude, so running
+  them costs no tokens, and each stop is one more turn. Semi-autonomous: every
+  executed command is a tool call that resends the conversation, kept down by
+  chaining. Remote containers, where Claude runs git in both modes, get a
+  manual cost line about the stops instead. Still neutral, with no
+  recommendation. The `AskUserQuestion` option descriptions are given word
+  for word, per environment, so the picker cannot drop the cost line, and a
+  new rule phrase in `scripts/rule-phrases.txt` fails validation if that
+  requirement is removed.
+- **MCP check (`SESSION_START.md`):** instead of a bare `/mcp`, the banner
+  lists one ready-to-paste `/mcp disable <server>` line per active server,
+  with `/mcp enable <server>` and `/mcp disable all` noted, the `/mcp` list's
+  display name as the fallback when the tool-prefix name isn't recognized,
+  and the interactive `/mcp` toggle for Claude Code versions without the
+  arguments.
+
 ## [2.31.0] — 2026-09-22
 
 **`SKILL.md` is about a quarter smaller (~54KB → ~40KB), with every rule

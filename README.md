@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.31.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.32.0`
 
 ---
 
@@ -187,6 +187,12 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   53-phrase manifest checked by `validate.sh` fails the build if a rule goes
   missing, and the size ceiling dropped to 44KB so the saving can't drift
   back. *(2.31.0)*
+- **The mode question states each mode's token cost, and MCP disabling is one
+  command per server.** Each mode option carries one plain line on how it uses
+  tokens: in manual on a local session, commands run outside Claude and are
+  free; in semi-autonomous, every executed command resends the conversation. The MCP
+  check now gives a ready-to-paste `/mcp disable <server>` line for each active
+  server instead of a bare `/mcp`. *(2.32.0)*
 
 ---
 
@@ -755,7 +761,7 @@ release breaks.
   model tier that fits the task (Haiku for lookups, Sonnet for code, Opus/Fable
   only when approved)
 - **MCP awareness** — identifies unused MCP servers adding token overhead and
-  shows how to disable them
+  gives the `/mcp disable <server>` command for each one
 - **Git command presentation** — on local sessions, presents git as a single
   copy-once block per operation rather than several, formatted for your shell
   (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and starting with the right
@@ -931,4 +937,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.31.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.32.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
