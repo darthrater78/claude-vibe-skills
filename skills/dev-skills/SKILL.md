@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.35.0
+version: 2.36.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -817,3 +817,45 @@ a declined item is a decision on the record and not a gap.
    events worth sending (errors, updates, security events such as lockouts
    and new-device logins), and a "send test notification" action. The user
    decides. Record it.
+5. **Docker projects document a compose quickstart.** The README's install
+   section is a copy-paste quickstart, in this order:
+   - **A one-line directory setup** that creates every host directory the
+     compose file mounts and `cd`s into it.
+   - **The compose block, with its explanations as `#` comments at the
+     bottom of the YAML**, below the last setting, never inline or above it.
+     There is one comment line per setting worth explaining (ports, env vars,
+     each mount). The settings read clean, and the notes travel with the file.
+   - **The filename, stated outright:** save it as `compose.yaml`. Then the
+     start command.
+
+   **Every volume is a bind mount under `/opt/docker/<container-name>/`**
+   (the user's convention, and the example path). Never a named volume. **The
+   image tag is pinned to the current version**, never `latest`. Gate 1 treats
+   it as a version reference, so a release that bumps the version bumps the
+   compose file too (`GATE_REFERENCE.md`, Gate 1, check 2). Gate 4 checks the
+   quickstart. Example:
+
+   ```bash
+   mkdir -p /opt/docker/myapp/{config,data} && cd /opt/docker/myapp
+   ```
+
+   ```yaml
+   services:
+     myapp:
+       image: ghcr.io/owner/myapp:1.4.2
+       container_name: myapp
+       restart: unless-stopped
+       ports:
+         - "8080:8080"
+       volumes:
+         - /opt/docker/myapp/config:/config
+         - /opt/docker/myapp/data:/data
+
+   # image: pinned to this release (1.4.2), updated with every release
+   # ports: 8080 is the web UI. Change the left side for a different host port
+   # /opt/docker/myapp/config: settings, kept across upgrades
+   # /opt/docker/myapp/data: the database and uploads. Back this directory up
+   ```
+
+   Save it as **`compose.yaml`** in `/opt/docker/myapp`, then run
+   `docker compose up -d`.

@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.35.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.36.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.35.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.35.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.36.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.0)
 
 ---
 
@@ -27,7 +27,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
-- [Project standards](#project-standards) — encryption at rest, login protections, main-page links, Apprise
+- [Project standards](#project-standards) — encryption at rest, login protections, main-page links, Apprise, compose quickstart
 - [Audit mode](#audit-mode) · [Shortcut detection](#shortcut-detection) · [What's inside](#whats-inside) · [For maintainers](#for-maintainers)
 
 ---
@@ -215,6 +215,11 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   device and an unlock/rescue path. Docker projects are offered Apprise
   notifications. Every main page links to GitHub and the current release notes,
   with no exceptions. *(2.35.0)*
+- **[Compose quickstart standard.](#project-standards)** Docker projects
+  document a copy-paste quickstart: set up the directory in one line, then the
+  compose block with its notes as `#` comments at the bottom of the YAML,
+  then the `compose.yaml` filename. Every volume is a bind mount under
+  `/opt/docker/<name>/`, and the image tag follows the version. *(2.36.0)*
 
 ---
 
@@ -832,7 +837,7 @@ release breaks.
 
 ## Project standards
 
-Four requirements that apply to every project. Claude raises each one when the
+Five requirements that apply to every project. Claude raises each one when the
 project or feature it applies to is being designed, not first at a gate. Your
 answer goes on the tracker's `Standards:` row, so a "no" is a decision on the
 record, not a gap. Gate 3 checks the code against that row.
@@ -843,6 +848,7 @@ record, not a gap. Gate 3 checks the code against that row.
 | **TOTP 2FA, "trust this device for 30 days", and unlock/rescue** | anything with a login | All three offered: RFC 6238 TOTP, a signed 30-day trusted-device token revoked on credential change, and recovery codes plus a logged admin unlock. You decide |
 | **GitHub + release-notes links on the main page** | every project, no exceptions | Gate 1 blocks until the README top section, and the app's main page if it has a UI, link to both |
 | **Apprise notifications** | Docker projects | Offered: an `APPRISE_URLS` setting (a secret, never logged), useful events, and a test-notification action. You decide |
+| **Compose quickstart** | Docker projects | The README gives a one-line `mkdir -p /opt/docker/<name>/…` setup, then the compose block with its explanations as `#` comments at the bottom of the YAML (not inline), then the filename (`compose.yaml`). Every volume is a bind mount under `/opt/docker/<name>/`, never a named volume. The image tag is pinned to the current version, so Gate 1 bumps it with every release. Gate 4 checks it |
 
 ---
 
@@ -994,4 +1000,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.35.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.36.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.36.0] — 2026-09-23
+
+**Project standard 5: Docker projects document a copy-paste compose
+quickstart. It uses bind mounts under `/opt/docker/<name>/`, and its image tag
+follows the version.**
+
+### Added
+- **`SKILL.md` §10, item 5: the compose quickstart.** The README's install
+  section is, in order:
+  1. a one-line `mkdir -p` that creates every mounted host directory and `cd`s
+     into it
+  2. the compose block, with one `#` comment line per notable setting at the
+     bottom of the YAML (not inline, not above it)
+  3. the filename (`compose.yaml`) and the start command
+
+  Every volume is a bind mount under `/opt/docker/<container-name>/`, never a
+  named volume.
+- **Gate 4, check 6:** a missing quickstart, a named volume or a `latest` tag
+  blocks DOCS on Docker projects.
+- Rule-phrase guards for the new standard.
+
+### Changed
+- **Gate 1, check 2: the compose image tag is a version reference.** The
+  README quickstart's tag, and the tag in any shipped `compose.yaml`, is
+  bumped with the rest. `latest` there fails the gate.
+
 ## [2.35.0] — 2026-09-23
 
 **Project standards: every project considers encryption at rest, login

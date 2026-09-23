@@ -98,6 +98,9 @@ No build starts until versioning is resolved.
    "About" dialogs, splash screens, window titles, headers, footers, constants, and
    config files. Every instance must be updated — not just the manifest files.
    A missed version string in the app's UI is a gate failure.
+   **Docker projects: the image tag in the README's compose quickstart and in
+   any shipped `compose.yaml` is a version reference** (`SKILL.md` §10). It is
+   bumped with the rest, and `latest` there is a gate failure.
 3. Every version reference must show the same version and it must be bumped from
    the previous release.
 4. Version must follow semver (MAJOR.MINOR.PATCH).
@@ -419,6 +422,13 @@ After security passes, check:
    concepts, restructured workflows, and changed terminology must be reflected
    everywhere — not just in the changelog. Read the full README and flag any
    description that no longer matches.
+6. **Docker compose quickstart** (`SKILL.md` §10). This applies to Docker
+   projects. The README has the one-line `mkdir -p /opt/docker/<name>/…`
+   setup, then the compose block with only bind mounts under
+   `/opt/docker/<name>/`, the image pinned to this version, and its
+   explanations as `#` comments at the bottom of the YAML (not inline), then
+   the `compose.yaml` filename. A missing quickstart, a named volume or a
+   `latest` tag blocks this gate.
 
 Show what was checked:
 
@@ -428,6 +438,7 @@ Show what was checked:
 > - Removed features: [list any stale refs cleaned up, or "none"]
 > - Architecture/tables: [updated / no changes needed]
 > - Internal consistency: [README descriptions match source of truth, or list fixes]
+> - Compose quickstart: [matches the standard at v1.2.3 / N/A, not Docker]
 
 If documentation is missing or stale:
 
