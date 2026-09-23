@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.35.0] — 2026-09-23
+
+**Project standards: every project considers encryption at rest, login
+projects are offered TOTP, a 30-day trusted device and a rescue path, Docker
+projects are offered Apprise, and every main page links to GitHub and the
+release notes.**
+
+### Added
+- **Section 10 of `SKILL.md`, project standards.** These are the user's standing
+  requirements. Claude raises each one when the project or feature it applies to
+  is being designed, not first at a gate. The user's answer goes on a new
+  `Standards:` row of the gate state file.
+  - **Encryption at rest is always considered.** The security section states
+    what is stored, whether each store is encrypted at rest, how, and where
+    the key lives.
+  - **Login projects are offered TOTP 2FA, "trust this device for 30 days" and
+    an unlock/rescue feature** (hashed single-use recovery codes plus a logged
+    admin/CLI unlock). The user decides on each one.
+  - **Docker projects are offered Apprise notifications**: an `APPRISE_URLS`
+    secret, useful events, and a test-notification action.
+- **Gate 3 checks the code against the `Standards:` row.** A missing
+  at-rest statement or an item never offered is a Medium finding. Sensitive
+  data stored in plaintext with no recorded decision is High. A declined
+  item is not a finding.
+- Rule-phrase guards for the new standards.
+
+### Changed
+- **Gate 1: main-page links are mandatory, without exception.** The README's
+  top section, and the app's main page when it has a UI, must link to the
+  GitHub repo and the current version's release notes. Before, only apps that
+  already showed a repo link had to add release notes. This repo's README now
+  carries both links.
+
 ## [2.34.0] — 2026-09-23
 
 **The Docker test login is repeated every time the test container changes,

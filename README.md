@@ -7,7 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.34.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.35.0`
+
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.35.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.35.0)
 
 ---
 
@@ -25,6 +27,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
+- [Project standards](#project-standards) — encryption at rest, login protections, main-page links, Apprise
 - [Audit mode](#audit-mode) · [Shortcut detection](#shortcut-detection) · [What's inside](#whats-inside) · [For maintainers](#for-maintainers)
 
 ---
@@ -207,6 +210,11 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   a Docker test container was started, rebuilt or restarted ends with its
   full login (URL, user, password), so it doesn't get lost in the scroll
   between test rounds. *(2.34.0)*
+- **[Project standards.](#project-standards)** Every project now considers
+  encryption at rest. Anything with a login is offered TOTP, a 30-day trusted
+  device and an unlock/rescue path. Docker projects are offered Apprise
+  notifications. Every main page links to GitHub and the current release notes,
+  with no exceptions. *(2.35.0)*
 
 ---
 
@@ -286,7 +294,10 @@ No build starts until every version file (`package.json`, `pyproject.toml`,
 `VERSION`, …) is bumped, consistent, and includes the repository URL. Greps the
 whole project for hardcoded version strings — source, UI templates (XAML,
 HTML), window titles, "About" dialogs, config files. Every match must be
-updated. Any app that shows a repo link must link the current release notes.
+updated. **Every project's main page (the README's top section, and the app's
+main page when it has a UI) links to the GitHub repo and the current release
+notes, without exception.** Anything else that shows a repo link must link the
+release notes too.
 
 > **A missing tag for the immediately preceding version hard-blocks this gate.**
 > It doesn't mean someone forgot to tag — it means the last release never
@@ -355,6 +366,9 @@ side effects · N+1 queries · wrong data structures · string concat in loops �
 blocking I/O · unbounded caches · missing indexes · premature abstraction ·
 container dependency drift (Dockerfiles hardcoding packages instead of
 installing from dependency files; imports missing from declared dependencies).
+
+**Project standards:** every scan also checks the [project standards](#project-standards)
+you decided on: encryption at rest, the login protections, and Apprise.
 
 Critical and High must be fixed before anything else happens. Medium and Low
 don't stop a work commit, but every finding has to be fixed, waived by you, or
@@ -816,6 +830,22 @@ release breaks.
 
 ---
 
+## Project standards
+
+Four requirements that apply to every project. Claude raises each one when the
+project or feature it applies to is being designed, not first at a gate. Your
+answer goes on the tracker's `Standards:` row, so a "no" is a decision on the
+record, not a gap. Gate 3 checks the code against that row.
+
+| Standard | Applies to | What happens |
+|---|---|---|
+| **Encryption at rest** | every project | The security section states what is stored, whether each store is encrypted at rest, how, and where the key lives. "Not needed, because …" is an answer. Silence is a finding |
+| **TOTP 2FA, "trust this device for 30 days", and unlock/rescue** | anything with a login | All three offered: RFC 6238 TOTP, a signed 30-day trusted-device token revoked on credential change, and recovery codes plus a logged admin unlock. You decide |
+| **GitHub + release-notes links on the main page** | every project, no exceptions | Gate 1 blocks until the README top section, and the app's main page if it has a UI, link to both |
+| **Apprise notifications** | Docker projects | Offered: an `APPRISE_URLS` setting (a secret, never logged), useful events, and a test-notification action. You decide |
+
+---
+
 ## Audit mode
 
 Say **"audit my project"**, **"scan this codebase"**, or **"security review"** to
@@ -862,10 +892,10 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~40KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SKILL.md` | ~42KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~32KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `GATE_REFERENCE.md` | ~27KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
-| `SECURITY_GATE.md` | ~15KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
+| `GATE_REFERENCE.md` | ~28KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
+| `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~5KB | Only when the version check finds this copy behind the latest release — which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
@@ -964,4 +994,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.34.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.35.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

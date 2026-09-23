@@ -105,12 +105,15 @@ No build starts until versioning is resolved.
    (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
    `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
    it belongs to. If missing, add it before passing this gate.
-6. **Release notes link is mandatory.** Every app that displays a repository link
-   (in an "About" dialog, settings screen, footer, help menu, etc.) must also
-   include a link to the current version's release notes. Use the pattern
-   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>` — the version in
-   the URL must match the version being built. If the app already shows a repo
-   link but has no release notes link, add one before passing this gate.
+6. **Main-page links are mandatory, without exception** (`SKILL.md` §10).
+   The project's main page (the README's top section, and the app's main page
+   or screen when it has a UI) links to **both** the GitHub repo and the
+   current version's release notes. Every other place that shows a repo link
+   (an "About" dialog, settings screen, footer, help menu) also carries the
+   release notes link. Use the pattern
+   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>`; the version in
+   the URL must match the version being built. A missing link on the main
+   page blocks this gate. Add it before passing.
 
 7. **Previous version tags must exist.** Run `git ls-remote --tags origin` —
    **not `git tag -l`**, which reads local tags and returns empty in any fresh
@@ -148,6 +151,7 @@ If any check fails:
 > - [e.g. "MainWindow.xaml still shows v1.0.0 in the title bar"]
 > - [e.g. "package.json missing repository field"]
 > - [e.g. "About dialog has repo link but no release notes link"]
+> - [e.g. "README top section has no link to the v1.2.3 release notes"]
 > - [e.g. "v1.2.2 has no git tag — needs retroactive tagging"]
 >
 > Current version: [version or "none found"]

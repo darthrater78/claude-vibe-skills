@@ -64,3 +64,7 @@ ANY|the install always comes whole from the release
 SKILL|Nothing merges to the default branch without a test artifact
 ANY|Docker test runs get fresh credentials, every run
 ANY|Echo the login every time the test container changes
+SKILL|Encryption at rest is always considered
+SKILL|The main page links to GitHub and the latest release notes, without exception
+SKILL|Docker projects offer Apprise notifications
+SKILL|trust this device for 30 days
