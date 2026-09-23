@@ -60,3 +60,6 @@ SKILL|Never spawn a subagent on a more expensive model than the main session is 
 SKILL|Do not proceed with substantial work on an above-ceiling model
 SKILL|covering every ecosystem
 ANY|The cost line is part of each option and is shown every time
+ANY|the install always comes whole from the release
+SKILL|Nothing merges to the default branch without a test artifact
+ANY|Docker test runs get fresh credentials, every run

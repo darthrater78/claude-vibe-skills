@@ -125,10 +125,17 @@ operation, the hook additionally denies a BUILD line marked ✅ that contains no
 (`Dockerfile`, `.csproj`/`.sln`, or an Android Gradle project — `build.gradle`,
 `build.gradle.kts`, or `AndroidManifest.xml`). Write the outcome onto the BUILD
 line itself, e.g. `✅ debug build verified; handoff offered, user declined to
-try it` or `✅ ...; handoff n/a (remote container / Termux session)` — see
-GATE_REFERENCE.md, Gate 2, for the full convention. A ✅ with no annotation in a
-matching repo reads as "the offer never happened," not "forgot to write it
-down."
+try it` — see GATE_REFERENCE.md, Gate 2, for the full convention. A ✅ with
+no annotation in a matching repo reads as "the offer never happened," not
+"forgot to write it down."
+
+**Test artifact before merge (merges only).** For `gh pr merge`, MCP
+`merge_pull_request` and `git push origin main|master`, in a repo with the same
+build signal, the hook denies the merge unless the BUILD row carries
+`test artifact: <path or link> @ <short SHA>`, whether BUILD reads ✅ or ➖. In
+a repo with a `Dockerfile` or compose file it also requires `test creds:`
+(`generated per run, shown to user`, or `n/a (no login)`). Remote container and
+Termux sessions are not exempt: their test artifact comes from CI.
 
 ## Failure modes
 
@@ -169,5 +176,11 @@ printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr crea
 # (no "handoff" text):
 # expect: deny, naming the missing handoff annotation
 printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr create --title x --body y"}}' \
+  | .claude/hooks/gate-preflight.sh
+
+# test-artifact check — same repo, BUILD row with "handoff" but no
+# "test artifact:" line:
+# expect: deny, naming the missing test artifact (and test creds, with a Dockerfile)
+printf '{"tool_name":"mcp__github__merge_pull_request","cwd":"'"$PWD"'","tool_input":{"pullNumber":1}}' \
   | .claude/hooks/gate-preflight.sh
 ```
