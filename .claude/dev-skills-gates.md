@@ -13,5 +13,5 @@ Updated: 2026-09-23
   Markdown-only diff + rebuilt bundle; no secrets, exec or new URLs beyond release link;
   no package deps (github-actions only); scripts/hooks unchanged; shellcheck not installed here
 📄 DOCS       ✅ CHANGELOG 2.32.0, README what's-new + MCP awareness line
-📦 RELEASE    ⏳ awaiting commit approval
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR #58, commit + notes approved 2026-09-23
+🚀 SHIP       ⏳ merge #58 → user tags v2.32.0 → release.yml publishes → verify
