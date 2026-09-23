@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [2.33.0] — 2026-09-23
+
+**Nothing merges without a test artifact, Docker test runs get a fresh
+throwaway login, and an outdated skill can be updated in place.**
 
 ### Added
 - **Out-of-date skill: Claude can install the update, or give you one

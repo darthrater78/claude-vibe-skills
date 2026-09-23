@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.32.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.33.0`
 
 ---
 
@@ -193,6 +193,16 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   free; in semi-autonomous, every executed command resends the conversation. The MCP
   check now gives a ready-to-paste `/mcp disable <server>` line for each active
   server instead of a bare `/mcp`. *(2.32.0)*
+- **[No merge without a test artifact.](#gate-2--build-)** For any project
+  that builds a Docker image, `.exe`, `.apk` or binary, a test artifact built
+  from the exact commit being merged must exist and be handed to you first,
+  in every environment — web and Termux sessions get theirs from CI. Docker
+  test runs get a freshly generated throwaway login, shown with the run
+  command. The pre-flight hook denies merges missing either. *(2.33.0)*
+- **[Outdated skill? Update in place.](#install)** The version-check warning
+  now offers to install the new release for you, or gives you one command
+  (bash or PowerShell). The whole skill is replaced from the release file,
+  and nothing changes if the download isn't the expected version. *(2.33.0)*
 
 ---
 
@@ -302,7 +312,7 @@ built from the exact commit being merged, in every environment: remote
 container and Termux sessions get theirs from CI (a PR build artifact or a
 dev pre-release) instead of skipping it. Every Docker test run gets a freshly
 generated throwaway username and password, shown to you with the run
-command, and the container is bound to `127.0.0.1`. *(Unreleased)* Where the [pre-flight
+command, and the container is bound to `127.0.0.1`. *(2.33.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
 a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
 repo with a Docker/.exe/.apk build signal, is denied — reading the tracker
@@ -948,4 +958,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.32.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.33.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
