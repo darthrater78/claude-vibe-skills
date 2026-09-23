@@ -32,7 +32,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -75,7 +75,8 @@ applies: the probe changes how many calls it takes, never what gets checked.
 `SHIP_REFERENCE.md`,
 `AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
 `SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`, `SECURITY_WINDOWS.md`,
-`SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, and `QUALITY_ANDROID.md` exist in this skill's base directory (shown when the
+`SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, `QUALITY_ANDROID.md`, and
+`UPDATE_REFERENCE.md` exist in this skill's base directory (shown when the
 skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
 warn immediately:
 
@@ -116,20 +117,24 @@ is not optional and does not wait for the user to ask.
        > v2.17.0. Release notes:
        > https://github.com/darthrater78/claude-vibe-skills/releases
        >
-       > **To update:** download the new `dev-skills.skill` from
-       > https://github.com/darthrater78/claude-vibe-skills/releases/latest
-       > and replace this copy (README → Install): re-upload on
-       > claude.ai/Desktop, or re-unzip into `~/.claude/skills/dev-skills/`
-       > (or the project's `.claude/skills/`).
-       >
-       > **Continue this session on v2.17.0 (outdated), or pause to update
-       > to v2.19.0 first?**
+       > **How do you want to update?**
+       > 1. **I install it:** I download v2.19.0 from the release and replace
+       >    this copy.
+       > 2. **You install it:** I give you one command to run.
+       > 3. **Continue on v2.17.0** (outdated).
        > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
 
-     Wait for an explicit answer before "What are we building?". If the user
-     continues anyway, carry `⚠️ outdated (v2.17.0, latest v2.19.0)` on every
-     later tracker display, status check, banner and handoff for the rest of
-     the session: loud once, then visibly present, never silently dropped.
+     Offer only the options the install location allows
+     (`UPDATE_REFERENCE.md`), and ask it in the first `AskUserQuestion` call.
+     Wait for an explicit answer before "What are we building?". If the user continues
+     anyway, carry `⚠️ outdated (v2.17.0, latest v2.19.0)` on every later
+     tracker display, status check, banner and handoff for the rest of the
+     session: loud once, then visibly present, never silently dropped.
+
+   **Before offering the update choice, read `UPDATE_REFERENCE.md`** from this
+   skill's base directory: which options the install location allows, and the
+   exact install commands. Never build an install command from memory.
+
 4. This check is unconditional — it runs even in sessions with no git repo
    detected for the *host* project (step 0 below is about that project's own
    repo; this check targets the skill's own upstream repo, which is unrelated
@@ -236,9 +241,9 @@ Claude Code admin settings.
    >
    > Which do you want?
 
-   This is separate from the local-artifact handoff. Marking BUILD "handoff
-   n/a (remote container)" does not resolve it: a container that can't build
-   Docker still owes the user this choice before BUILD passes.
+   This is separate from the test artifact. Either way, nothing merges to the
+   default branch until CI has produced a test image from the PR head
+   (`GATE_REFERENCE.md`, Gate 2, "Test artifact before merge").
 
 Report the detected environment in the session banner.
 
@@ -491,7 +496,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.32.0 active.
+Dev Skills v2.33.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -525,7 +530,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.32.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.33.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

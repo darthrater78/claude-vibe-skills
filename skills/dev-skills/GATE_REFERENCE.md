@@ -233,7 +233,8 @@ when all three hold, and stated on the tracker:
 > `dl.google.com` blocked in this container; config and lint checked locally;
 > CI build required before merge.
 
-This is weaker than the local gate and is recorded as such. It does not
+This is weaker than the local gate and is recorded as such. The test artifact
+before merge (below) still applies, and comes from that CI build. It does not
 license "CI will catch it" on a project where a local build merely takes a
 while — that is still a straightforward BUILD GATE BLOCKED, not this state.
 
@@ -253,96 +254,114 @@ trigger's context) and carry it forward release to release until it's
 actually run once for real — don't let it quietly stop being tracked just
 because the release it was flagged on shipped anyway.
 
-**Local artifact handoff — mandatory offer for compiled outputs, local Linux
-and Windows sessions only.** For any build that produces something a person
-installs or runs outside a terminal — a Docker image, a Windows `.exe`, an
-Android `.apk` — the smoke test above proves the code runs; it does not prove
-the artifact is something the user can actually pick up and try. This offer
-depends on the execution environment detected at session start (step 0) and
-the host shell (step 2):
+**Test artifact before merge — required in every environment and both
+modes.** For any build that produces something a person installs or runs
+outside a terminal — a Docker image, a Windows `.exe`, an Android `.apk`, a
+packaged binary — the smoke test proves the code runs; it does not prove the
+artifact works. **Nothing merges to the default branch until a test artifact
+built from the exact commit being merged exists, and the user has been told
+where it is and how to run it.** Trying it is the user's choice. The artifact
+existing is not. The release build CI makes after the tag never counts: it
+comes after the merge this rule protects. A push after the artifact was built
+means a new artifact.
 
-| Session | Offer |
+| Session | Where the test artifact comes from |
 |---|---|
-| **Local, Linux host** (shell = Linux Terminal, or WSL) | Full offer — Docker images, Windows `.exe`, Android `.apk` |
-| **Local, Windows host** (shell = Windows PowerShell or Git Bash) | Narrowed — Windows `.exe` and Android `.apk` only; no Docker load/run instructions |
-| **Remote container (cloud) or Termux (mobile)** | Not offered — these environments already ship through the regular CI-driven path (Gate 6), which is the correct handoff there |
+| **Local, Linux host** (Linux Terminal, WSL) | Built here: Docker image, `.exe`, `.apk`, binary |
+| **Local, Windows host** (PowerShell, Git Bash) | Built here: `.exe`, `.apk`. Docker only if `docker info` answers; otherwise from CI, as in the next row |
+| **Remote container or Termux** | Built by CI from the PR head commit: a PR build workflow that uploads it (`actions/upload-artifact`; a Docker image as a `docker save` tarball artifact or pushed with a `pr-<number>` tag), or a pre-release tag the user pushes (`WORKFLOW_REFERENCE.md`, "Dev releases"). Give the user the link to that run's artifact or the pre-release |
 
-"Not offered" here is about this specific step — letting a human try an
-already-built artifact by hand. A web container that can't build Docker at
-all is a separate, earlier problem (session start, Step 0, item 8) and is
-not resolved by this row.
+**No way to produce one is a blocked merge, not a skipped step.** If CI has no
+job that publishes a test artifact for a PR, offer to create one (`SKILL.md`
+§9.2) or a dev pre-release, and hold the merge until one exists. A container
+that cannot build Docker at all is the earlier problem in `SESSION_START.md`,
+step 0, item 8.
 
-Where the offer applies, after the smoke test passes and before this gate is
-marked passed, give the user a way to test the real build themselves:
+Hand it over after the smoke test passes, before this gate is marked passed:
 
-- **Windows `.exe` and Android `.apk`:** copy the built artifact into a local
-  folder (e.g. `dist/`, `build/output/`) and tell the user the exact path, so
-  they can download or copy it to a device and run it.
-- **Docker images (Linux host only):** give the exact commands to load and
-  run the image locally — `docker load -i <file>` (if built to a tarball) or
-  `docker build -t <tag> .`, then `docker run ...` with the ports/volumes the
-  project needs.
+- **`.exe`, `.apk`, binaries:** copy the artifact into a local folder (e.g.
+  `dist/`, `build/output/`) and give the exact path, or give the CI artifact
+  link.
+- **Docker images:** give the exact commands to get and run it: `docker load
+  -i <file>` (tarball), `docker pull <image>:pr-<n>`, or `docker build -t
+  <tag> .`, then `docker run ...` with the ports and volumes the project needs,
+  and the credentials below.
 
-  **Tear it down once its purpose is served.** A container started here —
-  or for the "prove a never-run release step" check above, or for any other
-  Gate 2 testing — is a running resource, not a fire-and-forget check.
-  Stop and remove it after the commit it verified is submitted, or
-  immediately if the user declines to try it: `docker stop <name>` (or
-  `docker compose down` for a compose stack), then `docker rm <name>` if it
-  wasn't started with `--rm`. Before the session ends (Section 8) or this
-  gate closes, `docker ps` to confirm nothing test-related is still
-  running — an orphaned container left behind by a smoke test is a silent
-  resource leak, not a passed gate.
+**Docker test runs get fresh credentials, every run.** Each time a container
+is started for testing — by Claude, or in a run command handed to the user —
+generate a new username and password for that run and show them to the user
+in the same message as the run command:
 
-This offer is mandatory **every time the build changes**, not only the first
-time in a session — a rebuild after a code change gets the same offer as the
-first build did. It is not mandatory to *accept*: if the user says they don't
-need to try this particular build by hand, skip it and move on. What can
-never be skipped silently is the offer itself.
+```bash
+TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
+TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
+docker run -d --rm --name <app>-test -p 127.0.0.1:8080:8080 \
+  -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image>
+```
 
-**Proceeding without acting on the offer counts as declining it — it is not
-an unanswered question that blocks the gate.** If the user responds to a
-commit/ship prompt with "commit" or "go ahead" without having run the image
-or exe, that is the decline; don't hold BUILD open waiting for an explicit
-"no thanks." Record it with the user's own words:
-`handoff offered, user said "Commit" without running the image — recorded
-as declined`. This is different from silently marking the annotation
-"declined" on Claude's own initiative — the record should make clear the
-user moved on, not that Claude assumed on their behalf.
+> 🔑 **Test login for this run** — throwaway, reachable only from this
+> machine, gone when the container is removed.
+> URL: http://127.0.0.1:8080 · User: `test-k3xm` · Password: `Hq7vT2mWz9Ka`
 
-This step comes after the automated smoke test, not instead of it — the
-smoke test confirms the code runs; this confirms a human can actually get
-their hands on it.
+- **Simple on purpose:** letters and digits only, with look-alikes (`0 O 1 l
+  I`) left out, so they can be read off the screen and typed.
+- **Passed to the variables the app actually reads for its login.** Find them
+  in the Dockerfile `ENV`, the compose file, `.env.example`, or the docs; never
+  guess a name. For compose, set them on the command line
+  (`TEST_USER=… TEST_PASS=… docker compose up -d`) for a compose file that
+  interpolates them. A compose file with credentials written into it is a
+  Gate 3 finding (hardcoded secret), not something to work around.
+- **Ports bound to `127.0.0.1` only**, so throwaway credentials never face a
+  network.
+- **Never** written to a file in the repo, baked into the image (`ENV`/`ARG`),
+  reused across runs or sessions, or the project's real credentials.
+  Displaying them is the point: they die with the container.
+- **An app with no login** needs none: say so, and record `test creds n/a (no
+  login)`.
 
-**Record the outcome on the tracker, not just in chat.** Where
-`hooks/gate-preflight.sh` is installed, it enforces this deterministically:
-for any repo with a Docker/.exe/.apk build signal (`Dockerfile`, `.csproj`/
-`.sln`, or an Android Gradle project), it denies a BUILD gate marked ✅ unless
-the tracker's BUILD line also says what happened to the offer. Write the
-BUILD line as one of:
+**Tear it down once its purpose is served.** A container started here — or for
+the "prove a never-run release step" check above, or for any other Gate 2
+testing — is a running resource, not a fire-and-forget check. Stop and remove
+it after the commit it verified is submitted, or immediately if the user
+declines to try it: `docker stop <name>` (or `docker compose down` for a
+compose stack), then `docker rm <name>` if it wasn't started with `--rm`.
+Before the session ends (Section 8) or this gate closes, `docker ps` to
+confirm nothing test-related is still running. Its credentials go with it.
 
-- `🔨 BUILD      ✅ <build description>; handoff offered, user tried it`
-- `🔨 BUILD      ✅ <build description>; handoff offered, user declined to try it`
-- `🔨 BUILD      ✅ <build description>; handoff n/a (remote container / Termux session)`
+The handover is repeated **every time the build changes**, not only the first
+time in a session. **Proceeding without trying it counts as declining to try
+it**, not as an unanswered question that blocks the gate: if the user answers
+a commit or ship prompt with "commit" or "go ahead", record their words
+(`handoff offered, user said "Commit" without running the image — recorded as
+declined`). Declining to try it never waives the artifact.
 
-Note the offer is always made where it applies — "declined" above describes
-the user's choice not to try the build by hand, never Claude skipping the
-offer itself. There is no valid annotation for "didn't offer."
+**Record it on the tracker, not just in chat.** Where `hooks/gate-preflight.sh`
+is installed, in any repo with a Docker/.exe/.apk build signal, it denies a
+BUILD ✅ with no `handoff` annotation, and **denies every merge to the default
+branch** whose BUILD row has no `test artifact:` annotation, or, with a
+Dockerfile or compose file, no `test creds` annotation. Write the BUILD row as:
 
-The hook can see whether the tracker says the offer happened; it cannot see
-the conversation, so a passed gate with no annotation reads as "skipped," not
-"forgot to write it down."
+```
+🔨 BUILD      ✅ <build>; handoff offered, user tried it
+  test artifact: <path, CI artifact link, or pre-release> @ <short SHA>
+  test creds: generated per run, shown to user   (or: n/a (no login))
+```
+
+"Declined" describes the user's choice not to try it, never Claude skipping
+the handover. There is no valid annotation for "no test artifact": in a
+remote container or Termux the artifact comes from CI, so `handoff n/a` is no
+longer an answer.
 
 **Projects with CI release workflows.** If the project has a GitHub Actions
 workflow that builds release artifacts on tag push (check
 `.github/workflows/` for `on: push: tags:`), the local build gate covers
-only the **debug/test build**. The release artifact is built by CI during
-Gate 6 — do not build it locally. Gate 2 passes when the debug build
-compiles and the app is verified working.
+only the **debug/test build**, which is also the test artifact. The release
+artifact is built by CI during Gate 6 — do not build it locally. Gate 2
+passes when the debug build compiles and the app is verified working.
 
 > ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred
-> to CI); handoff offered — Android `.apk` copied to `dist/`, user declined to
-> try it by hand this round
+> to CI); test artifact: Android `.apk` in `dist/` @ a1b2c3d; handoff offered,
+> user declined to try it by hand this round
 
 **Projects with no build step** (config repos, skill repos, documentation-only
 repos, pure script collections): mark this gate ➖ N/A with an explanation:

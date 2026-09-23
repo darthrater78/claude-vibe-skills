@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.33.0] — 2026-09-23
+
+**Nothing merges without a test artifact, Docker test runs get a fresh
+throwaway login, and an outdated skill can be updated in place.**
+
+### Added
+- **Out-of-date skill: Claude can install the update, or give you one
+  command.** When the version check finds this copy behind, the warning now
+  asks how to update: Claude installs it, you run one command (bash or
+  PowerShell), or continue outdated. Both install paths download the pinned
+  release asset, check its `version:` line before touching anything, replace
+  the whole directory so no stale files survive, and refuse any target not
+  named `dev-skills`. The options follow where the skill is installed: a
+  claude.ai-synced copy can only be re-uploaded, so Claude downloads the file
+  for you instead. The procedure lives in the new `UPDATE_REFERENCE.md`,
+  loaded only when the copy is behind, which keeps `SESSION_START.md` under
+  its size ceiling.
+- **A test artifact is required before anything merges to the default
+  branch.** For any project that builds a Docker image, `.exe`, `.apk` or
+  binary, a test artifact built from the exact commit being merged must exist
+  and be handed to the user first, in every environment and both modes.
+  Remote container and Termux sessions, which used to skip the handoff, now
+  get it from CI (a PR build artifact or a dev pre-release); no way to produce
+  one blocks the merge. The pre-flight hook denies a merge whose BUILD row has
+  no `test artifact:` annotation.
+- **Docker test runs get fresh credentials, every run.** A simple throwaway
+  username and password are generated for each test container, passed to the
+  variables the app reads for its login, and shown to the user with the run
+  command. Ports are bound to `127.0.0.1`; the credentials are never written
+  to the repo, baked into the image, or reused, and the hook denies a merge in
+  a Docker repo whose BUILD row has no `test creds` annotation.
+
+### Changed
+- **`handoff n/a (remote container / Termux session)` is no longer a valid
+  BUILD annotation** where a merge follows: those sessions get a CI-built test
+  artifact instead.
+
 ## [2.32.0] — 2026-09-23
 
 **The session-start mode question now says what each mode costs, and the MCP

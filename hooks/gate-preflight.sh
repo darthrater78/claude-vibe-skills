@@ -89,6 +89,7 @@ fi
 
 OP_LABEL=""
 REQUIRED=""
+IS_MERGE=""
 
 case "$TOOL_NAME" in
   Bash)
@@ -136,6 +137,7 @@ Present the command as a block for the user to run from their own clone, with th
        || printf '%s' "$SCAN" | grep -qE 'git[[:space:]]+push[[:space:]]+origin[[:space:]]+(main|master)([[:space:]]|$)'; then
       OP_LABEL="a release operation (merge / publish)"
       REQUIRED="VERSION BUILD SECURITY DOCS RELEASE"
+      printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+pr[[:space:]]+merge|git[[:space:]]+push[[:space:]]+origin[[:space:]]+(main|master)([[:space:]]|$)' && IS_MERGE=1
     elif printf '%s' "$SCAN" | grep -qE 'gh[[:space:]]+pr[[:space:]]+create'; then
       OP_LABEL="opening a pull request (Gate 5)"
       REQUIRED="VERSION BUILD SECURITY DOCS"
@@ -149,6 +151,7 @@ Present the command as a block for the user to run from their own clone, with th
   mcp__github__merge_pull_request)
     OP_LABEL="merging a pull request (Gate 6)"
     REQUIRED="VERSION BUILD SECURITY DOCS RELEASE"
+    IS_MERGE=1
     ;;
   mcp__github__create_pull_request)
     OP_LABEL="opening a pull request (Gate 5)"
@@ -353,7 +356,33 @@ if printf '%s' "$REQUIRED" | grep -qw BUILD; then
      && ! printf '%s' "$build_block" | grep -qiF 'handoff' \
      && produces_compiled_artifact; then
     BLOCKING="$BLOCKING
-  - BUILD — ✅ but no local-artifact-handoff annotation. This repo has a Docker/.exe/.apk build signal (Dockerfile, .csproj/.sln, or an Android Gradle project). GATE_REFERENCE.md Gate 2 requires offering the user a way to try the real artifact before this gate passes. Add \"handoff offered\", \"handoff declined\", or \"handoff n/a (remote container / Termux session)\" to the BUILD line, then retry."
+  - BUILD — ✅ but no local-artifact-handoff annotation. This repo has a Docker/.exe/.apk build signal (Dockerfile, .csproj/.sln, or an Android Gradle project). GATE_REFERENCE.md Gate 2 requires handing the user a test artifact before this gate passes. Add \"handoff offered, user tried it\" or \"handoff offered, user declined to try it\" to the BUILD row, then retry."
+  fi
+fi
+
+# --- merges: a test artifact from the merged commit ---------------------------
+# GATE_REFERENCE.md Gate 2, "Test artifact before merge": nothing merges to the
+# default branch in an artifact-producing repo until a test artifact built from
+# the exact commit being merged exists and was handed to the user -- in every
+# environment, remote containers included (they get theirs from CI). A ➖ BUILD
+# does not exempt a repo that plainly builds one. Docker repos also record that
+# the test run's throwaway credentials were generated and shown.
+uses_docker() {
+  find "$ROOT" -maxdepth 4 \
+    \( -path '*/.git' -o -path '*/node_modules' -o -path '*/.venv' -o -path '*/venv' -o -path '*/build' -o -path '*/dist' \) -prune -o \
+    \( -iname 'Dockerfile' -o -iname 'compose.yaml' -o -iname 'compose.yml' -o -iname 'docker-compose.yml' -o -iname 'docker-compose.yaml' \) -print \
+    2>/dev/null | head -1 | grep -q .
+}
+
+if [ -n "$IS_MERGE" ] && produces_compiled_artifact; then
+  build_block="$(gate_block BUILD)"
+  if ! printf '%s' "$build_block" | grep -qiF 'test artifact:'; then
+    BLOCKING="$BLOCKING
+  - BUILD — no test artifact recorded. Nothing merges to the default branch in a repo with a Docker/.exe/.apk build signal until a test artifact built from the exact commit being merged exists and the user has been told where it is (GATE_REFERENCE.md Gate 2, \"Test artifact before merge\"). In a remote container or Termux session it comes from CI: a PR build artifact or a dev pre-release. Add \"test artifact: <path or link> @ <short SHA>\" to the BUILD row once it exists, then retry."
+  fi
+  if uses_docker && ! printf '%s' "$build_block" | grep -qiF 'test creds'; then
+    BLOCKING="$BLOCKING
+  - BUILD — no test credentials recorded. Every Docker test run gets a freshly generated throwaway username and password, shown to the user with the run command (GATE_REFERENCE.md Gate 2). Add \"test creds: generated per run, shown to user\" or \"test creds: n/a (no login)\" to the BUILD row, then retry."
   fi
 fi
 

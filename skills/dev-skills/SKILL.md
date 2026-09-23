@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.32.0
+version: 2.33.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -123,7 +123,9 @@ merge, tag, release):**
 1. **Run the pre-flight (Section 2).** If a gate this work needs has not
    passed, stop and name it, even when the user said "commit", "merge" or
    "push". The gates exist for exactly the moments you are moving fast.
-2. If building an app: confirm a test build has been created and verified working.
+2. If building an app: confirm a test build has been created and verified
+   working. **Nothing merges to the default branch without a test artifact
+   built from the exact commit being merged**, in every environment (Gate 2).
 3. Run `git status` and `git diff` to show what will be committed.
 4. Draft a commit message per Section 1.1 and show it.
 5. Wait for explicit approval.
@@ -299,7 +301,7 @@ gate from memory of it:
 | Gate | Passes when |
 |---|---|
 | 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
-| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting |
+| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get fresh throwaway credentials, shown to the user) |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
@@ -679,8 +681,9 @@ When this skill loads, **read `SESSION_START.md` from this skill's base
 directory** and follow it in order:
 - the self-check
 - **the version check** against the latest upstream tag. If this copy is
-  behind, the loud bracketed warning goes first, then an explicit "continue or
-  update first?", and `⚠️ outdated` rides on every later tracker
+  behind, the loud bracketed warning goes first, then the update choice (Claude
+  installs the whole release, the user runs one command, or continue), and
+  `⚠️ outdated` rides on every later tracker
 - step 0 environment detection (local / remote container / Termux). It decides
   who runs git, whether to ask the shell question, `gh` vs MCP, and where the
   state file lives. A native Linux local session also gets a one-line

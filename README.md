@@ -7,7 +7,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.32.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.33.0`
 
 ---
 
@@ -193,6 +193,16 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   free; in semi-autonomous, every executed command resends the conversation. The MCP
   check now gives a ready-to-paste `/mcp disable <server>` line for each active
   server instead of a bare `/mcp`. *(2.32.0)*
+- **[No merge without a test artifact.](#gate-2--build-)** For any project
+  that builds a Docker image, `.exe`, `.apk` or binary, a test artifact built
+  from the exact commit being merged must exist and be handed to you first,
+  in every environment — web and Termux sessions get theirs from CI. Docker
+  test runs get a freshly generated throwaway login, shown with the run
+  command. The pre-flight hook denies merges missing either. *(2.33.0)*
+- **[Outdated skill? Update in place.](#install)** The version-check warning
+  now offers to install the new release for you, or gives you one command
+  (bash or PowerShell). The whole skill is replaced from the release file,
+  and nothing changes if the download isn't the expected version. *(2.33.0)*
 
 ---
 
@@ -253,6 +263,12 @@ mkdir -p ~/.claude/skills/dev-skills
 unzip dev-skills.skill -d ~/.claude/skills/dev-skills/
 ```
 
+**Updating:** when a session finds your copy out of date, it offers to
+install the new release for you or to give you a one-line command (bash or
+PowerShell). Either way the whole skill is replaced from the release file,
+and nothing changes if the download doesn't match the expected version.
+Copies synced from claude.ai have to be re-uploaded there.
+
 The skill activates on its trigger phrases ("ship it", "commit", "audit",
 "just push it", …) or when you invoke `/dev-skills` directly.
 
@@ -290,9 +306,13 @@ passing smoke test isn't the end of the gate: Claude must also offer a way to
 try the real build by hand (a local download folder, or `docker load`/`docker
 run` instructions), every time the build changes. The offer can be declined,
 never skipped silently. Scope is environment-gated: full offer on a local
-Linux session, `.exe`/`.apk` only (no Docker) on a local Windows session,
-and not offered on remote container or Termux sessions, which already ship
-through Gate 6's CI-driven path. *(2.22.0)* Where the [pre-flight
+Linux session, `.exe`/`.apk` only (no Docker) on a local Windows session.
+*(2.22.0)* **Nothing merges to the default branch without a test artifact**
+built from the exact commit being merged, in every environment: remote
+container and Termux sessions get theirs from CI (a PR build artifact or a
+dev pre-release) instead of skipping it. Every Docker test run gets a freshly
+generated throwaway username and password, shown to you with the run
+command, and the container is bound to `127.0.0.1`. *(2.33.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
 a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
 repo with a Docker/.exe/.apk build signal, is denied — reading the tracker
@@ -837,11 +857,12 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~40KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
+| `SESSION_START.md` | ~32KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `GATE_REFERENCE.md` | ~27KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `SECURITY_GATE.md` | ~15KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
+| `UPDATE_REFERENCE.md` | ~5KB | Only when the version check finds this copy behind the latest release — which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -937,4 +958,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.32.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.33.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
