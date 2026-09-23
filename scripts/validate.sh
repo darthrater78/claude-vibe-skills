@@ -13,7 +13,6 @@ version_file=$(tr -d '[:space:]' < VERSION)
 skill_frontmatter=$(grep -m1 '^version:' skills/dev-skills/SKILL.md | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
 skill_banner=$(grep -rhoP 'Dev Skills v\K[0-9]+\.[0-9]+\.[0-9]+' skills/dev-skills/*.md | head -1)
 readme_version_codes=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
-readme_version_code=$(echo "$readme_version_codes" | head -1)
 
 echo "=== Version sources ==="
 echo "  VERSION file:        $version_file"
@@ -47,6 +46,22 @@ if [ -f CHANGELOG.md ]; then
     echo "FAIL: CHANGELOG.md has no entry for version $version_file"
     errors=$((errors + 1))
   fi
+fi
+
+# The session-start probe checks the same reference files as the prose
+# self-check; the two lists are written separately, so keep them in step.
+echo ""
+echo "=== Session-start probe vs self-check ==="
+ss=skills/dev-skills/SESSION_START.md
+probe_list=$(grep -oP 'p skill_missing .*for f in \K[A-Z_ ]+(?=; do)' "$ss" | tr ' ' '\n' | sed '/^$/d' | sed 's/$/.md/' | sort)
+# shellcheck disable=SC2016 # literal backticks, not an expansion
+check_list=$(sed -n '/^\*\*Self-check:\*\*/,/^$/p' "$ss" | grep -oE '`[A-Z_]+\.md`' | tr -d '`' | sort)
+if [ -z "$probe_list" ] || [ "$probe_list" != "$check_list" ]; then
+  echo "  FAIL: probe skill_missing list differs from the Self-check list"
+  diff <(echo "$check_list") <(echo "$probe_list") | sed 's/^/    /'
+  errors=$((errors + 1))
+else
+  echo "  OK: probe and self-check name the same $(echo "$probe_list" | wc -l) files"
 fi
 
 # Check required skill files exist
@@ -133,8 +148,12 @@ if [ -f skills/dev-skills.skill ]; then
     echo "  OK: dev-skills.skill is a valid zip"
     # Every required file must actually be in the bundle, and the bundled
     # SKILL.md must carry the current version — a stale archive ships old rules.
+    # Read the listing once. Piping unzip straight into `grep -q` under
+    # pipefail is a race: grep exits on the first match, unzip takes SIGPIPE,
+    # and the pipeline reports a file missing that is in the bundle.
+    bundle_list=$(unzip -l skills/dev-skills.skill)
     for f in "${files[@]}"; do
-      if unzip -l skills/dev-skills.skill | grep -q "  $f\$"; then
+      if grep -q "  $f\$" <<< "$bundle_list"; then
         echo "  OK: bundled $f"
       else
         echo "  FAIL: $f missing from dev-skills.skill (rebuild the bundle)"

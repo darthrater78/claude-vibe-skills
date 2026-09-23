@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.29.0
+version: 2.30.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -47,7 +47,8 @@ well. **It is not the harness's own "auto mode"** (a permission setting) —
 being in that one answers nothing.
 
 It changes two things (`AUTO_MODE.md` holds the checkpoint formats, the
-per-step table, the round-trip rules and the stop conditions):
+per-step table and the stop conditions; chaining commands is §5.1, for every
+mode):
 
 1. **Claude executes git instead of presenting it**, in every environment:
    commits, branch pushes, the PR, the merge, CI watching, post-ship
@@ -221,7 +222,12 @@ user to run** (Section 1), STOP and do all four:
    or stale, re-derive state from evidence using the table below. Unknown is
    never "passed."
 2. **Name the track.** Work commit, or release sequence? (below)
-3. **Show the tracker** in this message, above any command block.
+3. **Show the tracker** in this message, above any command block. Show the
+   full six rows at session start, when a gate changed since they were last
+   shown, on "status", and in handoffs. Otherwise one line is enough:
+   `🔢✅ 🔨✅ 🔒⏳ 📄⬜ 📦⬜ 🚀⬜ · release sequence · semi-autonomous`. A
+   blocking gate is always named in full (step 4), and the pre-tag report is
+   never the short form (`AUTO_MODE.md`).
 4. **Block if a required gate for that track is not ✅ or ➖ N/A.** Surface the
    blocking gate by name and stop.
 
@@ -679,6 +685,29 @@ result already confirmed success.
 **Batch tool calls.** Independent calls go in parallel — each sequential round trip
 resends the full conversation history. Five parallel calls cost the same as one.
 
+**Chain shell commands into one invocation — in every mode.** Session-start
+reads, gate evidence, the session-end checkpoint, and any step that is several
+commands which must all succeed are one call, not one per command. `&&` them
+so the first failure stops the chain; `;` only for independent read-only
+commands whose output you want even if one fails. Examples:
+
+```
+git status -sb && git diff --stat && git ls-remote --tags origin
+git add -A && git commit -m "<message>" && git push -u origin <branch>
+```
+
+This governs the commands Claude runs. A block presented to the user chains
+with that shell's syntax (`;` in Windows PowerShell, `SHELL_REFERENCE.md`).
+Chaining changes the number of round trips, never the checks: the pre-flight
+runs before the line is written, and the pre-flight hook scans every command in
+a chain, not only the first.
+
+**Do not chain across a stop.** Anything the user must see or decide between
+two commands is a boundary the chain does not cross: the commit approval, the
+tag block, a gate that has not passed, a failed command whose output changes
+what comes next. When in doubt, split — a wasted round trip is cheaper than an
+action the user did not approve.
+
 **Grep before reading.** Find the right lines first, then read with offset/limit.
 Never read a 2000-line file to check one function.
 
@@ -815,12 +844,13 @@ can observe:
 - **Context loaded**: files read, their approximate sizes, unused reads
 - **Model multiplier**: if part of the session ran above Sonnet ceiling
 
-Present as 3–5 lines:
+Present as a header and at most 3 lines. Include the MCP line only when
+connections changed since the session-start MCP check. Otherwise that check
+already said it:
 
 ```
 Token impact (rough estimate):
 ✅ Saved ~40k — read only 2 relevant files instead of exploring the package
-✅ Saved ~25k/turn — session restarted at the implement phase
 ⚠️ ~30k/turn overhead — 5 connected MCP servers, none used this session
 Biggest win next time: disable unused connectors
 ```
@@ -941,7 +971,13 @@ reconstruct the tracker from memory.
 ## 8. Session-end checkpoint
 
 **Fires when the session is winding down**: "thanks", "that's all", "looks
-good", silence, or any sign the work is done. Before wrapping up:
+good", silence, or any sign the work is done. Before wrapping up, read the
+evidence for steps 1–5 in one call (§5.1). It is `;`-separated so that one
+failure cannot hide the rest, and each failure is itself a finding:
+
+```
+git status -sb; git diff --stat <start-commit>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .claude/dev-skills-gates.md; docker ps --format '{{.Names}}'
+```
 
 1. **Were source files modified this session?** (`git status`, `git diff`
    against the starting commit.) If not, skip the rest, including the token
