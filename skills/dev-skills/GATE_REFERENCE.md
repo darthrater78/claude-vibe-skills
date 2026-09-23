@@ -302,13 +302,16 @@ in the same message as the run command:
 ```bash
 TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
 TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
-docker run -d --rm --name <app>-test -p 127.0.0.1:8080:8080 \
+HOST_IP="$(hostname -I | awk '{print $1}')"   # macOS: ipconfig getifaddr en0
+case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) echo "not a private LAN IP: $HOST_IP" >&2; false ;; esac \
+  && docker run -d --rm --name <app>-test -p "$HOST_IP:8080:8080" \
   -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image>
+curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
 ```
 
-> 🔑 **Test login for this run** — throwaway, reachable only from this
-> machine, gone when the container is removed.
-> URL: http://127.0.0.1:8080 · User: `test-k3xm` · Password: `Hq7vT2mWz9Ka`
+> 🔑 **Test login for this run**: throwaway, reachable on your network,
+> and gone when the container is removed.
+> URL: http://192.168.1.50:8080 · User: `test-k3xm` · Password: `Hq7vT2mWz9Ka`
 
 - **Simple on purpose:** letters and digits only, with look-alikes (`0 O 1 l
   I`) left out, so they can be read off the screen and typed.
@@ -318,8 +321,24 @@ docker run -d --rm --name <app>-test -p 127.0.0.1:8080:8080 \
   (`TEST_USER=… TEST_PASS=… docker compose up -d`) for a compose file that
   interpolates them. A compose file with credentials written into it is a
   Gate 3 finding (hardcoded secret), not something to work around.
-- **Ports bound to `127.0.0.1` only**, so throwaway credentials never face a
-  network.
+- **Reachable on the network, always.** The user tests from other machines
+  and devices, so a loopback-only container is useless to them.
+  - **Never use `-p 127.0.0.1:…`**, and never hand over a `127.0.0.1` or
+    `localhost` URL.
+  - **Read the host's LAN IP from the host** (`hostname -I`). Never guess it.
+  - **Publish on that IP only** (`-p "$HOST_IP:8080:8080"`; for compose,
+    `ports: - "${HOST_IP}:8080:8080"` with `HOST_IP` set on the command line).
+  - **Check that the app answers** on `http://<LAN IP>:<port>` before handing
+    over the URL.
+  - **On a remote container, where no LAN exists**, say so instead of showing
+    a loopback URL.
+- **LAN only, never the internet.** A bare `-p 8080:8080` publishes on every
+  interface, and Docker's published ports bypass host firewalls such as ufw.
+  So bind to the LAN IP, and **if that IP is not private** (outside
+  `10/8`, `172.16/12` and `192.168/16`, for example on a VPS), **stop and ask**
+  rather than publish. Never set up a port-forward, tunnel or public bind.
+  With the random single-run credentials and the teardown below, that is
+  exposure enough for a test.
 - **Never** written to a file in the repo, baked into the image (`ENV`/`ARG`),
   reused across runs or sessions, or the project's real credentials.
   Displaying them is the point: they die with the container.

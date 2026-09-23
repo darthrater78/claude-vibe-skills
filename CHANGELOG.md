@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.36.1] — 2026-09-23
+
+**Docker test containers are reachable on the network, and the test login URL
+uses the host's LAN IP, never `127.0.0.1`.**
+
+### Fixed
+- **Gate 2: test containers were bound to `127.0.0.1`**, so the login handed
+  to the user only worked on the Docker host itself. The user can't test from
+  another machine or device that way. Test runs now:
+  - read the host's LAN IP from the host (`hostname -I`)
+  - publish on that IP (`-p "$HOST_IP:8080:8080"`)
+  - check that the app answers on that IP before handing over the URL
+
+  Neither `127.0.0.1` nor `localhost` URLs are allowed. A bare `-p 8080:8080`
+  is also avoided, because Docker's published ports bypass ufw. If the host's
+  IP is not a private address, Claude stops and asks. The throwaway
+  credentials and the teardown after use are unchanged.
+- Rule-phrase guard for the new rule.
+
 ## [2.36.0] — 2026-09-23
 
 **Project standard 5: Docker projects document a copy-paste compose
