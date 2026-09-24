@@ -16,6 +16,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 ## Contents
 
 - [What it does](#what-it-does) — the four rules
+- [Enforcement checks](#enforcement-checks) — what's actually checked, full disclosure, and how to decline
 - [What's new](#whats-new) — highlights since v2.12
 - [What it looks like](#what-it-looks-like) — a session, abridged
 - [Install](#install) — claude.ai, Desktop, CLI, web
@@ -23,7 +24,6 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Two tracks](#two-tracks) — why a work commit isn't a release
 - [Manual and semi-autonomous mode](#manual-and-semi-autonomous-mode) — who runs the commands
 - [How gates are enforced](#how-gates-are-enforced) — the state file, and why memory isn't trusted
-- [Enforcement checks](#enforcement-checks) — what's actually checked, full disclosure, and how to decline
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
@@ -52,6 +52,66 @@ to paste counts as running it** — the same pre-flight fires either way.
 **4. Security and quality get scanned.** After every build, a full scan checks
 for hardcoded secrets, injection vectors, spaghetti code, N+1 queries, and
 more. Critical and High findings block the release.
+
+---
+
+## Enforcement checks
+
+**Most of this skill is instructions, which Claude follows and nothing
+checks.** Until 2.37.0 that was true of everything on most machines: the old
+optional hook (`hooks/gate-preflight.sh`) had to be installed by hand, nothing
+installed it, and nothing said it was missing. A review found it had also
+weakened: prefixed commands, pushes to the default branch and decoy ✅ lines
+all got through.
+
+Since 2.37.0 the **enforcement checks ship inside the skill**
+(`checks/enforce.py`), and Claude Code turns them on by itself when the skill
+loads, through the `hooks:` block at the top of `SKILL.md`. There's nothing
+to install.
+
+**What they are, in full disclosure:**
+- **A small Python 3 program that Claude Code runs on its own**: before
+  Claude runs a command or edits a file, before Claude ends a reply, and after
+  you answer Claude's questions.
+- **They only read** the command, the file edit, the reply, your answers, the
+  project's gate file, and a compose file about to be started. They answer
+  allow, deny, ask you, or "fix the reply". **They never run a command.** The
+  only thing they write is a status marker in the temp folder, so the banner
+  can say whether they're on.
+- **Every session starts by telling you**, then asking: keep them on, or
+  decline for this session. It's all or nothing. You confirm a decline in
+  Claude Code's own permission dialog, so Claude can't switch them off by
+  itself.
+- **The banner always shows the status:** `Hook enforcement: ✅ active`,
+  `⚠️ declined`, or `⚠️ not active` with the reason
+  (Python 3 missing, an incomplete install, or a Claude Code version that
+  doesn't register skill checks).
+- **When they can't run, they block** git, gh and docker commands rather than
+  letting them through unchecked.
+- **One caveat, verified and disclosed:** the checks find their own folder
+  through `CLAUDE_PLUGIN_ROOT`, which Claude Code sets for skill checks
+  (verified on 2.1.281) but documents only for plugins. If a future version
+  changes that, the checks fail closed and the banner says hook enforcement
+  is not active.
+- **Without the hooks, the guardrails are still there.** Every gate,
+  approval and rule in the skill still applies: Claude follows them as
+  instructions. What's missing is the automatic check that it did.
+
+| Group | What's checked |
+|---|---|
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c` and any push that lands on the default branch · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
+| **Files Claude edits** | Gate-file lines that pass a gate, set the mode, decline enforcement, approve host networking or waive a finding go to you as a permission prompt, as do edits to settings files and the installed checks |
+| **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
+| **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
+
+Every check, with exactly what it blocks and lets through, is in
+[`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md). Each one has test cases
+in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
+quietly weaken again. **What they can't catch:** judgment (the track, N/A
+reasons, severity, docs accuracy), whether your "yes" meant commit approval,
+and what you actually paste. Those stay instructions. To run the checks in
+every session, including ones that don't load the skill, see
+[`hooks/README.md`](hooks/README.md).
 
 ---
 
@@ -494,7 +554,8 @@ stated out loud on the tracker.
 **You pick the mode at the start of every session.** It is one of the
 session-start questions, manual listed first and neither recommended, and
 nothing proceeds until you answer. No edits and no git writes happen before
-then, and a `Mode: unchosen` gate file is denied by the enforcement hook.
+then, and the [enforcement checks](#enforcement-checks) deny git writes while
+the gate file reads `Mode: unchosen`.
 
 **Manual mode** is the behavior this skill has always had. Claude hands you the
 git commands, you run them, and the tag push comes back to you no matter where
@@ -608,9 +669,8 @@ Two notes worth knowing:
 - **It costs more tokens on a local session.** A pasted block is free; a chain
   of executed git commands resends the conversation each round trip. You're
   buying autonomy with tokens, which is usually the right trade when you asked
-  for it — and if you install the [enforcement
-  hook](#enforcement-checks), semi-autonomous mode is the mode where it does
-  the most work, since every command now arrives as a tool call it can inspect.
+  for it. It's also where the [enforcement checks](#enforcement-checks) do
+  the most work, since every command arrives as a tool call they can inspect.
 
 ---
 
@@ -654,66 +714,6 @@ untagged, or every branch as gone, is a check nobody reads — and a genuine
 missing tag or live branch hides in that noise.
 
 </details>
-
----
-
-## Enforcement checks
-
-**Most of this skill is instructions, which Claude follows and nothing
-checks.** Until 2.37.0 that was true of everything on most machines: the old
-optional hook (`hooks/gate-preflight.sh`) had to be installed by hand, nothing
-installed it, and nothing said it was missing. A review found it had also
-weakened: prefixed commands, pushes to the default branch and decoy ✅ lines
-all got through.
-
-Since 2.37.0 the **enforcement checks ship inside the skill**
-(`checks/enforce.py`), and Claude Code turns them on by itself when the skill
-loads, through the `hooks:` block at the top of `SKILL.md`. There's nothing
-to install.
-
-**What they are, in full disclosure:**
-- **A small Python 3 program that Claude Code runs on its own**: before
-  Claude runs a command or edits a file, before Claude ends a reply, and after
-  you answer Claude's questions.
-- **They only read** the command, the file edit, the reply, your answers, the
-  project's gate file, and a compose file about to be started. They answer
-  allow, deny, ask you, or "fix the reply". **They never run a command.** The
-  only thing they write is a status marker in the temp folder, so the banner
-  can say whether they're on.
-- **Every session starts by telling you**, then asking: keep them on, or
-  decline for this session. It's all or nothing. You confirm a decline in
-  Claude Code's own permission dialog, so Claude can't switch them off by
-  itself.
-- **The banner always shows the status:** `Hook enforcement: ✅ active`,
-  `⚠️ declined`, or `⚠️ not active` with the reason
-  (Python 3 missing, an incomplete install, or a Claude Code version that
-  doesn't register skill checks).
-- **When they can't run, they block** git, gh and docker commands rather than
-  letting them through unchecked.
-- **One caveat, verified and disclosed:** the checks find their own folder
-  through `CLAUDE_PLUGIN_ROOT`, which Claude Code sets for skill checks
-  (verified on 2.1.281) but documents only for plugins. If a future version
-  changes that, the checks fail closed and the banner says hook enforcement
-  is not active.
-- **Without the hooks, the guardrails are still there.** Every gate,
-  approval and rule in the skill still applies: Claude follows them as
-  instructions. What's missing is the automatic check that it did.
-
-| Group | What's checked |
-|---|---|
-| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c` and any push that lands on the default branch · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that pass a gate, set the mode, decline enforcement, approve host networking or waive a finding go to you as a permission prompt, as do edits to settings files and the installed checks |
-| **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
-| **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
-
-Every check, with exactly what it blocks and lets through, is in
-[`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md). Each one has test cases
-in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
-quietly weaken again. **What they can't catch:** judgment (the track, N/A
-reasons, severity, docs accuracy), whether your "yes" meant commit approval,
-and what you actually paste. Those stay instructions. To run the checks in
-every session, including ones that don't load the skill, see
-[`hooks/README.md`](hooks/README.md).
 
 ---
 
