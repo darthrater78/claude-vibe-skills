@@ -4,6 +4,112 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.37.0] — 2026-09-24
+
+**Enforcement that actually runs: checks ship inside the skill and turn on
+when it loads, with full disclosure and a keep-or-decline question. Manual
+mode uses fewer turns and clearly labeled blocks, host networking needs the
+user's permission, and test containers really are reachable on the LAN.**
+
+### Added
+- **Enforcement checks ship inside the skill** (`checks/enforce.py`,
+  registered by a `hooks:` block in `SKILL.md`'s header). Claude Code runs
+  them on its own from the moment the skill loads. They only read, and
+  answer allow / deny / ask / fix the reply. They never run a command.
+  Every check, as a plain rule, is in the new `ENFORCEMENT.md`:
+  - **Commands Claude runs:** gates before git writes (A4), including after
+    a `cd` or `git -C` into another repo, mode chosen (A5), tags and ref
+    deletions are the user's (A6), test containers publish on the LAN IP
+    only (A1), host networking needs a recorded approval (A2), and no test
+    container combines a restart policy with a bind mount from a temp folder
+    (A9). That last one comes from a real incident: after a reboot wiped
+    `/tmp`, Docker restarted a test container and recreated its mount as root
+    inside `/tmp/claude-1000`, which broke Claude Code's shell until it was
+    removed with sudo. Two more checks close the rest of that incident:
+    temp-folder mounts are never root-owned (A10: the folder is created
+    first and the container runs as the user, or it mounts from outside
+    temp), and test containers are labeled so every session start finds
+    ones an earlier session left behind and offers their removal (A12).
+  - **Files Claude edits:** gate-file lines that pass a gate, set the mode,
+    decline enforcement, approve host networking or waive a finding, plus
+    settings files and the installed checks, go to the user as a permission
+    prompt (B5)
+  - **Replies:** no loopback or bridge test URLs (C1); presented git blocks
+    obey the gates (C2); run blocks are labeled (C3), have no `cd` (C4), the
+    tracker above (C5) and "No need to reply" below (C7). At most two fix
+    rounds per message, then the reply goes through with a visible warning.
+  - **Answers:** an unanswered or free-text answer is flagged to Claude (D1)
+- **Full disclosure and a decline, every session.** Session start shows what
+  the checks are and asks: keep them on, or decline for this session (all or
+  nothing). A decline is confirmed in Claude Code's own permission dialog.
+  The banner always shows `Hook enforcement: ✅ active`, `⚠️ declined`, or
+  `⚠️ not active` with the reason, and says the skill's instructions still
+  apply: the hooks check them, they aren't the only guardrail. With Python 3
+  or the checks file missing, git, gh and docker shell commands and the
+  GitHub tools are blocked, not let through. File edits are not affected.
+- **`scripts/test-checks.py`**: 145 cases, one or more per rule, run by
+  `validate.sh` and CI.
+- **Manual mode keeps stops to a minimum, and blocks are hard to miss.**
+  - Every run block: a `### ▶️ RUN THIS — <what> · in <dir> · 1 block`
+    label, `# ════════ ▶️ START`/`⏹️ END` marker lines, a final ✅/❌ echo,
+    and `### ⏹️ END` below. Anything else in a code box is labeled
+    `📄 FOR READING`.
+  - No `cd` in any block. The label names where to run it. The `cd` format
+    table and the workflow "clone path" question are gone.
+  - One chained block per decision. A release is two blocks: commit → push →
+    PR, then checks → merge → merge-commit check → CI on it → version guard →
+    tag.
+  - No "done" turn. The next message starts with a read that verifies the
+    block, and a failed block is raised first.
+  - Timers and watchers are documented as saving nothing.
+- **Never proceed on an unanswered question.** Skipped questions are re-asked,
+  never defaulted.
+- **Host networking needs explicit permission.** `network_mode: host`,
+  `--network host` and `--net=host` are never written, run or presented
+  without the user's yes for that container, with the reason recorded. An
+  unapproved one in existing code is a High finding. Also in the compose
+  standard.
+
+### Changed
+- **Only real hooks are called hooks.** Everything else in the skill is an
+  instruction, and the docs say which is which.
+- **Gate rows are read strictly.** A gate passes only on its own row's first
+  line (`🔒 SECURITY ✅ …`). `Previous:`, `Standards:` and evidence lines
+  never count. Text notes (`handoff`, `test artifact:`, `test creds`) may
+  sit on the row's indented lines.
+- **The session-start questions are ordered** (at most four per call:
+  enforcement, mode, model ceiling, shell first).
+- `SKILL.md`'s size ceiling counts what's loaded (the body), not the
+  `hooks:` header. `SESSION_START.md`'s ceiling rises from 32KB to 34KB, on
+  the record in `validate.sh`.
+
+### Removed
+- **`hooks/gate-preflight.sh`**, replaced by `checks/enforce.py`. It was never
+  installed automatically, so on most machines nothing enforced anything. A
+  review also found it bypassable: `bash -c`, `env`/`sudo`/`VAR=` prefixes,
+  `gh api` merges, pushes to the default branch counted as work commits, and
+  a ✅ on any line that mentioned a gate's name passed that gate. Those cases
+  are now tests. `hooks/` keeps an optional "always on" settings install.
+- `DEV_SKILLS_GATE_HOOK=off`. The only off switch is the user-confirmed
+  decline.
+
+### Fixed
+- **Test containers still handed over `127.0.0.1`/bridge URLs.** The LAN IP
+  was the first field of `hostname -I`, which on a Docker host can be a bridge
+  such as `172.17.0.1` (private, so it passed the check, but unreachable from
+  other machines). Now:
+  - the IP comes from the default route (`ip -4 route get 1.1.1.1`)
+  - Docker bridge and `veth` addresses are rejected
+  - the app must listen on `0.0.0.0` inside the container
+  - a compose file's `127.0.0.1:` port is overridden for the test run
+  - `docker port` must show the LAN IP before the URL is handed over
+  - the URL handed over is the one `curl` just reached
+  - test containers use `--rm` and no restart policy, are labeled
+    `dev-skills.test`, and never leave root-owned folders in temp
+  - check A1 now blocks the wrong binding before the container starts, and
+    C1 blocks a loopback URL in the reply
+- Rule-phrase guards for the new rules.
+
 ## [2.36.1] — 2026-09-23
 
 **Docker test containers are reachable on the network, and the test login URL

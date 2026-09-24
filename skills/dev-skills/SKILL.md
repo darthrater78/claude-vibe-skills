@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.36.1
+version: 2.37.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -10,6 +10,37 @@ description: >
   "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
   "review my CI", "auto mode", "semi-autonomous mode", "manual mode",
   "take it from here", or any attempt to bypass a gate.
+# Enforcement checks (ENFORCEMENT.md). Claude Code registers these when the
+# skill loads and runs them until the session ends. They only read and answer
+# allow / deny / ask. If Python 3 or the checks file is missing, git, gh and
+# docker commands are blocked rather than let through unchecked.
+hooks:
+  PreToolUse:
+    - matcher: "Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+      hooks:
+        - type: command
+          timeout: 15
+          command: >-
+            f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
+            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" pre-tool; done;
+            in=$(cat);
+            printf '%s' "$in" | grep -qE '"tool_name": *"mcp__[^"]*[Gg]it[Hh]ub' || { printf '%s' "$in" | grep -qE '"tool_name": *"Bash"' && printf '%s' "$in" | grep -qE '(^|[^A-Za-z])(git|gh|docker)[[:space:]]'; } || exit 0;
+            echo "dev-skills enforcement cannot run (checks file or Python 3 missing), so git, gh and docker are blocked. Reinstall the skill (ENFORCEMENT.md)." >&2; exit 2
+  PostToolUse:
+    - matcher: "AskUserQuestion"
+      hooks:
+        - type: command
+          timeout: 15
+          command: >-
+            f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
+            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" post-ask; done; exit 0
+  Stop:
+    - hooks:
+        - type: command
+          timeout: 15
+          command: >-
+            f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
+            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" stop; done; exit 0
 ---
 
 # Dev Skills
@@ -34,8 +65,13 @@ work begins** (`SESSION_START.md`, "Mode choice"). Until it is answered,
 nothing is edited and no git write is executed or presented. A mode nobody
 chose is a mode Claude guessed.
 
-**Manual mode:** git commands are presented for the user to run (Section 5.8),
-and Claude stops between steps.
+**Manual mode:** git commands are presented for the user to run (Section 5.8).
+Every stop costs a model request, so stops are few: one labeled, chained block
+per decision, a split only after the PR opens, and **no "done" turn**: the
+user's next message starts with a chained read that verifies the block. A
+failed block is raised before the new request. **Timers and watchers save
+nothing**, since their wakeup costs the same request as a reply. Format and
+examples: `SHELL_REFERENCE.md`, "Manual mode: few stops, clear blocks".
 
 **Semi-autonomous mode:** only the user's own words pick it, at that question or
 later ("auto mode", "take it from here"). Ask neutrally, manual first,
@@ -79,8 +115,9 @@ compaction.
 
 **A `Mode:` row that is missing, reads `unchosen`, or names anything other than
 `manual` or `semi-autonomous` means no mode, never manual.** Ask the mode
-question and write the answer before any git write. The hook enforces this for
-executed commands; the prose enforces it for presented ones. A resumed session,
+question and write the answer before any git write. The enforcement checks
+block both executed and presented git writes until it is set (ENFORCEMENT.md,
+A5 and C2). A resumed session,
 or one that finds a committed state file, asks again, because that row
 describes the *last* session. Switching is one phrase either way ("manual
 mode", "auto mode"): record it and continue.
@@ -199,22 +236,20 @@ Gate indicators:
 - ⬜ PENDING
 - ➖ N/A — gate does not apply to this project
 
-### The gate pre-flight hook
+### Enforcement checks
 
-The optional `PreToolUse` hook (`hooks/gate-preflight.sh`) blocks executed git
-writes whose required gates are not ✅ or ➖ N/A, reading the state file.
-**If the hook denies a call, a gate has not run**: run it, update the state
-file, then retry. Never:
-- edit `.claude/dev-skills-gates.md` to mark a gate ✅ that did not run
-- mark a gate ➖ N/A to clear the block, unless the structural reason is real
-  and stated on the tracker
-- set `DEV_SKILLS_GATE_HOOK=off`, or route the same operation through a path the
-  hook does not watch, to get around a denial
+The `hooks:` block at the top registers checks Claude Code runs on its own
+once the skill loads (`ENFORCEMENT.md`: each check, what it reads, how to
+decline). Only these are "hooks"; everything else here is an instruction.
+**If a check blocks, a gate has not run**: run it, then retry. Never mark a
+gate ✅ or ➖ that did not earn it, and never reword, split or re-route an
+operation, write the gate file from the shell, or ask the user to decline, to
+get something through. Working around a gate denial is a worse failure than
+the skipped gate, because it also destroys the signal. If a check looks wrong, tell the user.
 
-Working around a gate denial is a worse failure than the skipped gate, because
-it also destroys the signal. If you believe the hook is wrong, tell the user
-and let them decide. **The hook cannot see presented commands**, so for those
-the prose pre-flight is the only enforcement (Section 1).
+**Never proceed on an unanswered question.** Re-ask any the user skipped and
+wait; never fill in a default. An answer in the user's own words gets a
+response before anything is acted on.
 
 ### Two tracks
 
@@ -527,12 +562,15 @@ git add -A && git commit -m "<message>" && git push -u origin <branch>
 This governs the commands Claude runs. A block presented to the user chains
 with that shell's syntax (`;` in Windows PowerShell, `SHELL_REFERENCE.md`).
 Chaining changes the number of round trips, never the checks: the pre-flight
-runs before the line is written, and the pre-flight hook scans every command in
+runs before the line is written, and the enforcement checks scan every command in
 a chain.
 
 **Do not chain across a stop.** Anything the user must see or decide between
 two commands is a boundary: the commit approval, the tag block, a gate that
 has not passed, a failure that changes what comes next. When in doubt, split.
+A check the shell can make (`gh pr checks --watch`, a SHA comparison) is a
+chained link, not a stop, which is how manual mode puts the merge and the tag
+in one block (`SHIP_REFERENCE.md`, step 3).
 
 ### 5.2 Model gating — Sonnet ceiling
 
@@ -625,9 +663,9 @@ Never let the report become longer than the savings it describes.
 
 ### 5.8 Git command presentation
 
-**Before composing any command block, load `SHELL_REFERENCE.md`** (`cd`
-formats per shell, the one-block rule, remote verification, forks, the Termux
-clone flow, examples). Do not build a block from memory of this summary.
+**Before composing any command block, load `SHELL_REFERENCE.md`** (the
+labeled run-block format, no `cd`, one block per stop, remote verification,
+forks, the Termux clone flow). Do not build a block from memory of this summary.
 
 **Who runs git.** In semi-autonomous mode, Claude does (Operating modes), and
 presenting is only the fallback when an operation fails. In manual mode it
@@ -829,7 +867,10 @@ a declined item is a decision on the record and not a gap.
      start command.
 
    **Every volume is a bind mount under `/opt/docker/<container-name>/`**
-   (the user's convention, and the example path). Never a named volume. **The
+   (the user's convention, and the example path). Never a named volume.
+   **Never `network_mode: host` without the user's explicit permission** for
+   that container, recorded with its reason; use `ports:` instead
+   (`SECURITY_LINUX.md`). **The
    image tag is pinned to the current version**, never `latest`. Gate 1 treats
    it as a version reference, so a release that bumps the version bumps the
    compose file too (`GATE_REFERENCE.md`, Gate 1, check 2). Gate 4 checks the

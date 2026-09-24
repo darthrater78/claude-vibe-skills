@@ -1,186 +1,48 @@
-# Gate pre-flight hook
+# Enforcement checks — optional "always on" install
 
-`gate-preflight.sh` is a `PreToolUse` hook that blocks git write operations when
-the gates they require have not passed.
+**You don't need anything in this folder for the checks to work.** Since
+2.37.0 the enforcement checks ship inside the skill (`checks/enforce.py`), and
+Claude Code turns them on by itself when the skill loads, via the `hooks:`
+block at the top of `SKILL.md`. Every check, what it reads, and how to decline
+them for a session is in
+[`skills/dev-skills/ENFORCEMENT.md`](../skills/dev-skills/ENFORCEMENT.md).
 
-SKILL.md asks Claude to check the gates before every git write. This hook makes
-that check unskippable for anything Claude executes itself — it is the
-deterministic half of gate enforcement, and prose is the other half.
+This folder is for one extra case: running the same checks in **every**
+session on a machine, including sessions that never load the skill.
 
-## What it covers, and what it can't
+## Before you do this
 
-| Path | Covered |
-|---|---|
-| Claude runs `git commit` / `git push` / `git tag` / `gh pr create` / `gh pr merge` / `gh release create` | ✅ |
-| Claude calls GitHub MCP write tools (`create_pull_request`, `merge_pull_request`, `push_files`, …) | ✅ |
-| Claude **presents** commands for you to paste into your own terminal | ❌ — nothing intercepts your terminal |
-| You run git yourself | ❌ |
-
-That gap is why SKILL.md Section 1 defines presenting a command as performing it.
-The hook is strongest exactly where Claude executes git directly — remote
-container sessions (`SESSION_START.md`, step 0) — and weakest on local sessions,
-where presenting commands is the default.
-
-**Semi-autonomous mode moves most paths into the covered half.** When a session
-opts into semi-autonomous mode (`SKILL.md`, Operating modes), Claude runs the
-commits, pushes, PR and merge itself, so each arrives as a tool call this hook
-inspects rather than as a block you paste. The tag push and ref deletions are
-still handed to you in that mode — they are exactly the operations your
-credentials can do and Claude's often cannot — so those stay in the uncovered
-half either way. Installing the hook matters most in that mode: it is the
-enforcement that does not depend on Claude remembering to run a pre-flight
-nobody is watching.
+- **They run in every project.** A repo with no gate file gets its git writes
+  denied ("no gate file"), which is right for dev-skills projects and noise
+  for anything else. The skill-loaded default doesn't have this problem.
+- **Declining still works.** It's the same `Hook enforcement: declined` row in the
+  project's gate file.
+- **They need Python 3.** Unlike the skill-loaded version, the commands here
+  have no fallback: if `python3` is missing, the check errors and Claude Code
+  lets the action through. The skill-loaded version blocks git, gh and docker
+  instead.
 
 ## Install
 
-The hook is **project-scoped by default**: it only governs repos you install it
-in.
+1. Install the skill as usual, so `checks/enforce.py` exists under your skills
+   folder (normally `~/.claude/skills/dev-skills/`).
+2. Merge [`settings.example.json`](settings.example.json) into
+   `~/.claude/settings.json`. If that file already has a `hooks` key, merge
+   the arrays rather than replacing them. If your skills folder is elsewhere
+   (a custom `CLAUDE_CONFIG_DIR`, for example), change the three paths.
+3. Start a new session and check the banner for `Hook enforcement: ✅ active`.
 
-```bash
-mkdir -p .claude/hooks
-cp hooks/gate-preflight.sh .claude/hooks/
-chmod +x .claude/hooks/gate-preflight.sh
-```
+When both this install and the skill are active, each check runs twice with
+the same answer. That's harmless, but you can drop this install again once you
+only use dev-skills sessions.
 
-Then merge `hooks/settings.example.json` into the repo's `.claude/settings.json`.
-If that file already has a `hooks` key, merge the arrays rather than replacing
-them.
+## Replaced: `gate-preflight.sh`
 
-To govern every repo instead, put the same block in `~/.claude/settings.json`
-and use an absolute path to the script. Note that a global install enforces gates
-in repos that have no gate state file, which the hook treats as "no evidence any
-gate ran" — see Failure modes.
-
-**Requires `jq` or `python3`** to parse the hook payload. The hook fails closed:
-with neither available it denies rather than allows, per SKILL.md Section 4
-("fail closed — when something unexpected happens, deny rather than allow").
-
-## What it checks
-
-Source of truth is `.claude/dev-skills-gates.md` (SKILL.md Section 2). A gate
-counts as satisfied when its **row** — the line naming the gate, plus any
-continuation lines below it up to the next gate or a blank line — carries
-✅ (passed) or ➖ (N/A). Anything else — ⬜ pending, ⏳ in progress, 🚫 blocked,
-or a gate missing from the file — blocks. (Reading only the first line used
-to miss a status or `handoff` annotation that wrapped onto a continuation
-line; the hook now reads the whole row.)
-
-Required gates scale with the operation, matching the two tracks in Section 2:
-
-| Operation | Gates required |
-|---|---|
-| `git commit`, `git push` to a branch | SECURITY |
-| `gh pr create`, MCP `create_pull_request` | VERSION, BUILD, SECURITY, DOCS |
-| `git push origin main`, `gh pr merge`, `gh release create`, MCP `merge_pull_request` | VERSION, BUILD, SECURITY, DOCS, RELEASE |
-
-Read-only git (`status`, `diff`, `log`, `tag -l`, `fetch`) is never blocked.
-
-**User-only ref operations: always denied, in both modes.** Creating a tag
-(`git tag <name>`, `git tag -a/-s/-f/-m/-u`), pushing one (`git push … v1.2.3`,
-`--tags`, `--follow-tags`, `refs/tags/…`), and deleting any ref (`git push
---delete` / `-d`, `git push origin :<ref>`, `--mirror`, `gh pr merge
---delete-branch`, `gh api -X DELETE …/git/refs/…`, MCP `create_tag` /
-`delete_branch` / `delete_tag` / `delete_ref`) are all denied before the gate
-file is read. SKILL.md Section 5.8 makes these the user's to run in manual
-*and* semi-autonomous mode, so no gate state can turn them into something
-Claude executes. Present the block instead.
-
-**Operating mode chosen.** Every classified git write is denied unless the gate
-file's first `Mode:` line reads `manual` or `semi-autonomous`. A missing row,
-`Mode: unchosen`, or any other value means the session-start mode question was
-never answered (SKILL.md, "Operating modes"). The hook does not fall back to
-manual. Ask the user, then write their answer.
-
-**Fork targeting.** The gate file's `Origin:` row
-(`Origin: owner/repo (fork of parent/repo)` or `Origin: owner/repo (not a
-fork)`) drives three checks (`skills/dev-skills/SHELL_REFERENCE.md`, "Forks"):
-
-| Situation | Denied |
-|---|---|
-| Any repo with an `Origin:` slug | a `gh pr`/`gh release` write whose `--repo`/`-R` names a different repo; an MCP write whose `owner`/`repo` differ |
-| A fork | a `gh pr`/`gh release` write with **no** `--repo`, because `gh` resolves a fork to its parent by default |
-| A fork | a `git push` that does not name `origin` explicitly (bare `git push`, `git push upstream …`) |
-
-A row that says `fork of` but doesn't name the fork as `owner/repo` is denied
-outright. A gate file with no `Origin:` row skips these checks, but every
-session now writes the row at start (`SESSION_START.md`, step 1a).
-
-**Open-findings check (SECURITY, release track only).** `GATE_REFERENCE.md`
-Gate 3 says no finding of any severity may be open when the release track runs
-— a finding clears only by being fixed, waived by the *user* with a reason and
-date, or withdrawn as wrong. The SECURITY row's first line carries the open
-count for exactly this reason, so the check stays line-oriented. A ✅ whose
-first line does not say `0 open` is denied for release operations: it asserts
-the gate passed while the row still counts findings nobody resolved. Work
-commits are deliberately unaffected — a finding has to be recordable before it
-can be resolved. Resolve a denial by resolving the findings, never by editing
-the count.
-
-**Local-artifact-handoff annotation (BUILD only).** GATE_REFERENCE.md's Gate 2
-requires offering the user a way to try a compiled artifact (Docker image,
-Windows `.exe`, Android `.apk`) by hand before BUILD passes — a conversational
-step the hook cannot observe directly. Where BUILD is required for the
-operation, the hook additionally denies a BUILD line marked ✅ that contains no
-`handoff` annotation, in any repo with a Docker/.exe/.apk build signal
-(`Dockerfile`, `.csproj`/`.sln`, or an Android Gradle project — `build.gradle`,
-`build.gradle.kts`, or `AndroidManifest.xml`). Write the outcome onto the BUILD
-line itself, e.g. `✅ debug build verified; handoff offered, user declined to
-try it` — see GATE_REFERENCE.md, Gate 2, for the full convention. A ✅ with
-no annotation in a matching repo reads as "the offer never happened," not
-"forgot to write it down."
-
-**Test artifact before merge (merges only).** For `gh pr merge`, MCP
-`merge_pull_request` and `git push origin main|master`, in a repo with the same
-build signal, the hook denies the merge unless the BUILD row carries
-`test artifact: <path or link> @ <short SHA>`, whether BUILD reads ✅ or ➖. In
-a repo with a `Dockerfile` or compose file it also requires `test creds:`
-(`generated per run, shown to user`, or `n/a (no login)`). Remote container and
-Termux sessions are not exempt: their test artifact comes from CI.
-
-## Failure modes
-
-**No gate state file** → denied. There is no evidence any gate ran, and per
-Section 2 unknown is never "passed." Re-derive state from evidence and write the
-file.
-
-**Neither `jq` nor `python3`** → denied, with instructions to install one.
-
-**`Mode:` missing or `unchosen`** → denied. This includes a gate file written
-before 2.29.0 that has no `Mode:` row: ask the mode question and add the row.
-
-**Bypass:** `DEV_SKILLS_GATE_HOOK=off` disables the hook entirely. It exists for
-debugging the hook itself, not for getting past a gate — the supported way past
-a gate is to run it, or to mark it ➖ N/A for a structural reason on the tracker.
-
-## Testing it
-
-```bash
-# expect: deny
-printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git tag v1.0.0"}}' \
-  | .claude/hooks/gate-preflight.sh
-
-# expect: no output (allow)
-printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git status"}}' \
-  | .claude/hooks/gate-preflight.sh
-
-# with "Mode: unchosen" in the gate file — expect: deny, mode not chosen
-printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"git commit -m x"}}' \
-  | .claude/hooks/gate-preflight.sh
-
-# with "Origin: me/repo (fork of up/repo)" — expect: deny, no --repo in a fork
-printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr create --title x"}}' \
-  | .claude/hooks/gate-preflight.sh
-
-# handoff annotation check — run from a repo with a Dockerfile/.csproj/.sln/
-# Android Gradle project and a gate state file with a bare "BUILD ✅" line
-# (no "handoff" text):
-# expect: deny, naming the missing handoff annotation
-printf '{"tool_name":"Bash","cwd":"'"$PWD"'","tool_input":{"command":"gh pr create --title x --body y"}}' \
-  | .claude/hooks/gate-preflight.sh
-
-# test-artifact check — same repo, BUILD row with "handoff" but no
-# "test artifact:" line:
-# expect: deny, naming the missing test artifact (and test creds, with a Dockerfile)
-printf '{"tool_name":"mcp__github__merge_pull_request","cwd":"'"$PWD"'","tool_input":{"pullNumber":1}}' \
-  | .claude/hooks/gate-preflight.sh
-```
+Before 2.37.0 this folder held `gate-preflight.sh`, a bash checker you had to
+install by hand. Nothing installed it automatically, so on most machines it
+never ran. `checks/enforce.py` replaces it: it covers everything the old
+checker did, closes the gaps found in the 2.37.0 review (prefixed and wrapped
+commands, pushes to the default branch, decoy ✅ lines), and adds the Docker,
+gate-file, reply and unanswered-question checks. If you installed the old
+script, remove its entries from your `settings.json` and delete
+`.claude/hooks/gate-preflight.sh`.

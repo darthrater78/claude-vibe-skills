@@ -25,3 +25,4 @@ ehthumbs.db
 *.pem
 key.properties
 signing.properties
+__pycache__/

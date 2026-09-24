@@ -44,7 +44,7 @@ SKILL|| "just tag it" / "push the tag for me" |
 SKILL|| "that finding is pre-existing" / "it's unrelated to this change" |
 SKILL|| "we'll fix it next release" |
 ANY|A check list with zero runs is ⬜, never ✅
-ANY|Row format: the status symbol and every word the hook checks go on the row's first line
+ANY|Row format: the status symbol and every word the checks read go on the row's first line
 ANY|"It probably ran" is ⬜
 ANY|## Handoff: [task name]
 ANY|Never let the report become longer than the savings it describes
@@ -72,3 +72,19 @@ SKILL|Docker projects document a compose quickstart
 SKILL|Every volume is a bind mount under
 SKILL|The image tag is pinned to the current version
 ANY|Reachable on the network, always
+SKILL|Timers and watchers save nothing
+ANY|One block per stop
+ANY|Host networking needs the user's explicit permission, every time
+SKILL|Never `network_mode: host` without the user's explicit permission
+ANY|Read the binding back before handing over the URL
+ANY|Read the host's LAN IP from the default route
+SKILL|Never proceed on an unanswered question
+SKILL|If a check blocks, a gate has not run
+ANY|Keep the enforcement checks on for this session?
+ANY|They never run a command
+ANY|No `cd`, ever
+ANY|raise it first
+ANY|Test containers don't outlive the session
+ANY|Gone when it stops
+ANY|Temp-folder mounts are never root's
+ANY|Test containers are labeled, and leftovers are found
