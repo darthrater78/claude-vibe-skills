@@ -1,7 +1,8 @@
 # Enforcement checks
 
-Loaded by `SESSION_START.md` (the disclosure and the keep-or-decline
-question), and whenever a check blocks something. This is the full disclosure:
+Session start reads only the "At session start" section below (the
+disclosure and the keep-or-decline question). The whole file loads whenever a
+check blocks something, or the user asks what the checks do. This is the full disclosure:
 what the checks are, what they read, what each one blocks, how to decline them,
 and what they cannot catch.
 

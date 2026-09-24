@@ -56,6 +56,7 @@ These rules apply as code is written, not just during Gate 3 scans.
   direct and transitive (SKILL.md Section 4.1)
 - Never write a version number from memory — look up the current release before
   pinning; a remembered version is stale the day it is written
+- A package or runtime with LTS lines stays on LTS — see "LTS lines" below
 - Pin exact versions, and keep the lockfile committed
 - A pinned version is not a safe version: pinning decides *which* CVEs you carry
 - Re-audit the whole tree on every security gate, not only when the manifest
@@ -462,6 +463,54 @@ pip index versions <pkg>               # Python (pip marks this experimental)
 cargo search <pkg>                     # Rust
 go list -m -versions <module>          # Go
 dotnet package search <pkg>            # .NET (SDK 9+; else check nuget.org)
+```
+
+**LTS lines: stay on LTS, and on the newest one.** Where a package or runtime
+publishes long-term-support lines (Node.js, .NET, Java, Ubuntu, Debian,
+Kubernetes, Django, many databases and base images), "current" means the
+newest patch of the newest *settled* LTS line, not the newest release overall.
+A project picked LTS for stability, and a jump to a short-lived line trades
+that away without anyone deciding to.
+
+- **Settled** means the line has had its first patch after going LTS: Node's
+  line once it is Active LTS, Ubuntu `.04.1`, .NET `x.0.1`, Java `x.0.1`. A
+  brand-new LTS waits for that; the previous LTS line stays current until then.
+- **New projects start on the newest settled LTS** where the ecosystem has one.
+- **LTS → non-LTS** (Node Current, .NET STS, a Java feature release, an Ubuntu
+  interim) is the user's call, asked and recorded, never a silent upgrade.
+- **Within a line, always the newest patch.** That's where the security fixes
+  land.
+- **A newer LTS major is a major-version upgrade**: its own change, its own
+  gates (`SKILL.md` §4.1).
+- **An LTS past end of support is a High finding** (`SECURITY_GATE.md`): no
+  more security fixes will ship for it. A superseded LTS still in support is a
+  Low finding, and the upgrade gets planned.
+- **Pin the exact version**, never a floating `lts` tag (`node:lts`,
+  `lts/*` in a Dockerfile). The one exception is the CI runtime in a workflow
+  template, where `lts/*` is the point.
+- Ecosystems with no LTS lines (Python, most npm and PyPI libraries) keep
+  "latest stable".
+
+```
+# bad — "latest stable" (as of 2026-09) moved an LTS project to Current
+FROM node:26.10.0-alpine         # not LTS until 2026-10-28
+
+# good — newest patch of the newest settled LTS, looked up the same day
+FROM node:24.21.0-alpine         # Active LTS
+```
+
+Look up the LTS lines and their end-of-support dates; never recall them:
+
+**endoflife.date's `lts` can be a date instead of `true`.** A line whose `lts`
+date is still in the future is not LTS yet, so compare it with today; a truthy
+check calls Node 26 LTS months early. The `jq` lines need `jq` installed.
+
+```bash
+curl -sf https://endoflife.date/api/<product>.json   # any product: lts, eol, latest
+curl -sf https://nodejs.org/dist/index.json | jq -r '[.[]|select(.lts)][0].version'
+curl -sf https://api.adoptium.net/v3/info/available_releases | jq .most_recent_lts
+curl -sf https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json \
+  | jq -r '.["releases-index"][]|select(."release-type"=="lts")|."channel-version"' | head -1
 ```
 
 **Audit the tree, not the manifest.** Most advisories arrive through packages

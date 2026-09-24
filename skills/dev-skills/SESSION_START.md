@@ -32,7 +32,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE ENFORCEMENT; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -86,7 +86,8 @@ applies: the probe changes how many calls it takes, never what gets checked.
 `AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
 `SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`, `SECURITY_WINDOWS.md`,
 `SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, `QUALITY_ANDROID.md`,
-`UPDATE_REFERENCE.md`, and `ENFORCEMENT.md` exist in this skill's base directory (shown when the
+`UPDATE_REFERENCE.md`, `REMOTE_SESSION.md`, `STANDARDS_REFERENCE.md` and
+`ENFORCEMENT.md` exist in this skill's base directory (shown when the
 skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
 warn immediately:
 
@@ -115,35 +116,12 @@ is not optional and does not wait for the user to ask.
 3. **Compare** (strip the leading `v`, semver order).
    - **Current:** fold a single confirmed line into the banner — no separate
      callout needed.
-   - **Behind:** treat it like a failed security gate, not an FYI. It is **the
-     first thing in the first message**, above any greeting and the banner,
-     bracketed so it can't pass as routine output, with the versions at both
-     ends:
+   - **Behind:** treat it like a failed security gate, not an FYI. It is
+     **the first thing in the first message**, above any greeting and the
+     banner. **Read `UPDATE_REFERENCE.md` first**: it has the bracketed
+     callout, the options the install location allows, and the
+     `⚠️ outdated` marker every later tracker carries if the user continues.
 
-       > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
-       > **STOP — dev-skills is out of date: running v2.17.0, latest is v2.19.0.**
-       >
-       > Gates run in this session may be missing fixes released since
-       > v2.17.0. Release notes:
-       > https://github.com/darthrater78/claude-vibe-skills/releases
-       >
-       > **How do you want to update?**
-       > 1. **I install it:** I download v2.19.0 from the release and replace
-       >    this copy.
-       > 2. **You install it:** I give you one command to run.
-       > 3. **Continue on v2.17.0** (outdated).
-       > 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
-
-     Offer only the options the install location allows
-     (`UPDATE_REFERENCE.md`), and ask it in the first `AskUserQuestion` call.
-     Wait for an explicit answer before "What are we building?". If the user continues
-     anyway, carry `⚠️ outdated (v2.17.0, latest v2.19.0)` on every later
-     tracker display, status check, banner and handoff for the rest of the
-     session: loud once, then visibly present, never silently dropped.
-
-   **Before offering the update choice, read `UPDATE_REFERENCE.md`** from this
-   skill's base directory: which options the install location allows, and the
-   exact install commands. Never build an install command from memory.
 
 4. This check is unconditional — it runs even in sessions with no git repo
    detected for the *host* project (step 0 below is about that project's own
@@ -186,74 +164,10 @@ drop it. It changes nothing about gates, tracks or mode. It needs an eligible
 login (`/login`), and on Team/Enterprise plans an Owner must enable it in
 Claude Code admin settings.
 
-**Remote container specifics:**
-
-1. **Nothing needs cloning — the repo is already there.** The container is
-   provisioned with a fresh clone at session start. Never present `git clone`,
-   and never treat a missing local repo as the user's problem to fix.
-2. **The work exists only in the container until it is pushed.** Say this once,
-   early:
-
-   > ⚠️ **Remote session:** these edits live in this container. It is reclaimed
-   > when the session ends, so anything uncommitted is lost. I'll commit and
-   > push from here once you approve.
-
-3. **`gh` is typically not installed.** The probe's `gh_installed` and
-   `gh_repo` keys say whether it is there and whether it works. If absent, every
-   `gh` command in Gates 5 and 6 maps to a GitHub MCP tool (`mcp__github__*`):
-
-   | `gh` command | MCP equivalent |
-   |---|---|
-   | `gh pr create` | `create_pull_request` |
-   | `gh pr list` / `gh pr view` | `list_pull_requests` / `pull_request_read` |
-   | `gh pr merge` | `merge_pull_request` |
-   | `gh release create` / `gh release view` | `list_releases` / `get_release_by_tag` + release API |
-   | `gh run list` / `gh run view` | `actions_list` / `actions_get` / `get_job_logs` |
-
-   If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
-   rather than discovering it mid-ship.
-4. **Skip step 2 (shell detection) entirely — including for the tag and
-   ref-deletion blocks.** Every git command Claude runs here uses the
-   container's own bash. The tag-push and ref-deletion carve-out (Section 5.8)
-   still hands the user a block to run on their own machine, but that block
-   carries no `cd` and nothing else that varies by shell: it is plain
-   single-line `git` commands (`git checkout`, `git pull`, `git tag`,
-   `git push`) that run unmodified in every shell `SHELL_REFERENCE.md` lists.
-   So there is no clone path to ask for and no shell to ask about — put "run
-   this from your local clone" in the prose above the block and leave the block
-   itself copyable as given (`SHELL_REFERENCE.md`, "Tag and ref-deletion blocks
-   carry no `cd`").
-5. **Step 3 (sync offer) is usually unnecessary** — the clone is fresh as of
-   session start. Still run `git fetch origin` before Gate 5 in case the branch
-   moved during a long session.
-6. **Gate state file goes on the working branch,** not in `.gitignore`
-   (Section 2).
-7. **Executing git here does not extend to tag pushes.** Container credentials
-   are commonly denied (`403`) on `refs/tags/*`, and that is exactly the push
-   that fires the release workflow. Present the tag block to the user even
-   though everything else runs here — Section 5.8, "Tag pushes and ref
-   deletions are the exceptions." Semi-autonomous mode does not change this;
-   it only adds the full pre-tag report above the block ("Semi-autonomous mode
-   — execution", below).
-8. **Docker in a web container: only for projects with a Docker build
-   signal** (`Dockerfile`, `docker-compose.yml`/`compose.yaml`). Measure the
-   daemon, not the binary: `docker info`. A web container often ships the
-   CLI with no daemon behind it. If `docker info` fails, say so and offer a
-   choice. This is a real limitation, not something to route around:
-
-   > ⚠️ **Docker isn't usable in this container** — the `docker` CLI is
-   > present but `docker info` can't reach a daemon, so I can't build or
-   > verify the image here. Two ways forward:
-   > 1. **Work commit now** — save progress on the branch so you can finish
-   >    Gate 2 on a machine with a working Docker daemon.
-   > 2. **CI-only BUILD** — if a release workflow builds and tests the image
-   >    in CI, Gate 2 can pass on that basis (Gate 2, "CI-only").
-   >
-   > Which do you want?
-
-   This is separate from the test artifact. Either way, nothing merges to the
-   default branch until CI has produced a test image from the PR head
-   (`GATE_REFERENCE.md`, Gate 2, "Test artifact before merge").
+**Remote container: read `REMOTE_SESSION.md`** from this skill's base
+directory before step 1. It changes the clone, the shell and sync questions,
+`gh` (GitHub MCP equivalents), where the state file lives, the tag carve-out
+and Docker. Local and Termux sessions skip it.
 
 Report the detected environment in the session banner.
 
@@ -294,23 +208,12 @@ for it or it needs something the probe does not read.
    gh api user -q .login
    ```
 
-   (Without `gh`, use the GitHub MCP `get_repository` equivalent.) Then there
-   are four cases:
-
-   | What you find | What it means | Do |
-   |---|---|---|
-   | `isFork: true` | `origin` is the fork | Correct. Record `Origin: <owner>/<repo> (fork of <parent>)` and run `gh repo set-default <owner>/<repo>` |
-   | `isFork: false`, and `<login>/<repo>` exists with this repo as its `parent` | `origin` is **upstream**, and the user's fork exists | Stop. Fix the remote before any work: `git remote set-url origin <fork-url>`, then `git fetch origin`. Record the fork as above |
-   | `isFork: false`, the user is not the owner, `viewerPermission` is below `WRITE`, and no fork exists | They cloned someone else's repo and have nowhere to push | Stop and ask. The user creates the fork on GitHub (or approves `gh repo fork --remote=false`), and then the remote is fixed as above. Never plan a push or PR to the upstream repo |
-   | `isFork: false`, and the user owns it or has `WRITE` | An ordinary repo | Nothing to do. Record `Origin: <owner>/<repo> (not a fork)` |
-
-   The user's rule: **the user can go to GitHub directly if they want to go
-   upstream.** So the fix is always to repoint `origin` to the fork. Adding an
-   `upstream` remote beside it is not a fix. If an `upstream` remote already
-   exists, leave it alone and never push to it. Changing `set-url` is a local
-   config change, not a ref write: it follows the session's mode (presented in
-   manual, run by Claude in semi-autonomous), after the user has seen the
-   before and after URLs. Full rule: `SHELL_REFERENCE.md`, "Forks".
+   (Without `gh`, use the GitHub MCP `get_repository` equivalent.) **The
+   common case:** `isFork: false`, and the owner in `nameWithOwner` is the
+   `gh_login` user, so no fork of it can exist. Record `Origin: <owner>/<repo>
+   (not a fork)` and move on. **Anything else** (a fork, someone else's repo,
+   even one you can write to): read `SHELL_REFERENCE.md`,
+   "Forks", for the four cases and the fix, before any work.
 
    **Re-check after a fix, don't assume it worked.** `git remote -v` and the
    `gh repo view` call must now both name the fork. Record what they returned.
@@ -418,7 +321,9 @@ for it or it needs something the probe does not read.
    one, and Gate 1 will hard-block on it anyway.
 
 **Enforcement disclosure — every session, before the mode question.** Read
-`ENFORCEMENT.md` and follow its "At session start" section: the short
+only `ENFORCEMENT.md`'s "At session start" section (`sed -n '/^## At session
+start/,/^## The checks/p'`, about 2KB of a 12KB file; the rest loads when a
+check blocks) and follow it: the short
 disclosure, then **"Keep the enforcement checks on for this session?"** in the
 same `AskUserQuestion` call as the mode question. It is all or nothing, never
 defaulted, and asked again if skipped.
@@ -518,7 +423,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.37.0 active.
+Dev Skills v2.38.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -553,7 +458,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.37.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.38.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

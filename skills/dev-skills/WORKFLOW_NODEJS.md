@@ -54,10 +54,11 @@ jobs:
       - name: Test
         run: npm test --if-present
 
-      # ADAPT: add matrix testing for multiple Node versions
+      # ADAPT: add matrix testing for the Node LTS lines still in support
+      # (look them up: curl -s https://endoflife.date/api/nodejs.json)
       # strategy:
       #   matrix:
-      #     node-version: [18, 20, 22]
+      #     node-version: ['lts/-1', 'lts/*']
 ```
 
 ### Release workflow — `.github/workflows/release.yml`

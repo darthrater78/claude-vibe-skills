@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.37.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.38.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.37.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.37.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.38.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.38.0)
 
 ---
 
@@ -119,6 +119,15 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **LTS stays LTS.** A package or runtime on a long-term-support line
+  (Node.js, .NET, Java, Ubuntu, Debian, …) upgrades to the newest patch of the
+  newest *settled* LTS line, never to the newest release overall. A brand-new
+  LTS waits for its first patch, moving off LTS is your call, and an LTS past
+  end of support is a High finding. *(2.38.0)*
+- **Cheaper session start.** Parts only some sessions need (remote containers,
+  the out-of-date callout, fork cases, the full enforcement reference, the
+  compose example) load only when they apply. Session start reads 78KB instead
+  of 96KB, about 4k tokens less every session. *(2.38.0)*
 - **[Enforcement that actually runs.](#enforcement-checks)** Checks now ship
   inside the skill and turn on when it loads, with full disclosure and a
   keep-or-decline question every session. They cover gates on executed and
@@ -440,7 +449,8 @@ whichever platform-specific files match the detected project environment.
 
 **Security:** hardcoded secrets · SQL injection · command injection · disabled
 TLS · path traversal · missing auth · weak crypto · unsafe deserialization ·
-dependency auditing (typosquatting, unpinned versions, known CVEs).
+dependency auditing (typosquatting, unpinned versions, known CVEs, a runtime
+or LTS line past end of support, an LTS project moved off LTS).
 
 Plus platform-specific rules, loaded only when that platform is detected:
 
@@ -948,21 +958,23 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~44KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~33KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `ENFORCEMENT.md` | ~11KB | Once, at session start, and whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `SKILL.md` | ~43KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SESSION_START.md` | ~29KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `ENFORCEMENT.md` | ~13KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~31KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
-| `UPDATE_REFERENCE.md` | ~5KB | Only when the version check finds this copy behind the latest release — which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
-| `SECURITY_REFERENCE.md` | ~13KB | Gate 3 + audit mode — cross-platform and language-general security rules, each with a bad/good code example |
+| `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
+| `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
+| `STANDARDS_REFERENCE.md` | ~2KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — how the login protections are built, and the compose quickstart example |
+| `SECURITY_REFERENCE.md` | ~16KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
 | `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
-| `SHELL_REFERENCE.md` | ~14KB | Before writing any command block — fork targeting, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
+| `SHELL_REFERENCE.md` | ~16KB | Before writing any command block, and at session start when the repo is a fork or someone else's — fork targeting and the four fork cases, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
 | `WORKFLOW_REFERENCE.md` | ~40KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
 | `WORKFLOW_DOCKER.md` | ~9KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
@@ -1051,4 +1063,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.37.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.38.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
