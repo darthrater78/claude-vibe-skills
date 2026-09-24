@@ -14,6 +14,16 @@ patterns — cross-platform and language-general patterns are in
 - SUID/SGID: never set SUID casually — prefer Linux capabilities (`setcap`)
 - Containers: never run as root, never `--privileged`, drop all caps and add back selectively,
   never mount Docker socket, pin base image digests not tags, use `--read-only` root filesystem
+- **Host networking needs the user's explicit permission, every time.** Never
+  write, run or present `network_mode: host`, `--network host` or `--net=host`
+  (compose, `docker run`, Dockerfile docs, CI) without the user's own "yes" for
+  that container, in both modes. It removes network isolation, and it publishes
+  every port the app opens on every host interface, bypassing both the LAN-IP
+  binding (`GATE_REFERENCE.md`, Gate 2) and host firewalls. Offer the published
+  port (`-p <LAN IP>:<port>:<port>`) first, and say why host mode is needed if
+  it really is (mDNS/SSDP discovery, DHCP). Record the approval and its reason
+  on the tracker. An unapproved host-network line found in existing code is a
+  High finding (`SECURITY_GATE.md`)
 - Symlink/TOCTOU: use `mkstemp()`/`NamedTemporaryFile()`, not predictable temp paths;
   `O_NOFOLLOW` to refuse symlinks
 - Systemd: add `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`,

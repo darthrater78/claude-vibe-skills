@@ -102,26 +102,12 @@ exchanges — the user should be able to answer everything at once.
 
 ### Step 0 — Determine whether code blocks need a `cd`
 
-Before generating any workflow file or presenting commands, check how the
-user is working:
-
-- **Remote container sessions** — Claude's working directory is already the
-  repo root. No `cd` is needed in any code block. Do not ask for a path.
-- **Local sessions** — the user's terminal may or may not be in the repo
-  directory. Ask for the clone path as part of the Step 3 questions (below),
-  but only if not already known from the shell reference or session start.
-  If the user says they don't need a `cd` (they're already in the repo
-  directory, or they'll handle it themselves), record that and **omit `cd`
-  from all future code blocks in this session.** Do not ask again.
-
-This decision applies to every code block produced by this reference file —
-presented git commands, workflow file creation commands, and any other
-terminal instructions. `SHELL_REFERENCE.md` already handles `cd` formatting
-per shell; this step determines whether to include it at all.
-
-When `cd` is needed, use the format from `SHELL_REFERENCE.md` for the user's
-detected shell (PowerShell, Git Bash, Termux, macOS, Linux, WSL). When `cd`
-is not needed, start the block directly with the command.
+Presented blocks never carry a `cd`, in any session: every block assumes the
+user's terminal is already in the repo, and its label names where to run it
+(`SHELL_REFERENCE.md`, "Every presented block"). Don't ask for a clone path.
+This applies to every code block produced by this reference file: presented
+git commands, workflow file creation commands, and any other terminal
+instructions.
 
 ### Step 1 — Detect the project environment
 
@@ -175,23 +161,19 @@ relevant questions batched together.
 
 **Common questions for all environments:**
 
-1. **Clone path** (local sessions only, if not already known): What is the
-   path to your local clone? (Or "not needed" if you're already there / will
-   handle `cd` yourself.) If answered "not needed," omit `cd` from all code
-   blocks for the rest of the session.
-2. **Docker registry** (Docker only): Which registry? (Docker Hub / GitHub
+1. **Docker registry** (Docker only): Which registry? (Docker Hub / GitHub
    Container Registry / AWS ECR / other)
-3. **Artifact attachment** (when ambiguous): Should compiled artifacts be
+2. **Artifact attachment** (when ambiguous): Should compiled artifacts be
    attached to the GitHub release for download?
-4. **Signing** (Windows / Android): What signing secrets are needed?
+3. **Signing** (Windows / Android): What signing secrets are needed?
    (certificate name, keystore, etc.)
-5. **Release notes source**: Extract from CHANGELOG.md, or generate from PR
+4. **Release notes source**: Extract from CHANGELOG.md, or generate from PR
    description?
-6. **Branch protection**: Which branch is the default? (main / master / other)
-7. **Dev releases**: Do you want to be able to push pre-release tags from
+5. **Branch protection**: Which branch is the default? (main / master / other)
+6. **Dev releases**: Do you want to be able to push pre-release tags from
    feature branches for testing? (e.g., `v1.0.0-dev.1` builds from your
    working branch, marked as pre-release on GitHub)
-8. **Workflow linting**: Add `lint-workflows.yml` (runs `actionlint` on
+7. **Workflow linting**: Add `lint-workflows.yml` (runs `actionlint` on
    `.github/workflows/**` changes)? Recommended whenever any workflow is being
    added — see [Workflow linting](#workflow-linting).
 

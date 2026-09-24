@@ -171,7 +171,7 @@ the code it concerns is edited, the severity rises, the dependency it names
 gets an advisory — it re-opens and needs a fresh decision.
 
 **The tracker's SECURITY row carries the open count on its first line**, because
-that is the line `hooks/gate-preflight.sh` reads:
+that is the line the enforcement checks read (`ENFORCEMENT.md`, A4):
 
 ```
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
@@ -180,7 +180,7 @@ that is the line `hooks/gate-preflight.sh` reads:
 ```
 
 **A ✅ SECURITY row that does not say `0 open` on its first line is an illegal
-state**, and the hook denies the operation rather than trusting the ✅. Do not
+state**, and the checks deny the operation rather than trusting the ✅. Do not
 resolve that denial by editing the count — resolve the findings.
 
 Security step passes at zero Critical, zero High, **and zero open findings of

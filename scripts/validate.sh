@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md ENFORCEMENT.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -102,6 +102,17 @@ for name in "${files[@]}"; do
   fi
 done
 
+# Size of what Claude Code actually loads: SKILL.md's frontmatter (the
+# description and the enforcement `hooks:` block) is read by Claude Code, not
+# sent to the model with the skill body, so it doesn't count toward the ceiling.
+loaded_kb() {
+  if [ "$(basename "$1")" = "SKILL.md" ]; then
+    echo $(( ( $(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$1" | wc -c) + 512 ) / 1024 ))
+  else
+    echo $(( ( $(wc -c < "$1") + 512 ) / 1024 ))
+  fi
+}
+
 # Check the README size table matches reality.
 # SKILL.md is loaded every turn, so an understated figure hides a real per-request
 # cost. Tolerance is 2KB; update the README when a file legitimately grows.
@@ -115,7 +126,7 @@ for f in skills/dev-skills/*.md; do
     errors=$((errors + 1))
     continue
   fi
-  actual=$(( ( $(wc -c < "$f") + 512 ) / 1024 ))
+  actual=$(loaded_kb "$f")
   diff=$(( claimed - actual )); [ $diff -lt 0 ] && diff=$(( -diff ))
   if [ $diff -gt 2 ]; then
     echo "  FAIL: $base README says ~${claimed}KB, actual ${actual}KB"
@@ -149,6 +160,10 @@ ceiling_for() {
     # Still carries the best-practices and Dependabot sections; it is the next
     # extraction candidate, and this number comes down when they move.
     WORKFLOW_REFERENCE.md) echo 44 ;;
+    # Read once per session, not every turn. Raised from 32 in 2.37.0 for the
+    # enforcement disclosure and status (+~500 tokens a session); the
+    # disclosure text itself lives in ENFORCEMENT.md.
+    SESSION_START.md) echo 34 ;;
     # Every other reference file: read in full, one purpose each.
     *) echo 32 ;;
   esac
@@ -156,7 +171,7 @@ ceiling_for() {
 for f in skills/dev-skills/*.md; do
   base=$(basename "$f")
   ceiling=$(ceiling_for "$base")
-  actual=$(( ( $(wc -c < "$f") + 512 ) / 1024 ))
+  actual=$(loaded_kb "$f")
   if [ "$actual" -gt "$ceiling" ]; then
     echo "  FAIL: $base is ${actual}KB, over its ${ceiling}KB ceiling"
     echo "        Extract a section that has its own load trigger, or raise the"
@@ -166,6 +181,17 @@ for f in skills/dev-skills/*.md; do
     echo "  OK: $base ${actual}KB / ${ceiling}KB"
   fi
 done
+
+# The enforcement checks: every rule in ENFORCEMENT.md has test cases, so a
+# check can't get weaker without this failing.
+echo ""
+echo "=== Enforcement checks ==="
+if python3 scripts/test-checks.py; then
+  echo "  OK: enforcement check tests"
+else
+  echo "  FAIL: enforcement check tests (run python3 scripts/test-checks.py -v)"
+  errors=$((errors + 1))
+fi
 
 # Check .skill archive if present
 if [ -f skills/dev-skills.skill ]; then

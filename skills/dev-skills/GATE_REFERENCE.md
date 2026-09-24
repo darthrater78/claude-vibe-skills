@@ -302,11 +302,15 @@ in the same message as the run command:
 ```bash
 TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
 TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
-HOST_IP="$(hostname -I | awk '{print $1}')"   # macOS: ipconfig getifaddr en0
+# the address the host actually uses on the LAN, not the first of `hostname -I`,
+# which can be a Docker bridge (172.17.0.1). macOS: ipconfig getifaddr en0
+HOST_IP="$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
 case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) echo "not a private LAN IP: $HOST_IP" >&2; false ;; esac \
-  && docker run -d --rm --name <app>-test -p "$HOST_IP:8080:8080" \
-  -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image>
-curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
+  && ! ip -4 -o addr show | grep -E 'docker0|br-|veth' | grep -qwF "$HOST_IP" \
+  && docker run -d --rm --name <app>-test --label dev-skills.test="$CLAUDE_CODE_SESSION_ID" -p "$HOST_IP:8080:8080" \
+  -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image> \
+  && sleep 3 && docker port <app>-test \
+  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
 ```
 
 > 🔑 **Test login for this run**: throwaway, reachable on your network,
@@ -325,13 +329,43 @@ curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOS
   and devices, so a loopback-only container is useless to them.
   - **Never use `-p 127.0.0.1:…`**, and never hand over a `127.0.0.1` or
     `localhost` URL.
-  - **Read the host's LAN IP from the host** (`hostname -I`). Never guess it.
+  - **Read the host's LAN IP from the default route** (`ip -4 route get
+    1.1.1.1`, its `src`). Never guess it, and never take the first field of
+    `hostname -I`: its order isn't fixed, and on a Docker host it lists
+    bridge addresses (`172.17.0.1`, `172.18.0.1`, …) that pass the private-IP
+    check but can't be reached from another machine. Reject an IP that
+    belongs to `docker0`, a `br-*` bridge or a `veth`.
   - **Publish on that IP only** (`-p "$HOST_IP:8080:8080"`; for compose,
     `ports: - "${HOST_IP}:8080:8080"` with `HOST_IP` set on the command line).
-  - **Check that the app answers** on `http://<LAN IP>:<port>` before handing
-    over the URL.
+  - **The app inside the container listens on `0.0.0.0`**, not `127.0.0.1`.
+    An app bound to loopback inside the container is unreachable however the
+    port is published. Set its host/bind variable (`HOST=0.0.0.0`,
+    `--host 0.0.0.0`, …) from the Dockerfile, the compose file or the docs.
+  - **A compose file that pins `127.0.0.1:` in `ports:`** is overridden for
+    the test run with `${HOST_IP}`, and flagged to the user, never used as is.
+  - **Read the binding back before handing over the URL.** `docker port
+    <name>` (or `docker compose port <service> <port>`) must show the LAN IP.
+    If it shows `127.0.0.1`, `localhost` or `0.0.0.0`, the run is wrong: fix
+    it and restart. Then **check that the app answers** on
+    `http://<LAN IP>:<port>`.
+  - **The URL handed over is the one that `curl` just reached**, copied from
+    that command's output, never retyped. A message that shows `127.0.0.1`,
+    `localhost` or a bridge IP as the test URL is a Gate 2 failure, not a
+    typo.
   - **On a remote container, where no LAN exists**, say so instead of showing
     a loopback URL.
+- **Mounts are never root's in temp.** A bind mount under a temp folder is
+  created first with `mkdir -p` and used by a container running as you
+  (`--user "$(id -u):$(id -g)"`, or `PUID`/`PGID`). A container that has to
+  run as root mounts from outside temp (`/opt/docker/<name>-test/`). Label
+  every test container (`--label dev-skills.test=…`, or compose
+  `-p dev-skills-test-<name>`) so leftovers are found (`ENFORCEMENT.md`,
+  A10 and A12).
+- **Gone when it stops.** Test containers run with `--rm` and **no restart
+  policy**, and never bind-mount from a temp folder (`/tmp`, Claude's
+  `/tmp/claude-*` scratchpad) with one. A reboot wipes `/tmp`, Docker
+  restarts the container, and it recreates the mount as root, breaking Claude
+  Code's temp directory for every later session (`ENFORCEMENT.md`, A9).
 - **LAN only, never the internet.** A bare `-p 8080:8080` publishes on every
   interface, and Docker's published ports bypass host firewalls such as ufw.
   So bind to the LAN IP, and **if that IP is not private** (outside
@@ -375,9 +409,9 @@ a commit or ship prompt with "commit" or "go ahead", record their words
 (`handoff offered, user said "Commit" without running the image — recorded as
 declined`). Declining to try it never waives the artifact.
 
-**Record it on the tracker, not just in chat.** Where `hooks/gate-preflight.sh`
-is installed, in any repo with a Docker/.exe/.apk build signal, it denies a
-BUILD ✅ with no `handoff` annotation, and **denies every merge to the default
+**Record it on the tracker, not just in chat.** In any repo with a
+Docker/.exe/.apk build signal, the enforcement checks (`ENFORCEMENT.md`, A4)
+deny a BUILD ✅ with no `handoff` annotation, and **deny every merge to the default
 branch** whose BUILD row has no `test artifact:` annotation, or, with a
 Dockerfile or compose file, no `test creds` annotation. Write the BUILD row as:
 

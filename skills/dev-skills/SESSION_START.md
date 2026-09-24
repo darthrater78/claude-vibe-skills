@@ -32,7 +32,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE ENFORCEMENT; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -47,6 +47,8 @@ p latest_tag bash -o pipefail -c "git ls-remote --tags origin | sed 's#.*refs/ta
 p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | grep -v '\^{}'); grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
 p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
 p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
+p enforcement bash -o pipefail -c '[ -f "$B/checks/enforce.py" ] || echo checks-file-missing; for py in python3 python; do "$py" -c "import getpass,os,re,sys,tempfile; u=re.sub(r\"[^A-Za-z0-9_.-]\",\"\",getpass.getuser())[:64]; f=os.path.join(tempfile.gettempdir(),\"dev-skills-enforcement-\"+u,os.environ.get(\"CLAUDE_CODE_SESSION_ID\",\"none\")); print(\"active\" if os.path.isfile(f) else \"NOT-ACTIVE\")" 2>/dev/null && exit 0; done; echo NOT-ACTIVE-no-python3'
+p leftover_tests bash -c 'command -v docker >/dev/null 2>&1 || { echo no-docker; exit 0; }; docker ps -a --filter label=dev-skills.test --format "{{.Names}} ({{.Status}})"; docker ps -a --filter label=com.docker.compose.project --format "{{.Names}} {{.Label \"com.docker.compose.project\"}} ({{.Status}})" | grep " dev-skills-test" || true'
 p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
 ```
 
@@ -65,6 +67,14 @@ Reading it:
   versions before it.
 - **`origin` has any credentials in the URL stripped** (`https://user:token@…`
   becomes `https://…`) so a token never lands in the transcript.
+- **`enforcement=active`**: the checks ran on this very probe. Anything else
+  (`NOT-ACTIVE`, `checks-file-missing`) is `⚠️ Hook enforcement: not active — instructions still apply` in
+  the banner, with the reason.
+- **`leftover_tests` lists test containers an earlier session left behind**
+  (`ENFORCEMENT.md`, A12). The banner shows `⚠️ Leftover test containers: N`,
+  and before any new work, present a ▶️ RUN THIS block that removes them
+  (`docker rm -f …`) and their temp mount folders
+  (`docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}'` lists them).
 - **The probe only reads.** It fetches nothing, so `status`'s ahead/behind
   counts are as of the last fetch, and step 3's sync offer still stands.
 
@@ -75,8 +85,8 @@ applies: the probe changes how many calls it takes, never what gets checked.
 `SHIP_REFERENCE.md`,
 `AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
 `SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`, `SECURITY_WINDOWS.md`,
-`SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, `QUALITY_ANDROID.md`, and
-`UPDATE_REFERENCE.md` exist in this skill's base directory (shown when the
+`SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, `QUALITY_ANDROID.md`,
+`UPDATE_REFERENCE.md`, and `ENFORCEMENT.md` exist in this skill's base directory (shown when the
 skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
 warn immediately:
 
@@ -407,6 +417,12 @@ for it or it needs something the probe does not read.
    gap here means the *next* release is about to be stacked on an unpublished
    one, and Gate 1 will hard-block on it anyway.
 
+**Enforcement disclosure — every session, before the mode question.** Read
+`ENFORCEMENT.md` and follow its "At session start" section: the short
+disclosure, then **"Keep the enforcement checks on for this session?"** in the
+same `AskUserQuestion` call as the mode question. It is all or nothing, never
+defaulted, and asked again if skipped.
+
 **Mode choice — ask every session, and block until it is answered.** This is
 the question the skill used to leave to the user to volunteer. In practice
 that meant it was never asked, and every session ran manual whether or not
@@ -418,12 +434,15 @@ the user wanted that. Now it is asked every time:
   a call that is already being made, so it adds no extra round trip. If there
   is nothing else to ask (a remote container with a clean, current branch),
   ask it on its own. Never skip it.
+- **At most four questions per call**: enforcement, mode, model ceiling and
+  shell first, with sync and branch in the next. Nothing is edited until every
+  question has an answer.
 - **Word it neutrally, with manual first and no recommendation:**
 
   > **Operating mode for this session?**
-  > 1. **Manual:** I present git commands and you run them. I stop between
-  >    steps. *Cost:* running the commands costs no tokens, since they run
-  >    outside me. Each stop is one more turn when you reply.
+  > 1. **Manual:** I present git commands and you run them, one block per
+  >    decision. *Cost:* running the commands costs no tokens, since they run
+  >    outside me, and you never need to reply just to say "done".
   > 2. **Semi-autonomous:** I run git myself after your approval of each
   >    commit. The tag push and any ref deletion are still yours to run.
   >    *Cost:* every command I run is a tool call that resends the whole
@@ -437,7 +456,7 @@ the user wanted that. Now it is asked every time:
 
   | Option label | Description, local and Termux sessions | Description, remote container |
   |---|---|---|
-  | `Manual` | I present git commands and you run them; I stop between steps. Cost: the commands run outside me, so they cost no tokens; each stop is one more turn. | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
+  | `Manual` | I present git commands and you run them, one block per decision. Cost: the commands run outside me, so they cost no tokens; you never need to reply just to say "done". | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
   | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run resends the whole conversation; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
 
   In a remote container Claude runs git in both modes (`SKILL.md` §5.8), so the
@@ -457,8 +476,9 @@ the user wanted that. Now it is asked every time:
 six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
 (format below), and a `Standards:` row for the project standards that apply
 (`SKILL.md` §10; `n/a` when none do). Replace `unchosen` with the user's answer as soon as it
-arrives. Where the pre-flight hook is installed, it denies every git write
-while the row reads `unchosen`. A file committed by an earlier session is
+arrives. The checks deny git writes while it reads `unchosen`. **Edit this
+file with the Write/Edit tools, never the shell**, so the checks can show the
+user each line that passes a gate or sets the mode (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
 sessions add the file to `.gitignore`; on remote containers it is committed
 with the work. This file, not the conversation, is the source of truth for gate
@@ -483,8 +503,8 @@ Updated: 2026-09-07
 🚀 SHIP       ⬜
 ```
 
-**Row format: the status symbol and every word the hook checks go on the row's
-first line.** The hook and re-derivation both read the ✅/➖/⏳/🚫/⬜ symbol and
+**Row format: the status symbol and every word the checks read go on the row's
+first line.** The checks and re-derivation both read the ✅/➖/⏳/🚫/⬜ symbol and
 annotations like `handoff` or `0 open` line by line, so a check that wraps to
 line two reads as absent. Keep line one to the symbol plus a short label, and
 put the why and the evidence on indented lines below it.
@@ -498,11 +518,12 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.36.1 active.
+Dev Skills v2.37.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
 Mode: <manual / semi-autonomous / ⬜ unchosen — answer the mode question first>
+Hook enforcement: <✅ active (ENFORCEMENT.md) / ⚠️ declined — instructions still apply / ⚠️ not active — <reason>; instructions still apply>
 Env: <local / remote container / Termux> | Git: <presented for you to run / run by Claude here>
 Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced>
 CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
@@ -525,14 +546,14 @@ All work on branches — merge to default branch via PR only.
 `Skill version` get their own line only when they need attention (⚠️, ❌, 🚫,
 🚨). The ones that read ✅ collapse into one line, for example
 `Checks: ✅ origin, CI, local dev, releases, skill version`. `Repo`, `Mode`,
-`Env` and `Shell` always print. They are this session's settings, not checks.
+`Env`, `Shell` and `Enforcement` always print. They are this session's settings, not checks.
 
 **Important:** The version shown must match the `version` field in `SKILL.md`'s
 frontmatter. If they differ, the skill was not repackaged after a version bump —
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.37.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

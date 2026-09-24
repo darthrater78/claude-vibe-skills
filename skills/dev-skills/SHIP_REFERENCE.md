@@ -152,6 +152,45 @@ looks fine and is not:
    ("once the merge and CI are confirmed, I'll give you the tag block"), not
    the commands themselves.
 
+   **Manual mode: merge through tag can be one block, when the shell makes
+   step 2's checks.** Every stop in manual mode costs a model request
+   (`SKILL.md`, Operating modes), and step 2's checks are mechanical. So the
+   merge, both checks, the version guard and the tag can go in one `&&` chain
+   that fails closed. It **replaces** the stop only when every link below is
+   present: PR checks green before the merge, `HEAD` equal to the merge commit,
+   and a CI run *on that commit* watched to success. A missing run makes
+   `gh run watch` fail, which stops the chain, so an empty run list cannot
+   read as a pass. Fill in the number, branch, workflow and version from this
+   project:
+
+   ````
+   ### ▶️ RUN THIS — merge PR #<n> → tag v1.2.3 · in ~/<repo> · block 2 of 2
+   ```bash
+   # ════════ ▶️ START: merge → tag v1.2.3 ════════
+   n=<pr-number> && gh pr checks "$n" --watch --fail-fast \
+     && gh pr merge "$n" --merge --delete-branch \
+     && git checkout main && git pull --ff-only origin main \
+     && sha=$(gh pr view "$n" --json mergeCommit -q .mergeCommit.oid) \
+     && [ "$(git rev-parse HEAD)" = "$sha" ] && sleep 20 \
+     && gh run watch "$(gh run list --commit "$sha" --workflow <ci-workflow>.yml --json databaseId -q '.[0].databaseId')" --exit-status \
+     && grep -qx '1.2.3' VERSION \
+     && git tag v1.2.3 && git push origin v1.2.3 \
+     && echo "✅ DONE: v1.2.3 tagged" || echo "❌ STOPPED: scroll up for the error"
+   # ════════ ⏹️ END ════════
+   ```
+   ### ⏹️ END — nothing else to run
+   No need to reply. Your next message starts with me checking the tag and
+   the release run.
+   ````
+
+   Block 1 of 2 (commit → push → open PR) comes first, and the user looks at
+   the PR between the two. Only a user can run this block, since it holds a
+   tag push and a ref deletion (Section 5.8). The enforcement checks hold it
+   back until every gate through RELEASE is ✅ (`ENFORCEMENT.md`, C2). The two-step form above stays in place when CI
+   doesn't run on pushes to the default branch, or when the shell can't run
+   `gh`. After the block, verify the tag's target as below, in the chained read
+   that opens the user's next message.
+
    **No `cd`, and no clone-path question.** Say "run this from your local clone
    of the repo" in the prose above the block and leave the block copyable as
    given — a `cd` the user has to edit is a broken first line, and someone
@@ -175,7 +214,8 @@ looks fine and is not:
    — drop this clause and say so.
 
    > 📌 **Pushing that tag is what starts the release build.** Run the block
-   > above and tell me when it's done — I'll watch the workflow from here.
+   > above. No need to reply just to say it's done: I'll check the tag and the
+   > release run at the start of your next message.
 
    No local clone (web or mobile session)? Offer the UI instead: **Releases →
    Draft a new release → Choose a tag → create it on the default branch.** Same

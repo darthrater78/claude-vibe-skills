@@ -2,10 +2,10 @@
 
 This file is loaded on demand by the dev-skills skill when git commands need to
 be formatted for the user's shell environment (Section 5.8). It contains the
-environment rules in full: the `cd` format table, the rules every presented
-block follows, why tag pushes and ref deletions always go to the user,
-shell-specific syntax, the Termux clone flow, and example blocks for each
-supported shell.
+environment rules in full: the rules and the labeled format every presented
+block follows, manual mode's few-stops rules, why tag pushes and ref
+deletions always go to the user, shell-specific syntax, and the Termux clone
+flow.
 
 **This file applies only when Claude is presenting commands for the user to run
 in their own terminal** — that is, local and Termux sessions in manual mode.
@@ -124,18 +124,17 @@ step 1a). What holds for the rest of the session:
   a second guard, but the explicit `--repo` is the rule. The GitHub MCP
   equivalents take the fork's owner and repo, never the parent's.
 - **The `Origin:` row in the gate state file records it** (`Origin:
-  <owner>/<repo> (fork of <parent>)`). The pre-flight hook reads that row and
-  blocks a `gh` write in a fork that has no `--repo`, or whose `--repo` is not
-  the fork (`hooks/README.md`).
+  <owner>/<repo> (fork of <parent>)`). The enforcement checks read that row
+  and block a `gh` write in a fork that has no `--repo`, or whose `--repo` is
+  not the fork (`ENFORCEMENT.md`, A4).
 
 ## Every presented block
 
-**Always start with `cd`** — with two exceptions. Never assume the user's
-terminal is in the project directory; use the `cd` format for their shell from
-the table above. This does not apply to commands Claude executes itself (the
-container's working directory is already correct), and it does not apply to the
-tag and ref-deletion blocks above, where the path is unknown and the reminder
-goes in the prose instead.
+**No `cd`, ever.** Every block assumes the user's terminal is already in the
+repo, and the label names where to run it (`· in ~/claude-vibe-skills`).
+A path the user has to edit is a broken first line, and a guessed one is
+worse. The enforcement checks block a `cd` in a run block (`ENFORCEMENT.md`,
+C4).
 
 **Never use bare `git push`.** Every push specifies the remote and the branch:
 `git push -u origin <branch-name>`. The `-u` sets upstream tracking, which
@@ -148,35 +147,75 @@ prevents the "default repo has not been set" error.
 
 **Explanation goes above or below the block, never inside it** as interleaved
 prose. Brief `#` comments within the block are fine.
----
-
-## One block per operation
-
-Present the entire sequence in a single fenced block the user can copy once —
-`cd` through push. Do not split an operation across several blocks or interleave
-prose between commands. The examples at the bottom of this
-file show the intended shape: one block, one paste.
-
-Split only when the user must stop and inspect something first (a conflict, a
-build, a PR number). Say what to check before the next block.
 
 ---
 
-## `cd` format by shell
+## Manual mode: few stops, clear blocks
 
-| Shell | `cd` format |
-|---|---|
-| Windows PowerShell | `cd "C:\Users\steve\Desktop\git\project-name"` |
-| Linux PowerShell (pwsh) | `cd "/home/user/projects/project-name"` |
-| Git Bash (Windows) | `cd "/c/Users/steve/Desktop/git/project-name"` |
-| Termux (Android) | `cd ~/storage/shared/projects/project-name` |
-| macOS Terminal | `cd ~/projects/project-name` |
-| Linux Terminal | `cd ~/projects/project-name` |
-| WSL | `cd /mnt/c/Users/steve/Desktop/git/project-name` |
+Every stop in manual mode costs one model request, which resends the whole
+conversation, so stops are few and every command block is impossible to miss.
 
-Use the actual project path from the current working directory. For Git Bash,
-convert Windows paths (`C:\foo\bar`) to Unix-style (`/c/foo/bar`). For WSL,
-convert to `/mnt/c/...` form.
+**Every block the user is meant to run looks like this, in every mode**
+(semi-autonomous hands over the tag and ref-deletion blocks this way too):
+
+````
+`🔢✅ 🔨➖ 🔒✅ 📄✅ 📦⬜ 🚀⬜ · work commit · manual`
+
+### ▶️ RUN THIS — commit + push + open PR · in ~/myapp · 1 block
+```bash
+# ════════ ▶️ START: commit + push + open PR ════════
+git checkout -b feat/x && git add -A \
+  && git commit -m "feat: add x" \
+  && git push -u origin feat/x \
+  && gh pr create --title "feat: add x" --body-file notes.md \
+  && echo "✅ DONE: PR open" || echo "❌ STOPPED: scroll up for the error"
+# ════════ ⏹️ END ════════
+```
+### ⏹️ END — nothing else to run
+No need to reply. Your next message starts with me checking the PR.
+````
+
+- **The label** says what the block does, where to run it, and how many
+  blocks there are (`block 1 of 2` when there are several, and the first
+  one's END line says "then block 2 below").
+- **The START and END comment lines** travel with the paste and do nothing.
+  The last command prints ✅ or ❌, so the user sees in their own terminal
+  whether the whole chain ran.
+- **The tracker line goes above the first block**, and "No need to reply"
+  under the last. A test container's 🔑 login stays the very last thing in
+  the message, below the block.
+- **Anything else in a code box** (a diff, an example, a snippet to read) is
+  labeled `📄 FOR READING — don't run`, so it can't be mistaken for a command.
+
+The enforcement checks hold every reply to this (`ENFORCEMENT.md`, C2–C7).
+
+**One block per stop, not per command.** Chain everything up to the next
+real decision with `&&`, so the first failure stops everything after it. **A
+step that must pass before the next runs is a chained check, not a stop**:
+`gh pr checks "$n" --watch --fail-fast` exits non-zero when CI fails, so a
+merge chained after it only runs on green. Split only when the user must
+**decide** something the shell can't: a conflict, a finding, a result to
+inspect by eye.
+
+**A release is two blocks.** Block 1 runs commit → push → open PR, and the
+user looks at the PR. Block 2 runs checks → merge → confirm the merge
+commit → CI on it → version guard → tag (`SHIP_REFERENCE.md`, step 3).
+
+**No "done" turn.** Say "No need to reply" under every run block. The
+user's next message, about anything, starts with one chained read that
+verifies the block's result from git state. **When that read finds the block
+failed or never ran, raise it first**, before the new request, with the
+error and a fixed block. Never "assuming that worked." "Done" still works
+for a user with nothing else to say. It just isn't required.
+
+**Timers and watchers save nothing.** A wakeup or a background loop that
+waits for the user's paste still ends in a model request, which costs the
+same as their reply. A wakeup that fires too early costs more.
+
+**Chained ✅/❌ by shell:** bash, zsh, Git Bash, Termux, WSL and pwsh 7 use
+`&& echo "✅ DONE" || echo "❌ STOPPED"`. Windows PowerShell 5.1 has no `&&`:
+chain with `; if ($?) { … }` and end with
+`if ($?) { "✅ DONE" } else { "❌ STOPPED" }`.
 
 ---
 
@@ -249,67 +288,10 @@ a user who does not want WSL is not thereby blocked from passing Gate 2.
 ## Termux clone flow
 
 On Termux (Android), the repo may not exist on the device. This is the only
-environment where Claude presents a clone step — remote containers arrive
-pre-cloned, and local sessions are already in the repo. When the user's shell is
-Termux, every command block must account for this:
-- **First time (repo not yet cloned):** start with `git clone <url>` then `cd`
-  into the cloned directory. Use the repo URL stored at session start
-  (`SESSION_START.md`, step 1).
-- **Subsequent commands (repo already cloned):** start with `cd` then
+environment where Claude presents a clone step. Remote containers arrive
+pre-cloned, and local sessions are already in the repo.
+- **First time:** a block that clones straight into its final path:
+  `git clone <url> ~/storage/shared/projects/<repo>`. Every later block's
+  label says `· in ~/storage/shared/projects/<repo>`.
+- **Already cloned:** start the block with
   `git fetch origin && git pull origin <branch>` to sync before any work.
-
----
-
-## Example output (Windows PowerShell)
-
-```powershell
-cd "C:\Users\steve\Desktop\git\claude-vibe-skills"
-git checkout -b release/v2.10.0
-git add -A
-git commit -m @'
-v2.10.0 — git repo detection and branch enforcement
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-'@
-git push -u origin release/v2.10.0
-```
-
-## Example output (Git Bash)
-
-```bash
-cd "/c/Users/steve/Desktop/git/claude-vibe-skills"
-git checkout -b release/v2.10.0
-git add -A
-git commit -m "v2.10.0 — git repo detection and branch enforcement
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.10.0
-```
-
-## Example output (Termux — first time, repo not yet cloned)
-
-```bash
-cd ~/storage/shared/projects
-git clone https://github.com/owner/repo.git
-cd repo
-git fetch origin && git pull origin main
-git checkout -b release/v2.10.0
-git add -A
-git commit -m "v2.10.0 — git repo detection and branch enforcement
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.10.0
-```
-
-## Example output (Termux — repo already cloned)
-
-```bash
-cd ~/storage/shared/projects/repo
-git fetch origin && git pull origin main
-git checkout -b release/v2.10.0
-git add -A
-git commit -m "v2.10.0 — git repo detection and branch enforcement
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-git push -u origin release/v2.10.0
-```

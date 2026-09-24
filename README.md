@@ -7,15 +7,16 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.36.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.37.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.36.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.36.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.37.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.37.0)
 
 ---
 
 ## Contents
 
 - [What it does](#what-it-does) — the four rules
+- [Enforcement checks](#enforcement-checks) — what's actually checked, full disclosure, and how to decline
 - [What's new](#whats-new) — highlights since v2.12
 - [What it looks like](#what-it-looks-like) — a session, abridged
 - [Install](#install) — claude.ai, Desktop, CLI, web
@@ -23,7 +24,6 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Two tracks](#two-tracks) — why a work commit isn't a release
 - [Manual and semi-autonomous mode](#manual-and-semi-autonomous-mode) — who runs the commands
 - [How gates are enforced](#how-gates-are-enforced) — the state file, and why memory isn't trusted
-- [Enforcement hook](#enforcement-hook-optional) — optional, blocks git at the tool call
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
@@ -55,13 +55,79 @@ more. Critical and High findings block the release.
 
 ---
 
+## Enforcement checks
+
+**Most of this skill is instructions, which Claude follows and nothing
+checks.** Until 2.37.0 that was true of everything on most machines: the old
+optional hook (`hooks/gate-preflight.sh`) had to be installed by hand, nothing
+installed it, and nothing said it was missing. A review found it had also
+weakened: prefixed commands, pushes to the default branch and decoy ✅ lines
+all got through.
+
+Since 2.37.0 the **enforcement checks ship inside the skill**
+(`checks/enforce.py`), and Claude Code turns them on by itself when the skill
+loads, through the `hooks:` block at the top of `SKILL.md`. There's nothing
+to install.
+
+**What they are, in full disclosure:**
+- **A small Python 3 program that Claude Code runs on its own**: before
+  Claude runs a command or edits a file, before Claude ends a reply, and after
+  you answer Claude's questions.
+- **They only read** the command, the file edit, the reply, your answers, the
+  project's gate file, and a compose file about to be started. They answer
+  allow, deny, ask you, or "fix the reply". **They never run a command.** The
+  only thing they write is a status marker in the temp folder, so the banner
+  can say whether they're on.
+- **Every session starts by telling you**, then asking: keep them on, or
+  decline for this session. It's all or nothing. You confirm a decline in
+  Claude Code's own permission dialog, so Claude can't switch them off by
+  itself.
+- **The banner always shows the status:** `Hook enforcement: ✅ active`,
+  `⚠️ declined`, or `⚠️ not active` with the reason
+  (Python 3 missing, an incomplete install, or a Claude Code version that
+  doesn't register skill checks).
+- **When they can't run, they block** git, gh and docker commands rather than
+  letting them through unchecked.
+- **One caveat, verified and disclosed:** the checks find their own folder
+  through `CLAUDE_PLUGIN_ROOT`, which Claude Code sets for skill checks
+  (verified on 2.1.281) but documents only for plugins. If a future version
+  changes that, the checks fail closed and the banner says hook enforcement
+  is not active.
+- **Without the hooks, the guardrails are still there.** Every gate,
+  approval and rule in the skill still applies: Claude follows them as
+  instructions. What's missing is the automatic check that it did.
+
+| Group | What's checked |
+|---|---|
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c` and any push that lands on the default branch · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
+| **Files Claude edits** | Gate-file lines that pass a gate, set the mode, decline enforcement, approve host networking or waive a finding go to you as a permission prompt, as do edits to settings files and the installed checks |
+| **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
+| **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
+
+Every check, with exactly what it blocks and lets through, is in
+[`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md). Each one has test cases
+in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
+quietly weaken again. **What they can't catch:** judgment (the track, N/A
+reasons, severity, docs accuracy), whether your "yes" meant commit approval,
+and what you actually paste. Those stay instructions. To run the checks in
+every session, including ones that don't load the skill, see
+[`hooks/README.md`](hooks/README.md).
+
+---
+
 ## What's new
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **[Enforcement that actually runs.](#enforcement-checks)** Checks now ship
+  inside the skill and turn on when it loads, with full disclosure and a
+  keep-or-decline question every session. They cover gates on executed and
+  presented git, LAN-only test ports, host networking, gate-file edits,
+  labeled run blocks and unanswered questions. The old hand-installed hook
+  is replaced. *(2.37.0)*
 - **Gate enforcement stopped being bypassable.** Presenting a git command for
   you to paste now counts as running it — same pre-flight, same tracker. An
-  optional [hook](#enforcement-hook-optional) blocks git at the tool call
+  optional [hook](#enforcement-checks) blocks git at the tool call
   itself, and gate state moved into a
   [file](#how-gates-are-enforced) so a compacted session can't "remember" a
   scan that never ran. *(2.12, 2.13)*
@@ -222,7 +288,16 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   `/opt/docker/<name>/`, and the image tag follows the version. *(2.36.0)*
 - **[Test containers you can reach.](#gate-2--build-)** Docker test runs
   publish on the network, and the login URL uses the host's LAN IP (checked
-  to answer before it's handed over), never `127.0.0.1`. *(2.36.1)*
+  to answer before it's handed over), never `127.0.0.1`. *(2.36.1)* The LAN
+  IP comes from the default route, not a Docker bridge, and the binding is
+  read back with `docker port` before the URL is handed over. *(2.37.0)*
+- **[Fewer turns, clearer blocks in manual mode.](#manual-and-semi-autonomous-mode)**
+  One labeled `▶️ RUN THIS` block per decision, with START/END markers and a
+  ✅/❌ result line, and no `cd`. A release is two blocks (commit → PR, then
+  merge → tag), and you never need to reply "done". *(2.37.0)*
+- **[Host networking needs your permission.](#gate-3--security--quality-)**
+  `network_mode: host` / `--network host` is never used without your explicit
+  yes for that container. *(2.37.0)*
 
 ---
 
@@ -337,7 +412,10 @@ dev pre-release) instead of skipping it. Every Docker test run gets a freshly
 generated throwaway username and password, shown to you with the run
 command. *(2.33.0)* The container is published on the network, and its URL
 uses the host's LAN IP (checked to answer), never `127.0.0.1`. It binds to
-that private IP only, never a public interface. *(2.36.1)* The login
+that private IP only, never a public interface. *(2.36.1)* That IP is read
+from the default route (a Docker bridge such as `172.17.0.1` is rejected), the
+app inside listens on `0.0.0.0`, and `docker port` must show the LAN IP before
+the URL is handed over. *(2.37.0)* The login
 is repeated at the bottom of every message after the test container is
 started, rebuilt or restarted, never just "see above". *(2.34.0)* Where the [pre-flight
 hook](hooks/README.md) is installed, it enforces the offer deterministically:
@@ -368,7 +446,7 @@ Plus platform-specific rules, loaded only when that platform is detected:
 
 - **Windows** — UAC elevation, PowerShell injection, UNC path attacks, DLL
   hijacking, registry ACLs, unquoted service paths, code signing
-- **Linux** — SUID misuse, container security, symlink races, systemd hardening
+- **Linux** — SUID misuse, container security (host networking only with your permission), symlink races, systemd hardening
 - **Android** — exported components, WebView RCE, Intent spoofing, insecure storage
 
 **Code quality:** deep nesting · god functions · circular dependencies · hidden
@@ -459,7 +537,7 @@ nothing — a tracker-bookkeeping commit, a docs typo fix — is still a work
 commit, with RELEASE/SHIP marked ➖ N/A and the reason stated. Treating every
 default-branch merge as release-track by default is what turns a five-line
 housekeeping commit into a six-gate ceremony. (If the [enforcement
-hook](#enforcement-hook-optional) is installed, it is stricter here: see its
+hook](#enforcement-checks) is installed, it is stricter here: see its
 table.) When a repo's own convention
 here is genuinely unclear, the skill asks once at session start rather than
 discovering it mid-PR.
@@ -476,11 +554,19 @@ stated out loud on the tracker.
 **You pick the mode at the start of every session.** It is one of the
 session-start questions, manual listed first and neither recommended, and
 nothing proceeds until you answer. No edits and no git writes happen before
-then, and a `Mode: unchosen` gate file is denied by the enforcement hook.
+then, and the [enforcement checks](#enforcement-checks) deny git writes while
+the gate file reads `Mode: unchosen`.
 
 **Manual mode** is the behavior this skill has always had. Claude hands you the
 git commands, you run them, and the tag push comes back to you no matter where
-the session is running.
+the session is running. Each stop costs a model request, so Claude keeps them
+few: one chained block per decision, with the CI checks inside the chain. A
+release is two blocks: commit → push → PR, then (after you've looked at the
+PR) merge → tag. Every block is labeled `▶️ RUN THIS`, starts and ends with
+marker lines, prints ✅ or ❌ at the end, and has no `cd`. You never need to
+reply just to say "done": your next message starts with a check of the
+result, and a failed block is raised before anything else. A timer wouldn't
+save anything, because its wakeup costs the same request. *(2.37.0)*
 
 **Semi-autonomous mode** is chosen per session, either at that question or
 later by asking for it: "auto mode", "semi-autonomous mode", "take it from
@@ -583,9 +669,8 @@ Two notes worth knowing:
 - **It costs more tokens on a local session.** A pasted block is free; a chain
   of executed git commands resends the conversation each round trip. You're
   buying autonomy with tokens, which is usually the right trade when you asked
-  for it — and if you install the [enforcement
-  hook](#enforcement-hook-optional), semi-autonomous mode is the mode where it does
-  the most work, since every command now arrives as a tool call it can inspect.
+  for it. It's also where the [enforcement checks](#enforcement-checks) do
+  the most work, since every command arrives as a tool call they can inspect.
 
 ---
 
@@ -632,46 +717,6 @@ missing tag or live branch hides in that noise.
 
 ---
 
-## Enforcement hook (optional)
-
-`hooks/gate-preflight.sh` is a `PreToolUse` hook that **blocks** git write
-operations whose required gates haven't passed, reading
-`.claude/dev-skills-gates.md` for state. Where it's installed, the pre-flight
-stops being advisory for anything Claude runs itself.
-
-| Operation | Gates required before it runs |
-|---|---|
-| `git commit`, `git push` to a branch | Security |
-| `gh pr create`, MCP `create_pull_request` | Version, Build, Security, Docs |
-| `gh pr merge`, `gh release create`, `git push origin main`, MCP `merge_pull_request` | Version, Build, Security, Docs, Release |
-| Creating or pushing a tag, deleting any ref (`git push --delete`, `:<ref>`, `gh pr merge --delete-branch`, …) | **Always denied.** These are yours to run in both modes |
-
-The hook reads any `gh pr merge` as release-level, so it is stricter than
-[Two tracks](#two-tracks) for a bookkeeping merge: with the hook installed,
-Version, Build and Docs must also read ✅ or ➖ N/A before such a merge runs.
-
-On top of the gates, every git write is denied until the gate file's `Mode:`
-row names `manual` or `semi-autonomous`, so an unanswered mode question
-blocks. In a fork, a `gh` write without `--repo <fork>` and a push that
-doesn't name `origin` are denied too ([Forks](#forks)). Read-only git is never
-blocked. For BUILD specifically, the hook also denies a
-✅ with no `handoff` annotation in any repo with a Docker/.exe/.apk build
-signal — the deterministic half of the [local-artifact-handoff
-offer](#gate-2--build-). It reads a gate row's full text (the status line
-plus any continuation lines below it), not just the first line, so an
-annotation that wraps doesn't read as missing. Install instructions, the
-settings snippet, and failure modes are in [`hooks/README.md`](hooks/README.md).
-The hook ships in the repo, not in the `.skill` bundle — it's installed
-separately.
-
-**It covers what Claude executes — not commands presented for you to paste, and
-not git you run yourself.** So it's strongest on remote container sessions,
-where Claude executes git directly, and weakest on local sessions, where
-presenting is the default. The prose rule that presenting a command counts as
-performing it covers the rest.
-
----
-
 ## Execution environments
 
 The skill detects where the session is running, because in
@@ -700,7 +745,7 @@ a bare `gh pr create` defaults to opening the PR against the **parent** repo.
 Anything you want to do upstream, like opening a PR there or syncing the fork,
 you do on GitHub directly. The gate file records this as
 `Origin: <you>/<repo> (fork of <parent>)`, and the [enforcement
-hook](#enforcement-hook-optional) blocks a `gh` write in a fork that has no
+hook](#enforcement-checks) blocks a `gh` write in a fork that has no
 `--repo` or names another repo.
 
 ### Native Linux sessions get offered Remote Control
@@ -903,9 +948,10 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~42KB | **Every turn** — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~32KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `GATE_REFERENCE.md` | ~28KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
+| `SKILL.md` | ~44KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SESSION_START.md` | ~33KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `ENFORCEMENT.md` | ~11KB | Once, at session start, and whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `GATE_REFERENCE.md` | ~31KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
@@ -916,7 +962,7 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
-| `SHELL_REFERENCE.md` | ~14KB | Before writing any command block — fork targeting, `cd` formats, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
+| `SHELL_REFERENCE.md` | ~14KB | Before writing any command block — fork targeting, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
 | `WORKFLOW_REFERENCE.md` | ~40KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
 | `WORKFLOW_DOCKER.md` | ~9KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
@@ -1005,4 +1051,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.36.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.37.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
