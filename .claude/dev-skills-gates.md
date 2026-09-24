@@ -1,25 +1,26 @@
 # Dev Skills gate state
 Track: release sequence
 Mode: semi-autonomous (approved 2026-09-24) — commits and the tag still require the user's approval
-Hook enforcement: not active — installed skill is v2.36.1 (instructions still apply)
 Origin: darthrater78/claude-vibe-skills (not a fork)
 Standards: at-rest ➖ stores nothing · login ➖ none · Apprise ➖ not Docker · compose ➖ not Docker · main-page links ✅
-Version: 2.38.0
+Version: 2.39.0
 Updated: 2026-09-24
 
-Previous: v2.37.0 SHIP done — PR #65 merged as 8bd6681, tag at 8bd6681, release run ok, asset dev-skills.skill (161223 B) verified
+Previous: v2.38.0 SHIP done — PR #66 merged as 40eb11d, tag at 40eb11d, release run ok
 
-🔢 VERSION    ✅ all refs at 2.38.0
-  VERSION, SKILL.md, banner, release-notes link, README (x3); v2.37.0 tagged on remote
-🔨 BUILD      ✅ build-skill.sh + validate.sh pass, 145/145 check tests
-  every documented lookup run live: nodejs.org (v24.21.0), Adoptium (25), .NET
-  releases-index (10.0 lts), endoflife.date (node 26 lts=2026-10-28, ubuntu 26.04)
-  session-start ENFORCEMENT.md section extract returns 1790 B
+Task: Windows hook gaps (py launcher, settings path match, PowerShell tool) + B5 prompt friction in semi-autonomous mode
+
+🔢 VERSION    ✅ all refs at 2.39.0
+  VERSION, SKILL.md, banner, release-notes link, README (x3); v2.38.0 tagged on remote
+🔨 BUILD      ✅ build-skill.sh + validate.sh pass, 189/189 check tests
+  real SKILL.md hook run in bash: py-only PATH → checks run; no Python → git/gh blocked exit 2
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
-  diff: skill docs + file lists and size ceilings in build-skill.sh/validate.sh; no code in checks/
-  doc commands: HTTPS read-only lookups, no pipe-to-shell; fixed Low: curl -s → -sf
-  moved rules still backed in SKILL.md (tags §5.8, forks §5.8, version check §6); rule phrases guard them
+  fixed Medium: PowerShell/Windows forms bypassed A4/B5 (iex, pwsh -c/-EncodedCommand, cmd /c,
+    git.exe, Set-Content/Out-File/Copy-Item/[IO.File]) — regression tests fail on old code
+  fixed Low: leaving semi-auto + passing gates in one edit hid the gate rows from the prompt
+  fixed Low: Start-Process/saps (+ -WorkingDirectory via git -C, no cd leak); here-strings
+  fixed Low: heredoc bodies read as commands; now data unless a shell reads them (guard tests)
   Dependabot 0 open
-📄 DOCS       ✅ CHANGELOG 2.38.0, README (what's new, Gate 3 list, file table + sizes)
-📦 RELEASE    ✅ PR #66 open, commit 99892ad approved, CHANGELOG 2.38.0 notes approved
-🚀 SHIP       ⏳
+📄 DOCS       ✅ CHANGELOG 2.39.0, README what's new, ENFORCEMENT.md (A4, B5, Python)
+📦 RELEASE    ⏳ commit + CHANGELOG 2.39.0 notes approved 2026-09-24; PR to open from fix/windows-hooks
+🚀 SHIP       ⏳ plan: CI green → merge (no --delete-branch) → user tags v2.39.0 → release.yml publishes

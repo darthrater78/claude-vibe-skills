@@ -7,6 +7,7 @@ check cannot get weaker without this failing. Run by scripts/validate.sh and CI.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import socket
@@ -45,6 +46,7 @@ Standards: BUILD docs ✅
 🚀 SHIP       ⬜
 """
 GATES_WORK = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅ 0 open")
+GATES_SEMI = GATES_NONE.replace("Mode: manual", "Mode: semi-autonomous (approved 2026-09-24)")
 GATES_UNCHOSEN = GATES_ALL.replace("Mode: manual", "Mode: unchosen")
 GATES_DECLINED = GATES_NONE.replace("Mode: manual", "Mode: manual\nHook enforcement: declined (2026-09-24)")
 GATES_FORK = GATES_ALL.replace("owner/repo (not a fork)", "me/repo (fork of up/repo)")
@@ -133,6 +135,13 @@ def header_fallback(payload: dict) -> str:
 def bash(cmd: str, gates: str | None = GATES_ALL, **kw: str) -> str:
     d = repo(gates, **{k: v for k, v in kw.items() if k in ("branch", "compose")})
     return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
+
+
+def pwsh(cmd: str, gates: str | None = GATES_NONE) -> str:
+    return run("pre-tool", {"session_id": "t", "tool_name": "PowerShell", "cwd": repo(gates), "tool_input": {"command": cmd}})
+
+
+ENC = base64.b64encode("git commit -m x".encode("utf-16-le")).decode()
 
 
 def bash_cd_other(cmd: str, other_gates: str | None = None) -> str:
@@ -334,6 +343,66 @@ CASES = [
                                                                       "tool_input": {"command": "cp x $HOME/.claude/skills/dsk/checks/enforce.py"}},
                                                          env={"CLAUDE_PLUGIN_ROOT": os.path.expanduser("~/.claude/skills/dsk")}), "ask"),
     ("B5 bash read gate file ok", lambda: bash("cat .claude/dev-skills-gates.md"), "allow"),
+    ("B5 semi-auto gate to ✅ ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+                                                     "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 0 open"},
+                                            gates=GATES_SEMI), "allow"),
+    ("B5 semi-auto waiver still asks", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+                                                             "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
+                                                    gates=GATES_SEMI), "ask"),
+    ("B5 semi-auto mode change still asks", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+                                                                  "old_string": "Mode: semi-autonomous", "new_string": "Mode: manual"},
+                                                         gates=GATES_SEMI), "ask"),
+    ("B5 leaving semi-auto + gate in one edit asks", lambda: edit("Write", {"file_path": ".claude/dev-skills-gates.md",
+                                                                           "content": GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
+                                                                  gates=GATES_SEMI), "ask"),
+    ("B5 switching to semi-auto + gate in one edit asks", lambda: edit("Write", {"file_path": ".claude/dev-skills-gates.md",
+                                                                                 "content": GATES_SEMI.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
+                                                                        gates=GATES_NONE), "ask"),
+    ("B5 Windows settings path", lambda: edit("Write", {"file_path": "C:\\Users\\me\\.claude\\settings.json", "content": "{}"}), "ask"),
+    ("B5 bash write to Windows settings path", lambda: bash("copy x C:\\Users\\me\\.claude\\settings.local.json > out"), "ask"),
+    # --- PowerShell tool (Windows)
+    ("A4 PowerShell commit, gates pending", lambda: run("pre-tool", {"session_id": "t", "tool_name": "PowerShell", "cwd": repo(GATES_NONE),
+                                                                     "tool_input": {"command": "git add -A; git commit -m x"}}), "deny"),
+    ("A4 PowerShell commit, work gates pass", lambda: run("pre-tool", {"session_id": "t", "tool_name": "PowerShell", "cwd": repo(GATES_WORK),
+                                                                       "tool_input": {"command": "git commit -m x"}}), "allow"),
+    ("A4 PowerShell Set-Location into pending repo", lambda:
+        run("pre-tool", {"session_id": "t", "tool_name": "PowerShell", "cwd": repo(GATES_WORK),
+                         "tool_input": {"command": "Set-Location " + repo(GATES_NONE) + "; git commit -m x"}}), "deny"),
+    ("A4 PowerShell call operator", lambda: pwsh("& git commit -m x"), "deny"),
+    ("A4 PowerShell git.exe", lambda: pwsh("git.exe commit -m x"), "deny"),
+    ("A4 PowerShell full path to git.exe", lambda: pwsh("& 'C:\\Program Files\\Git\\cmd\\git.exe' push"), "deny"),
+    ("A4 bash git.exe", lambda: bash("git.exe push", gates=GATES_NONE), "deny"),
+    ("A4 PowerShell iex", lambda: pwsh('iex "git commit -m x"'), "deny"),
+    ("A4 PowerShell Invoke-Expression", lambda: pwsh("Invoke-Expression 'git commit -m x'"), "deny"),
+    ("A4 PowerShell pwsh -c", lambda: pwsh('pwsh -NoProfile -c "git commit -m x"'), "deny"),
+    ("A4 PowerShell powershell -Command", lambda: pwsh('powershell.exe -Command "git commit -m x"'), "deny"),
+    ("A4 PowerShell -EncodedCommand", lambda: pwsh("pwsh -EncodedCommand " + ENC), "deny"),
+    ("A4 PowerShell cmd /c", lambda: pwsh("cmd /c git commit -m x"), "deny"),
+    ("A4 bash cmd.exe /c", lambda: bash("cmd.exe /c git push", gates=GATES_NONE), "deny"),
+    ("A4 PowerShell subexpression", lambda: pwsh("Write-Output $(git commit -m x)"), "deny"),
+    ("A4 PowerShell backtick is not a subshell", lambda: pwsh("Write-Output `git commit`", gates=GATES_WORK), "allow"),
+    ("A4 PowerShell read-only git ok", lambda: pwsh("git status; Get-ChildItem"), "allow"),
+    ("A4 Start-Process positional", lambda: pwsh("Start-Process git -ArgumentList 'push'"), "deny"),
+    ("A4 Start-Process named", lambda: pwsh('Start-Process -Wait -FilePath git.exe -ArgumentList "commit -m x"'), "deny"),
+    ("A4 Start-Process array args", lambda: pwsh("saps git push,origin -NoNewWindow"), "deny"),
+    ("A4 Start-Process WorkingDirectory into pending repo", lambda:
+        pwsh("Start-Process git -ArgumentList 'commit -m x' -WorkingDirectory " + repo(GATES_NONE), gates=GATES_WORK), "deny"),
+    ("A4 Start-Process WorkingDirectory doesn't leak", lambda:
+        pwsh("Start-Process notepad -WorkingDirectory " + repo(GATES_WORK) + "; git commit -m x"), "deny"),
+    ("A4 Start-Process other program ok", lambda: pwsh("Start-Process notepad.exe"), "allow"),
+    ("A4 here-string to bash", lambda: bash('bash <<< "git push"', gates=GATES_NONE), "deny"),
+    ("A4 heredoc to bash still checked", lambda: bash("bash <<'EOF'\ngit push\nEOF", gates=GATES_NONE), "deny"),
+    ("A4 heredoc piped to sh still checked", lambda: bash("cat <<EOF | sh\ngit push\nEOF", gates=GATES_NONE), "deny"),
+    ("A4 quoted heredoc to python is data", lambda: bash("python3 - <<'EOF'\n# $(git push) and git push\nEOF", gates=GATES_NONE), "allow"),
+    ("A4 unquoted data heredoc still expands $( )", lambda: bash("cat <<EOF > x\n$(git push)\nEOF", gates=GATES_NONE), "deny"),
+    ("A4 command after heredoc checked", lambda: bash("cat <<'EOF' > x\nhi\nEOF\ngit push", gates=GATES_NONE), "deny"),
+    ("A4 quoted << is not a heredoc", lambda: bash('python3 -c "x=1<<y"\ngit push\ny', gates=GATES_NONE), "deny"),
+    ("A4 <<- heredoc with tab delimiter", lambda: bash("cat <<-EOF > x\n\tgit push\n\tEOF\ngit push", gates=GATES_NONE), "deny"),
+    ("B5 PowerShell Set-Content gate file", lambda: pwsh('Set-Content .claude\\dev-skills-gates.md "x"'), "ask"),
+    ("B5 PowerShell Out-File gate file", lambda: pwsh("'x' | Out-File .claude/dev-skills-gates.md"), "ask"),
+    ("B5 PowerShell Copy-Item settings", lambda: pwsh("Copy-Item x C:\\Users\\me\\.claude\\settings.json"), "ask"),
+    ("B5 PowerShell .NET write gate file", lambda: pwsh("[IO.File]::WriteAllText('.claude/dev-skills-gates.md', 'x')"), "ask"),
+    ("B5 PowerShell read gate file ok", lambda: pwsh("Get-Content .claude/dev-skills-gates.md"), "allow"),
     ("B5 other file ok", lambda: edit("Write", {"file_path": "README.md", "content": "hi"}), "allow"),
     # --- C: replies
     ("C ok reply", lambda: stop(RUN_OK, gates=GATES_WORK), "allow"),
@@ -364,6 +433,7 @@ CASES = [
     # --- header fallback (checks file missing): only Bash git/gh/docker and GitHub MCP tools stop
     ("fallback bash git blocked", lambda: header_fallback({"tool_name": "Bash", "tool_input": {"command": "git status"}}), "block"),
     ("fallback bash docker blocked", lambda: header_fallback({"tool_name": "Bash", "tool_input": {"command": "cd /x && docker ps"}}), "block"),
+    ("fallback PowerShell git blocked", lambda: header_fallback({"tool_name": "PowerShell", "tool_input": {"command": "git push"}}), "block"),
     ("fallback bash ls ok", lambda: header_fallback({"tool_name": "Bash", "tool_input": {"command": "ls -la"}}), "allow"),
     ("fallback github mcp blocked", lambda: header_fallback({"tool_name": "mcp__github__create_pull_request", "tool_input": {}}), "block"),
     ("fallback other mcp ok", lambda: header_fallback({"tool_name": "mcp__other__x", "tool_input": {"q": "git status"}}), "allow"),

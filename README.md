@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.38.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.39.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.38.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.38.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.39.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.0)
 
 ---
 
@@ -119,6 +119,11 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Enforcement on Windows.** The checks now cover Claude Code's PowerShell
+  tool, find Python through the `py -3` launcher, and protect Windows-style
+  settings paths. In semi-autonomous mode, a gate passing no longer stops for
+  a prompt: your commit approval and the pre-tag report are the checkpoints.
+  *(2.39.0)*
 - **LTS stays LTS.** A package or runtime on a long-term-support line
   (Node.js, .NET, Java, Ubuntu, Debian, …) upgrades to the newest patch of the
   newest *settled* LTS line, never to the newest release overall. A brand-new
@@ -1063,4 +1068,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.38.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.39.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

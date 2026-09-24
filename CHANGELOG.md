@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.39.0] — 2026-09-24
+
+**Enforcement checks work on Windows, and semi-autonomous mode stops asking
+about every gate.**
+
+### Added
+- **The PowerShell tool is checked like Bash** (`ENFORCEMENT.md`, A4). On
+  Windows, Claude Code can run commands through a PowerShell tool, which the
+  hooks didn't match, so git writes there skipped every check. They now get
+  the same gate checks, including after a `Set-Location` (or `sl`, `chdir`,
+  `Push-Location`) into another repo, and the fallback that blocks git, gh
+  and docker when the checks can't run covers PowerShell too.
+- **Windows and PowerShell spellings of a git write are recognized**
+  (`ENFORCEMENT.md`, A4): `git.exe` or a full path to it, the `&` call
+  operator, `iex`/`Invoke-Expression`, `pwsh`/`powershell -Command` and
+  `-EncodedCommand` (decoded and checked), `cmd /c`, `Start-Process`/`saps`
+  (with `-WorkingDirectory` checked against that folder's repo), and `$( )`
+  subexpressions. In PowerShell `\` is read as a path separator and a
+  backtick is no longer taken for a subshell. `git.exe` and `cmd /c` are
+  caught in Bash too.
+- **PowerShell writes to the gate file and settings ask** (B5):
+  `Set-Content`, `Add-Content`, `Out-File`, the `*-Item` cmdlets, their
+  aliases, `copy`/`del`/`robocopy`, and `[IO.File]::` writes.
+
+### Changed
+- **Semi-autonomous mode: gate rows pass without a prompt** (`ENFORCEMENT.md`,
+  B5). The commit approval and the pre-tag report are the user's checkpoints
+  in that mode, so asking again for each ✅ or ➖ was a third. Mode changes,
+  enforcement declines, host-network approvals and waivers still ask. The
+  skip applies only when the file reads semi-autonomous before *and* after
+  the edit, so switching into or out of the mode shows every gate row the
+  same edit passes.
+
+### Fixed
+- **Python found through the `py -3` launcher.** A Windows machine with only
+  the Python launcher on `PATH` read as "Python 3 missing", so the checks
+  blocked git, gh and docker for the whole session. The hooks and the
+  session-start probe now try `py -3` after `python3` and `python`.
+- **Heredoc bodies are no longer read as commands** unless a shell runs them
+  (`ENFORCEMENT.md`, A4). A script passed as `python3 - <<'EOF'` that merely
+  *mentioned* `$(git push)` was blocked as a push. Now a quoted data heredoc
+  is not read, an unquoted one is read only for `$( )` (bash still expands
+  it), and one fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as
+  before. A `<<` inside quotes is not taken for a heredoc.
+- **Here-strings are checked.** `bash <<< "git push"` ran with no gate check.
+- **Windows settings paths are protected.** Edits to
+  `C:\Users\…\.claude\settings.json` (backslash paths) didn't match B5's
+  settings pattern and went through without asking. Both `/` and `\` paths
+  now ask.
+
 ## [2.38.0] — 2026-09-24
 
 **LTS stays LTS, and session start loads only what the session needs.**

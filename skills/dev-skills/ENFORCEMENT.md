@@ -43,7 +43,8 @@ guardrails".
   Claude Code registers them when the skill loads and keeps them on until the
   session ends. There's nothing to install and no settings to edit. A session
   that never loads the skill has no checks, and no gates either.
-- **They need Python 3** on the machine. If Python 3 or the checks file is
+- **They need Python 3** on the machine, found as `python3`, `python` or,
+  on Windows, the `py -3` launcher. If Python 3 or the checks file is
   missing, `git`, `gh` and `docker` shell commands and GitHub tools are **blocked**, not let through
   unchecked, and the banner says `⚠️ Hook enforcement: not active — instructions still apply`.
 - **They find their own folder through `CLAUDE_PLUGIN_ROOT`**, which Claude Code
@@ -52,9 +53,9 @@ guardrails".
   plugins, so a future Claude Code version could change it. If that happens,
   the checks fail closed as above and the banner says so. They never fail
   silently.
-- **Claude can't edit its way out.** Changes to the gate file that pass a
-  gate, set the mode, decline enforcement, approve host networking or waive a
-  finding, and any edit to a Claude Code settings file or to the installed
+- **Claude can't edit its way out.** Changes to the gate file that set the
+  mode, decline enforcement, approve host networking or waive a finding, a
+  gate passing in manual mode, and any edit to a Claude Code settings file or to the installed
   checks, go to the user as a permission prompt (check B5).
 
 ## At session start: disclose, then keep or decline
@@ -137,10 +138,16 @@ and Claude hands the user a block to remove them before new work. That
 matters because a session that crashes or is cut off never reaches its own
 cleanup. The checks never remove anything themselves.
 
-**A4. Gates before git writes.** A command containing `git commit`,
+**A4. Gates before git writes.** A Bash or PowerShell command containing `git commit`,
 `git push`, `gh pr create|merge`, `gh release create`, or a `gh api` merge or
 release, even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
-or `;`, is checked against the gate file:
+or `;`, is checked against the gate file. So is the PowerShell and Windows
+spelling of each: `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`,
+`pwsh`/`powershell -Command` or `-EncodedCommand`, `cmd /c`,
+`Start-Process` (with its `-WorkingDirectory`), and a `Set-Location` into
+another repo. A heredoc or here-string (`<<<`) fed to a shell is checked as
+commands. Any other heredoc is data: a quoted one (`python3 - <<'EOF'`) is
+not read, and an unquoted one is read only for `$( )`. The gates it needs:
 - commit, or a push to a non-default branch: **SECURITY**
 - opening a PR: **VERSION, BUILD, SECURITY, DOCS**
 - a merge, a release, or **any push that lands on the default branch**
@@ -176,10 +183,19 @@ user, showing the lines:
 - `Host network: … approved`
 - anything mentioning a waiver
 
+**In semi-autonomous mode, a gate row with ✅ or ➖ passes without asking**:
+the commit approval and the pre-tag report are the user's checkpoints there,
+and a prompt per gate would add a third. The other four still ask. An edit
+that switches into or out of semi-autonomous mode shows every gate row it
+passes, because the skip applies only when the file reads semi-autonomous both
+before and after.
+
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
-a Claude Code `settings.json`/`settings.local.json` or to the installed checks
-folder asks. A shell command that looks like it writes any of those files
-asks, so the gate file is edited with the Edit/Write tools, where the change
+a Claude Code `settings.json`/`settings.local.json` (`/` or Windows `\`
+paths) or to the installed checks folder asks. A shell command that looks
+like it writes any of those files asks, including PowerShell's
+`Set-Content`/`Out-File`/`Copy-Item` family, their aliases and
+`[IO.File]::` writes, so the gate file is edited with the Edit/Write tools, where the change
 can be shown line by line.
 
 ### C. Claude's replies
