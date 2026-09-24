@@ -128,6 +128,28 @@ step 1a). What holds for the rest of the session:
   and block a `gh` write in a fork that has no `--repo`, or whose `--repo` is
   not the fork (`ENFORCEMENT.md`, A4).
 
+**Session start's fork check, the four cases** (`SESSION_START.md`, step 1a,
+from the probe's `gh_repo` and `gh_login`; without `gh`, the GitHub MCP
+`get_repository` equivalent):
+
+| What you find | What it means | Do |
+|---|---|---|
+| `isFork: true` | `origin` is the fork | Correct. Record `Origin: <owner>/<repo> (fork of <parent>)` and run `gh repo set-default <owner>/<repo>` |
+| `isFork: false`, and `<login>/<repo>` exists with this repo as its `parent` | `origin` is **upstream**, and the user's fork exists | Stop. Fix the remote before any work: `git remote set-url origin <fork-url>`, then `git fetch origin`. Record the fork as above |
+| `isFork: false`, the user is not the owner, `viewerPermission` is below `WRITE`, and no fork exists | They cloned someone else's repo and have nowhere to push | Stop and ask. The user creates the fork on GitHub (or approves `gh repo fork --remote=false`), and then the remote is fixed as above. Never plan a push or PR to the upstream repo |
+| `isFork: false`, and the user owns it or has `WRITE` | An ordinary repo | Nothing to do. Record `Origin: <owner>/<repo> (not a fork)` |
+
+The user's rule: **the user can go to GitHub directly if they want to go
+upstream.** So the fix is always to repoint `origin` to the fork. Adding an
+`upstream` remote beside it is not a fix. If an `upstream` remote already
+exists, leave it alone and never push to it. Changing `set-url` is a local
+config change, not a ref write: it follows the session's mode (presented in
+manual, run by Claude in semi-autonomous), after the user has seen the
+before and after URLs.
+
+**Re-check after a fix, don't assume it worked.** `git remote -v` and the
+`gh repo view` call must now both name the fork.
+
 ## Every presented block
 
 **No `cd`, ever.** Every block assumes the user's terminal is already in the

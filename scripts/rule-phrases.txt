@@ -88,3 +88,6 @@ ANY|Test containers don't outlive the session
 ANY|Gone when it stops
 ANY|Temp-folder mounts are never root's
 ANY|Test containers are labeled, and leftovers are found
+SKILL|A package with LTS lines stays on LTS
+ANY|LTS lines: stay on LTS, and on the newest one
+ANY|An LTS past end of support is a High finding

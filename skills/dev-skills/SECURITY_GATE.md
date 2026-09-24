@@ -75,7 +75,8 @@ version, and the fixed version:
 - 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
   disabled TLS, `pickle` on untrusted data, RCE vectors
 - ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
-  passwords, `random` for tokens, no input validation on endpoints
+  passwords, `random` for tokens, no input validation on endpoints, a runtime
+  or LTS line past its end of support (`SECURITY_REFERENCE.md`, "LTS lines")
 - 🚨⚠️ **Any dependency — direct or transitive — carrying a Critical or High
   advisory** (Section 4.1). A pinned version is not a safe version; pinning
   fixes *which* CVEs the project has, not *whether* it has any. Bump to the
@@ -106,13 +107,15 @@ move on":**
 (below):**
 - 📝 Medium: bare `except`, no type hints, mutable defaults, `assert` for validation,
   logging sensitive data, unpinned deps, dependencies with a Medium/Low advisory,
-  dependencies several majors behind current with no advisory yet
-- 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI
+  dependencies several majors behind current with no advisory yet, an LTS
+  project moved to a non-LTS line without the user's recorded yes
+- 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI,
+  an LTS line still in support but superseded by a newer settled LTS
 
 #### Project standards check (`SKILL.md` §10)
 
 Part of every scan. Read the tracker's `Standards:` row, and check the code
-against it:
+against it (how each standard is built: `STANDARDS_REFERENCE.md`):
 
 - **Encryption at rest:** the project's security section names what is
   stored and whether each store is encrypted at rest. A missing statement is

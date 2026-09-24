@@ -6,6 +6,37 @@ update choice is offered. Section numbers point at `SKILL.md`.
 
 ---
 
+## The out-of-date callout
+
+**When the version check finds this copy behind**, treat it like a failed
+security gate, not an FYI. It is **the first thing in the first message**,
+above any greeting and the banner, bracketed so it can't pass as routine output, with the versions at both
+ends:
+
+> 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+> **STOP — dev-skills is out of date: running v2.17.0, latest is v2.19.0.**
+  >
+> Gates run in this session may be missing fixes released since
+> v2.17.0. Release notes:
+> https://github.com/darthrater78/claude-vibe-skills/releases
+  >
+> **How do you want to update?**
+> 1. **I install it:** I download v2.19.0 from the release and replace
+>    this copy.
+> 2. **You install it:** I give you one command to run.
+> 3. **Continue on v2.17.0** (outdated).
+> 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+
+Offer only the options the install location allows (table below), and ask it in the first `AskUserQuestion` call.
+Wait for an explicit answer before "What are we building?". If the user continues
+anyway, carry `⚠️ outdated (v2.17.0, latest v2.19.0)` on every later
+tracker display, status check, banner and handoff for the rest of the
+session: loud once, then visibly present, never silently dropped.
+
+Never build an install command from memory: the commands are below.
+
+---
+
 ## Updating the skill — the install always comes whole from the release
 
 The source is the latest tag's release asset,

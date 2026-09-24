@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.38.0] — 2026-09-24
+
+**LTS stays LTS, and session start loads only what the session needs.**
+
+### Added
+- **LTS lines rule** (`SKILL.md` §4.1, `SECURITY_REFERENCE.md`, "LTS lines").
+  "Latest stable" moved LTS projects onto short-lived lines (Node Current,
+  .NET STS, Java feature releases, Ubuntu interims). Now, where a package or
+  runtime publishes LTS lines:
+  - it upgrades to the newest patch of the newest *settled* LTS line: one
+    that has had its first patch after going LTS (Node's Active LTS, Ubuntu
+    `.04.1`, .NET and Java `x.0.1`)
+  - new projects start on the newest settled LTS
+  - LTS → non-LTS is the user's call, asked and recorded
+  - a newer LTS major is a major-version upgrade, with its own gates
+  - exact pins, never a floating `lts` tag, except `lts/*` for the CI runtime
+  - lookup commands for endoflife.date, Node, Adoptium and .NET, with a
+    warning that endoflife.date's `lts` field can be a *date*: a future one
+    means not LTS yet (Node 26 reads `2026-10-28` today). Every lookup was run
+    against the live endpoint before release
+- **Gate 3 findings** (`SECURITY_GATE.md`): a runtime or LTS line past end of
+  support is High; an LTS project moved to non-LTS without a recorded yes is
+  Medium; a superseded LTS still in support is Low.
+- **`REMOTE_SESSION.md`** and **`STANDARDS_REFERENCE.md`**, loaded only when
+  they apply (see Changed).
+
+### Changed
+- **Session start loads less.** Measured in a typical local session:
+  - the remote-container specifics (~4KB) moved to `REMOTE_SESSION.md`, read
+    only when step 0 finds a remote container
+  - the out-of-date callout moved to `UPDATE_REFERENCE.md`, which was already
+    read whenever this copy is behind
+  - the fork-check table moved to `SHELL_REFERENCE.md`, "Forks". Session start
+    keeps the common case (the user owns the repo) and reads the table
+    otherwise
+  - only `ENFORCEMENT.md`'s "At session start" section (~2KB) is read at
+    session start; the whole file (~13KB) loads when a check blocks
+  - `SKILL.md` §10 keeps every rule, and its compose example and login
+    implementation details moved to `STANDARDS_REFERENCE.md`
+  - measured in bytes: `SKILL.md` 47.4KB → 46.6KB (billed every turn, with
+    the LTS rule added), `SESSION_START.md` 35.3KB → 29.3KB, and the
+    enforcement read 12.8KB → 1.8KB. Session start reads 77.7KB instead of
+    95.5KB, about 4k tokens less every session (1.7KB of it comes back in
+    manual sessions, where `SHELL_REFERENCE.md` is read and now carries the
+    fork table). Ceilings in `validate.sh` are lowered to match (`SKILL.md`
+    43, `SESSION_START.md` 30), so the saving can't drift back
+- The Node.js workflow template's example matrix listed Node 18 and 20, both
+  past end of life. It now uses `['lts/-1', 'lts/*']`.
+
 ## [2.37.0] — 2026-09-24
 
 **Enforcement that actually runs: checks ship inside the skill and turn on

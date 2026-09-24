@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.37.0
+version: 2.38.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -401,10 +401,11 @@ version stands still while the CVEs accumulate against it.
 
 **When adding a package:**
 
-1. **Current version** — pin the latest stable release. **Never write a version
-   number from memory.** A model pins what it saw in training, which is already
-   months or years stale on the day it is written, so a brand-new project is
-   born outdated. Look it up: `npm view <pkg> version`,
+1. **Current version** — pin the latest stable release. **A package with LTS
+   lines stays on LTS: the newest patch of the newest settled LTS line**, and
+   never LTS → non-LTS without the user's yes (`SECURITY_REFERENCE.md`, "LTS
+   lines"). **Never write a version number from memory.** A model pins what it
+   saw in training, so a brand-new project is born outdated. Look it up: `npm view <pkg> version`,
    `pip index versions <pkg>`, `cargo search <pkg>`, `go list -m -versions <mod>`.
 2. **Known CVEs** — check before adopting, not after: `npm audit`, `pip-audit`,
    `cargo audit`, `osv-scanner`, `dotnet list package --vulnerable`. A package
@@ -836,13 +837,9 @@ a declined item is a decision on the record and not a gap.
    encrypted at rest, how, and where the key lives. "Not needed, because …" is
    an answer. Silence is not.
 2. **Login means TOTP, 30-day trust, and a rescue path, offered.** Any project
-   with user authentication gets all three offered: **TOTP 2FA** (RFC 6238,
-   secrets encrypted at rest), a **"trust this device for 30 days"** option (a
-   signed, `HttpOnly`/`Secure` cookie or token with a 30-day hard expiry,
-   revoked on password or 2FA change, with trusted devices listed and
-   revocable), and an **unlock / rescue feature** for a locked-out user
-   (single-use hashed recovery codes plus an admin or CLI unlock that is logged).
-   The user decides. Record which were accepted or declined.
+   with user authentication gets all three offered: **TOTP 2FA**, a **"trust
+   this device for 30 days"** option, and an **unlock / rescue feature** for a
+   locked-out user. The user decides. Record which were accepted or declined.
 3. **The main page links to GitHub and the latest release notes, without
    exception.** The README's top section, and the app's main page or screen
    when it has a UI, links to the GitHub repo and to the release notes for the
@@ -874,29 +871,8 @@ a declined item is a decision on the record and not a gap.
    image tag is pinned to the current version**, never `latest`. Gate 1 treats
    it as a version reference, so a release that bumps the version bumps the
    compose file too (`GATE_REFERENCE.md`, Gate 1, check 2). Gate 4 checks the
-   quickstart. Example:
+   quickstart.
 
-   ```bash
-   mkdir -p /opt/docker/myapp/{config,data} && cd /opt/docker/myapp
-   ```
-
-   ```yaml
-   services:
-     myapp:
-       image: ghcr.io/owner/myapp:1.4.2
-       container_name: myapp
-       restart: unless-stopped
-       ports:
-         - "8080:8080"
-       volumes:
-         - /opt/docker/myapp/config:/config
-         - /opt/docker/myapp/data:/data
-
-   # image: pinned to this release (1.4.2), updated with every release
-   # ports: 8080 is the web UI. Change the left side for a different host port
-   # /opt/docker/myapp/config: settings, kept across upgrades
-   # /opt/docker/myapp/data: the database and uploads. Back this directory up
-   ```
-
-   Save it as **`compose.yaml`** in `/opt/docker/myapp`, then run
-   `docker compose up -d`.
+**Before designing a project or a feature these apply to, read
+`STANDARDS_REFERENCE.md`**: how each login piece is built, and the compose
+quickstart example.

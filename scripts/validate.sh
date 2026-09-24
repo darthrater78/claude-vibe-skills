@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md ENFORCEMENT.md checks/enforce.py)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -155,15 +155,16 @@ ceiling_for() {
   case "$1" in
     # Billed every request. Deliberately the tightest number here: 2.31.0
     # trimmed it from ~54KB to ~40KB, and this keeps the saving from drifting
-    # back without a decision on the record.
-    SKILL.md) echo 44 ;;
+    # back without a decision on the record. Lowered to 43 in 2.38.0 when
+    # §10's example and login details moved to STANDARDS_REFERENCE.md.
+    SKILL.md) echo 43 ;;
     # Still carries the best-practices and Dependabot sections; it is the next
     # extraction candidate, and this number comes down when they move.
     WORKFLOW_REFERENCE.md) echo 44 ;;
-    # Read once per session, not every turn. Raised from 32 in 2.37.0 for the
-    # enforcement disclosure and status (+~500 tokens a session); the
-    # disclosure text itself lives in ENFORCEMENT.md.
-    SESSION_START.md) echo 34 ;;
+    # Read once per session, not every turn. Raised to 34 in 2.37.0 for the
+    # enforcement disclosure; lowered to 30 in 2.38.0 when the remote-container,
+    # out-of-date and fork-case sections moved to the files that need them.
+    SESSION_START.md) echo 30 ;;
     # Every other reference file: read in full, one purpose each.
     *) echo 32 ;;
   esac
