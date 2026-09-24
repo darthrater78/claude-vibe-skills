@@ -21,5 +21,5 @@ Previous: v2.37.0 SHIP done — PR #65 merged as 8bd6681, tag at 8bd6681, releas
   moved rules still backed in SKILL.md (tags §5.8, forks §5.8, version check §6); rule phrases guard them
   Dependabot 0 open
 📄 DOCS       ✅ CHANGELOG 2.38.0, README (what's new, Gate 3 list, file table + sizes)
-📦 RELEASE    ⬜
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR #66 open, commit 99892ad approved, CHANGELOG 2.38.0 notes approved
+🚀 SHIP       ⏳
