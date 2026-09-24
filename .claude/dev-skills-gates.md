@@ -28,5 +28,5 @@ Previous: v2.36.1 SHIP done — PR #64, tag at 90d8107, release run ok, asset de
   fixed: Medium no type hints (enforce.py, test-checks.py) → added
   fixed: Low open() without encoding → added
 📄 DOCS       ✅ CHANGELOG 2.37.0, README (enforcement, manual mode, what's new, sizes), ENFORCEMENT.md, hooks/README.md
-📦 RELEASE    ⬜
-🚀 SHIP       ⬜
+📦 RELEASE    ✅ PR #65 open, commit 246ea9e approved, CHANGELOG 2.37.0 notes approved
+🚀 SHIP       ⏳
