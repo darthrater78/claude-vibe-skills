@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.39.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.39.1`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.39.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.39.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.1)
 
 ---
 
@@ -100,7 +100,7 @@ to install.
 | Group | What's checked |
 |---|---|
 | **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c` and any push that lands on the default branch · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that pass a gate, set the mode, decline enforcement, approve host networking or waive a finding go to you as a permission prompt, as do edits to settings files and the installed checks |
+| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
@@ -121,9 +121,10 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
 - **Enforcement on Windows.** The checks now cover Claude Code's PowerShell
   tool, find Python through the `py -3` launcher, and protect Windows-style
-  settings paths. In semi-autonomous mode, a gate passing no longer stops for
-  a prompt: your commit approval and the pre-tag report are the checkpoints.
-  *(2.39.0)*
+  settings paths. A gate passing or the mode being recorded no longer stops
+  for a prompt in either mode; declines, host-network approvals and waivers
+  still ask. On local sessions the gate file is no longer committed, so it
+  can't block `git checkout`. *(2.39.0, 2.39.1)*
 - **LTS stays LTS.** A package or runtime on a long-term-support line
   (Node.js, .NET, Java, Ubuntu, Debian, …) upgrades to the newest patch of the
   newest *settled* LTS line, never to the newest release overall. A brand-new
@@ -507,10 +508,11 @@ The tag push itself always comes back to you — see
 Before a tag exercises a release-workflow step that's never actually run in
 this repo (a first registry login, a first signing step), it's worth
 dry-running that step locally against the built artifact first — cheaper
-than discovering it fails during a live release. The gate-state file ships inside
-the release PR with SHIP ⏳; the SHIP ✅ line, which can only exist after the
-tag, rides in the *next* release's PR. There is never a PR whose only content
-is tracker bookkeeping. *(2.25.0, 2.28.0)*
+than discovering it fails during a live release. On a local session the gate-state
+file is gitignored and never committed, so switching branches never trips over
+it. In a remote container it ships inside the release PR with SHIP ⏳, and the
+SHIP ✅ line rides in the *next* release's PR. There is never a PR whose only
+content is tracker bookkeeping. *(2.25.0, 2.28.0, 2.39.1)*
 
 <details>
 <summary><b>The git flow is identical across platforms — only the CI build differs</b></summary>
@@ -968,7 +970,7 @@ The skill uses tiered loading to keep token costs down:
 | `ENFORCEMENT.md` | ~13KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~31KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
-| `SHIP_REFERENCE.md` | ~23KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
+| `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
@@ -1068,4 +1070,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.39.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.39.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

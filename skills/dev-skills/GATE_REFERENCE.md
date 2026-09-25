@@ -522,19 +522,22 @@ Execution (merge, tag, publish) happens in Gate 6.
    > [status: up to date / N commits behind / diverged]
 
    If diverged, resolve before proceeding. Do not skip this step.
-3. **Stage the gate state file with the release — it ships inside this PR.**
-   `.claude/dev-skills-gates.md` is part of the release commit, not a
-   follow-up. Bring it up to date first: gates 1–5 ✅ with the evidence that
-   passed each, SECURITY reading `0 open` (Gate 3 — it cannot be ✅ otherwise),
-   and 🚀 SHIP ⏳ carrying the plan rather than ⬜. Where the file is
-   gitignored, force-add it: `git add -f .claude/dev-skills-gates.md`.
+3. **Bring the gate state file up to date before the release commit**: gates
+   1–5 ✅ with the evidence that passed each, SECURITY reading `0 open` (Gate 3
+   — it cannot be ✅ otherwise), and 🚀 SHIP ⏳ carrying the plan rather than ⬜.
+   **Local sessions: it stays untracked.** Never stage or `git add -f` it: a
+   tracked copy is rewritten by every session and blocks `git checkout`. The
+   release record is the commit, `CHANGELOG.md`, the tag and the handoff.
+   **Remote containers: stage it with the release — it ships inside this PR**
+   (`git add -f .claude/dev-skills-gates.md` where gitignored), because the
+   container's copy dies with the container.
 
    SHIP is ⏳ here and that is correct, not a gap: the tag does not exist yet,
    so no commit that precedes it can honestly claim it does. The post-tag line
    folds into the next release's PR (`SHIP_REFERENCE.md`, step 7). **There is
    never a separate bookkeeping PR**, and a release PR that does not carry the
    state file leaves the tagged commit describing a release that had not
-   happened.
+   happened. (Remote containers; a local file is never in any commit.)
 4. **Get commit approval** (per `SKILL.md` Section 1) — show what's staged, get explicit yes
 5. **Verify remote is configured.** Run `git remote -v`. If no origin is set,
    include `git remote add origin <url>` (using the URL stored at session start)
@@ -572,7 +575,7 @@ branches and merges via PR. If the session is on the default branch when Gate 5
 is reached, create a branch first.
 
 > ✅ **RELEASE GATE PASSED** — PR [url] ready, release notes approved
-> Gate state file included in the PR: gates 1–5 ✅, SHIP ⏳
+> Gate state file: gates 1–5 ✅, SHIP ⏳ (in the PR on remote containers; untracked locally)
 > Pending: merge, tag, and publish (Gate 6)
 
 ---

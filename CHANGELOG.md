@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.39.1] — 2026-09-25
+
+**Passing a gate or setting the mode no longer stops for a permission prompt,
+in either mode.**
+
+### Changed
+- **Gate rows and the `Mode:` line pass without a prompt, in manual and
+  semi-autonomous mode alike** (`ENFORCEMENT.md`, B5). 2.39.0 stopped the
+  per-gate prompt only in semi-autonomous mode, so manual sessions still asked
+  for every ✅ or ➖, and every session asked to confirm the mode it had just
+  been told. The mode is the user's answer to the session-start question, and
+  a gate passing is on the tracker and backed by the commit approval.
+  Enforcement declines, host-network approvals and waivers still ask: they
+  lift a check, so they are the lines Claude could write to get past one.
+
+### Fixed
+- **The gate file no longer blocks `git checkout` on local sessions.** Since
+  2.28.0 the release PR force-added `.claude/dev-skills-gates.md`, which made
+  it tracked despite `.gitignore`. Every session rewrites it, so the tree was
+  dirty and switching branches failed with "Your local changes … would be
+  overwritten by checkout". Local sessions now keep it untracked, and session
+  start untracks it (`git rm --cached`, with the next commit) where an earlier
+  release committed it. Remote containers still commit it, since theirs dies
+  with the container. A new check, **B6**, denies a `git add` that would
+  stage the gate file on a local session.
+
 ## [2.39.0] — 2026-09-24
 
 **Enforcement checks work on Windows, and semi-autonomous mode stops asking

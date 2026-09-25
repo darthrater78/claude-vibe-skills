@@ -49,6 +49,7 @@ p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
 p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
 p enforcement bash -o pipefail -c '[ -f "$B/checks/enforce.py" ] || echo checks-file-missing; for py in python3 python "py -3"; do $py -c "import getpass,os,re,sys,tempfile; u=re.sub(r\"[^A-Za-z0-9_.-]\",\"\",getpass.getuser())[:64]; f=os.path.join(tempfile.gettempdir(),\"dev-skills-enforcement-\"+u,os.environ.get(\"CLAUDE_CODE_SESSION_ID\",\"none\")); print(\"active\" if os.path.isfile(f) else \"NOT-ACTIVE\")" 2>/dev/null && exit 0; done; echo NOT-ACTIVE-no-python3'
 p leftover_tests bash -c 'command -v docker >/dev/null 2>&1 || { echo no-docker; exit 0; }; docker ps -a --filter label=dev-skills.test --format "{{.Names}} ({{.Status}})"; docker ps -a --filter label=com.docker.compose.project --format "{{.Names}} {{.Label \"com.docker.compose.project\"}} ({{.Status}})" | grep " dev-skills-test" || true'
+p gate_tracked bash -c 'git ls-files --error-unmatch .claude/dev-skills-gates.md >/dev/null 2>&1 && echo yes || echo no'
 p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
 ```
 
@@ -383,10 +384,15 @@ six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
 (`SKILL.md` §10; `n/a` when none do). Replace `unchosen` with the user's answer as soon as it
 arrives. The checks deny git writes while it reads `unchosen`. **Edit this
 file with the Write/Edit tools, never the shell**, so the checks can show the
-user each line that passes a gate or sets the mode (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
+user each line that declines enforcement, approves host networking or waives
+a finding (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
-sessions add the file to `.gitignore`; on remote containers it is committed
-with the work. This file, not the conversation, is the source of truth for gate
+sessions add the file to `.gitignore` and keep it untracked. **`gate_tracked=yes`
+on a local session** means an earlier release committed it (2.28.0–2.39.0 did),
+which blocks `git checkout` whenever the session has rewritten it. Untrack it:
+`git rm --cached .claude/dev-skills-gates.md` plus the `.gitignore` line, staged
+with the session's first commit and named in its approval. On remote
+containers it is committed with the work. This file, not the conversation, is the source of truth for gate
 state and mode for the rest of the session.
 
 **Format:**
@@ -423,7 +429,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.39.0 active.
+Dev Skills v2.39.1 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -458,7 +464,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.1
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

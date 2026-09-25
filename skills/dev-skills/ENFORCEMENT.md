@@ -53,10 +53,10 @@ guardrails".
   plugins, so a future Claude Code version could change it. If that happens,
   the checks fail closed as above and the banner says so. They never fail
   silently.
-- **Claude can't edit its way out.** Changes to the gate file that set the
-  mode, decline enforcement, approve host networking or waive a finding, a
-  gate passing in manual mode, and any edit to a Claude Code settings file or to the installed
-  checks, go to the user as a permission prompt (check B5).
+- **Claude can't edit its way out.** Changes to the gate file that decline
+  enforcement, approve host networking or waive a finding, and any edit to a
+  Claude Code settings file or to the installed checks, go to the user as a
+  permission prompt (check B5).
 
 ## At session start: disclose, then keep or decline
 
@@ -177,18 +177,16 @@ modes. Listing tags and deleting a local tag pass.
 **B5. The gate file, settings and the checks go through the user.** An edit
 to `.claude/dev-skills-gates.md` that **adds** any of these lines asks the
 user, showing the lines:
-- a gate row with ✅ or ➖
-- `Mode: manual` or `Mode: semi-autonomous`
 - `Hook enforcement: declined`
 - `Host network: … approved`
 - anything mentioning a waiver
 
-**In semi-autonomous mode, a gate row with ✅ or ➖ passes without asking**:
-the commit approval and the pre-tag report are the user's checkpoints there,
-and a prompt per gate would add a third. The other four still ask. An edit
-that switches into or out of semi-autonomous mode shows every gate row it
-passes, because the skip applies only when the file reads semi-autonomous both
-before and after.
+**Gate rows and the `Mode:` line pass without asking, in both modes.** The
+mode is the user's answer to the session-start question, and a gate passing
+is shown on the tracker and backed by the commit approval (and, in
+semi-autonomous mode, the pre-tag report). A prompt for each would ask the
+user to approve bookkeeping they already approved. A gate row that mentions a
+waiver still asks, because of the waiver.
 
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
 a Claude Code `settings.json`/`settings.local.json` (`/` or Windows `\`
@@ -196,7 +194,15 @@ paths) or to the installed checks folder asks. A shell command that looks
 like it writes any of those files asks, including PowerShell's
 `Set-Content`/`Out-File`/`Copy-Item` family, their aliases and
 `[IO.File]::` writes, so the gate file is edited with the Edit/Write tools, where the change
-can be shown line by line.
+can be shown line by line. `git rm --cached` on the gate file passes: it only
+untracks it.
+
+**B6. The gate file stays out of local commits.** A `git add` that names
+`.claude/dev-skills-gates.md`, or force-adds `.claude/`, `.` or `-A`, is
+denied on a local session. Every session rewrites the file, so a committed
+copy leaves the tree dirty and blocks `git checkout`. A remote container
+(`CLAUDE_CODE_REMOTE` set, as Claude Code on the web does) may stage it,
+because its copy dies with the container.
 
 ### C. Claude's replies
 
@@ -248,6 +254,11 @@ have already arrived.
 - **Commands the user runs.** C2–C7 check what Claude hands over. What the
   user actually pastes is theirs.
 - **Anything while declined**, apart from B5.
+- **A gate file that is already tracked.** B6 stops it being staged by name,
+  but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
+  up its changes. Session start untracks it (`SESSION_START.md`).
+- **Whether a gate row is honest.** Gate rows and the `Mode:` line pass
+  without a prompt (B5), so the git-write checks trust what the file says.
 
 ## When a check blocks
 
