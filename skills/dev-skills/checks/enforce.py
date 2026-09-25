@@ -20,6 +20,7 @@ confirms in a permission prompt (B5).
 
 from __future__ import annotations
 
+import base64
 import getpass
 import ipaddress
 import json
@@ -201,17 +202,90 @@ OPS = {"&&", "||", ";", "|", "&", "(", ")", ";;", "|&", "\n"}
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "exec", "nice", "stdbuf", "timeout", "xargs"}
 
 
-def simple_commands(text: str, depth: int = 0) -> list[list[str]]:
-    """Split a shell string into argv lists, unwrapping env/sudo/bash -c and friends."""
+# Programs that run what they read as commands. A heredoc or here-string fed to
+# one of them is checked like any other command text.
+SHELL_READERS = {"bash", "sh", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd", "eval", "iex",
+                 "invoke-expression", "xargs", "source", "."}
+
+
+def line_tokens(line: str) -> list[str]:
+    """Tokens with their quotes kept, so a quoted `<<` stays inside its string."""
+    lexer = shlex.shlex(line, posix=False, punctuation_chars=";&|()")
+    lexer.whitespace_split = True
+    lexer.commenters = "#"
+    try:
+        return list(lexer)
+    except ValueError:
+        return line.split()
+
+
+def heredoc_marks(tokens: list[str]) -> list[tuple[str, bool, bool]]:
+    """(delimiter, quoted, strip leading tabs) for each `<<` heredoc on a line."""
+    marks = []
+    for i, tok in enumerate(tokens):
+        m = re.match(r"^[^'\"<]*<<(?!<)(-?)(.*)$", tok)
+        if not m:
+            continue
+        dash, word = m.group(1), m.group(2) or (tokens[i + 1] if i + 1 < len(tokens) else "")
+        quoted = word[:1] in ("'", '"', "\\")
+        delim = word.strip("'\"\\")
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", delim):
+            marks.append((delim, quoted, bool(dash)))
+    return marks
+
+
+def split_heredocs(text: str) -> tuple[str, list[str], list[str]]:
+    """Take heredoc bodies out of the command text.
+
+    Returns the command lines, the bodies a shell will run (checked as
+    commands), and the unquoted data bodies (checked only for `$( )`, which bash
+    still expands in them). A quoted data body (`python3 - <<'EOF'`) is inert.
+    """
+    lines = text.split("\n")
+    keep, run, expand = [], [], []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        keep.append(line)
+        i += 1
+        if "<<" not in line:
+            continue
+        tokens = line_tokens(line)
+        fed = any(program_name(t.strip("'\"")) in SHELL_READERS for t in tokens)
+        for delim, quoted, dash in heredoc_marks(tokens):
+            body = []
+            while i < len(lines):
+                b = lines[i]
+                i += 1
+                if (b.lstrip("\t") if dash else b).rstrip("\r") == delim:
+                    break
+                body.append(b)
+            if fed:
+                run.append("\n".join(body))
+            elif not quoted:
+                expand.append("\n".join(body))
+    return "\n".join(keep), run, expand
+
+
+def simple_commands(text: str, depth: int = 0, ps: bool = False) -> list[list[str]]:
+    """Split a shell string into argv lists, unwrapping env/sudo/bash -c and friends.
+
+    ps: the text is PowerShell, where `\\` is a path separator, not an escape.
+    """
     if depth > 4 or not text:
         return []
+    run_bodies, expand_bodies = [], []
+    if not ps and "<<" in text:
+        text, run_bodies, expand_bodies = split_heredocs(text)
     tokens = []
     # One line at a time, so a `#` comment ends at its own line and doesn't
     # swallow the rest of a multi-line block.
-    for line in re.sub(r"\\\r?\n", " ", text).splitlines():
+    for line in (text if ps else re.sub(r"\\\r?\n", " ", text)).splitlines():
         lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|()")
         lexer.whitespace_split = True
         lexer.commenters = "#"
+        if ps:
+            lexer.escape = ""
         try:
             tokens.extend(list(lexer))
         except ValueError:
@@ -229,14 +303,76 @@ def simple_commands(text: str, depth: int = 0) -> list[list[str]]:
         cmds.append(cur)
     out = []
     for argv in cmds:
-        out.extend(unwrap(argv, depth))
-    # Command substitutions: $(git push) and `git push` inside other commands.
-    for inner in re.findall(r"\$\(([^()]*)\)|`([^`]*)`", text):
-        out.extend(simple_commands(inner[0] or inner[1], depth + 1))
+        out.extend(unwrap(argv, depth, ps))
+    # Command substitutions: $(git push), and `git push` outside PowerShell
+    # (where the backtick is the escape character).
+    subst = r"\$\(([^()]*)\)()" if ps else r"\$\(([^()]*)\)|`([^`]*)`"
+    for inner in re.findall(subst, "\n".join([text] + expand_bodies)):
+        out.extend(simple_commands(inner[0] or inner[1], depth + 1, ps))
+    for body in run_bodies:
+        out.extend(simple_commands(body, depth + 1))
     return out
 
 
-def unwrap(argv: list[str], depth: int) -> list[list[str]]:
+# Compared case-insensitively and without `.exe`, so Windows spellings
+# (`git.exe`, `C:\Program Files\Git\cmd\git.exe`, `Git`) classify like `git`.
+KNOWN_PROGRAMS = {"git", "gh", "docker", "podman", "bash", "sh", "zsh", "dash", "ksh", "fish", "pwsh",
+                  "powershell", "cmd", "eval", "iex", "invoke-expression", "xargs", "source",
+                  "start-process", "saps", "start"}
+
+# Start-Process switches that take no value; every other named parameter does.
+PS_SWITCHES = {"wait", "nonewwindow", "passthru", "usenewenvironment", "loaduserprofile"}
+
+
+def start_process(argv: list[str], depth: int) -> list[list[str]]:
+    """`Start-Process git -ArgumentList 'push'` runs `git push`, in -WorkingDirectory if given."""
+    named: dict[str, str] = {}
+    positional: list[str] = []
+    j = 1
+    while j < len(argv):
+        a = argv[j]
+        if a[:1] == "-" and len(a) > 1:
+            name = a[1:].lower().rstrip(":")
+            if not any(s.startswith(name) for s in PS_SWITCHES):
+                named[name] = argv[j + 1] if j + 1 < len(argv) else ""
+                j += 1
+        else:
+            positional.append(a)
+        j += 1
+    pick = lambda full, pos: next((v for k, v in named.items() if full.startswith(k)), None) or \
+        (positional[pos] if len(positional) > pos else "")  # noqa: E731
+    exe, args = pick("filepath", 0), pick("argumentlist", 1)
+    if not exe:
+        return [argv]
+    out = simple_commands(exe + " " + args.replace(",", " "), depth + 1, ps=True)
+    # -WorkingDirectory applies to the started process only, so it becomes
+    # `git -C <dir>` there, never a cd that would carry on to later commands.
+    wd = pick("workingdirectory", len(argv))
+    if wd:
+        out = [["git", "-C", wd] + a[1:] if a[:1] == ["git"] else a for a in out]
+    return out
+
+
+def program_name(tok: str) -> str:
+    base = re.split(r"[/\\]", tok)[-1]
+    low = re.sub(r"\.exe$", "", base.lower())
+    return low if low in KNOWN_PROGRAMS else base
+
+
+def ps_param(arg: str, full: str, shortest: int) -> bool:
+    """PowerShell accepts any unambiguous prefix of a parameter: -c, -Com, -Command."""
+    name = arg[1:].lower()
+    return arg[:1] in "-/" and len(name) >= shortest and full.startswith(name)
+
+
+def ps_encoded(arg: str) -> str:
+    try:
+        return base64.b64decode(arg, validate=True).decode("utf-16-le")
+    except (ValueError, UnicodeDecodeError):
+        return ""
+
+
+def unwrap(argv: list[str], depth: int, ps: bool = False) -> list[list[str]]:
     i = 0
     while i < len(argv):
         tok = argv[i]
@@ -253,12 +389,31 @@ def unwrap(argv: list[str], depth: int) -> list[list[str]]:
     argv = argv[i:]
     if not argv:
         return []
-    base = os.path.basename(argv[0])
+    base = program_name(argv[0])
+    argv = [base] + argv[1:]
+    if base in SHELL_READERS:
+        # Here-string: `bash <<< "git push"` runs the string.
+        for j, a in enumerate(argv[1:], 1):
+            if a.startswith("<<<"):
+                inner = a[3:] or (argv[j + 1] if j + 1 < len(argv) else "")
+                return [argv] + simple_commands(inner, depth + 1, base in ("pwsh", "powershell"))
+    if base in ("start-process", "saps", "start"):
+        return start_process(argv, depth)
     if base in ("bash", "sh", "zsh", "dash") and "-c" in argv:
         j = argv.index("-c")
         return simple_commands(argv[j + 1], depth + 1) if j + 1 < len(argv) else []
-    if base == "eval":
-        return simple_commands(" ".join(argv[1:]), depth + 1)
+    if base in ("pwsh", "powershell"):
+        for j, a in enumerate(argv[1:], 1):
+            if ps_param(a, "command", 1):
+                return simple_commands(" ".join(argv[j + 1:]), depth + 1, ps=True)
+            if ps_param(a, "encodedcommand", 1) or a.lower() in ("-ec", "/ec"):
+                return simple_commands(ps_encoded(argv[j + 1]) if j + 1 < len(argv) else "", depth + 1, ps=True)
+        return [argv]
+    if base == "cmd":
+        j = next((j for j, a in enumerate(argv) if a.lower() in ("/c", "/k")), None)
+        return simple_commands(" ".join(argv[j + 1:]), depth + 1) if j is not None else [argv]
+    if base in ("eval", "iex", "invoke-expression"):
+        return simple_commands(" ".join(argv[1:]), depth + 1, ps or base != "eval")
     return [argv]
 
 
@@ -896,7 +1051,7 @@ def protected_path(path: str | None, root: str | None) -> str | None:
     plugin = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if plugin and os.path.abspath(p).startswith(os.path.abspath(plugin) + os.sep):
         return "checks"
-    if re.search(r"(^|/)\.claude[^/]*/settings(\.local)?\.json$", p):
+    if re.search(r"(^|[/\\])\.claude[^/\\]*[/\\]settings(\.local)?\.json$", p):
         return "settings"
     return None
 
@@ -923,20 +1078,33 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
     if kind in ("checks", "settings"):
         return ("ask", f"this edits {path}, which is where enforcement lives. The user decides.")
     current = read(path)
-    added = sensitive_lines(new_content(tool, inp, current)) - sensitive_lines(current)
+    new = new_content(tool, inp, current)
+    added = sensitive_lines(new) - sensitive_lines(current)
+    semi = re.compile(r"^Mode:\s*semi-autonomous(\s|$)", re.M)
+    if semi.search(current or "") and semi.search(new):
+        # Semi-autonomous before and after: gate rows pass without a prompt (the
+        # commit approval and the pre-tag report are the user's checkpoints).
+        # Mode, decline, host network and waiver lines still ask, and an edit
+        # that leaves semi-autonomous shows every gate row it passes.
+        added = {line for line in added
+                 if not SENSITIVE[0][0].search(line) or any(pat.search(line) for pat, _ in SENSITIVE[1:])}
     if not added:
         return None
     return ("ask", "the gate file change needs the user's OK:\n" + "\n".join(f"  + {line}" for line in sorted(added)))
 
 
 WRITE_HINT = re.compile(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-[a-z]*i|\bcp\b|\bmv\b|\brm\b|\bpython3?\b|\bnode\b|"
-                        r"\btruncate\b|\bdd\b|\binstall\b|\bln\b|\bchmod\b)")
+                        r"\btruncate\b|\bdd\b|\binstall\b|\bln\b|\bchmod\b|"
+                        # PowerShell and cmd: cmdlets, their aliases, and .NET file writes.
+                        r"\b(set|add|clear)-content\b|\bout-file\b|\b(copy|move|remove|rename|new)-item\b|"
+                        r"\btee-object\b|\b(sc|ac|clc|cpi|mi|ri|rni|ni|copy|move|del|erase|ren|xcopy|robocopy)\b|"
+                        r"\[(system\.)?io\.file\]::)", re.I)
 
 
 def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     home = os.path.expanduser("~")
     cmd = re.sub(r"(?<![\w/])~(?=/|\s|$)", home, cmd).replace("${HOME}", home).replace("$HOME", home)
-    touches = "dev-skills-gates.md" in cmd or re.search(r"\.claude[^/\s]*/settings(\.local)?\.json", cmd)
+    touches = "dev-skills-gates.md" in cmd or re.search(r"\.claude[^/\\\s]*[/\\]settings(\.local)?\.json", cmd)
     plugin = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if plugin and plugin in cmd:
         touches = True
@@ -964,13 +1132,13 @@ def pre_tool(payload: dict) -> NoReturn:
     if gates.declined:
         allow()
 
-    if tool == "Bash":
+    if tool in ("Bash", "PowerShell"):
         cmd = inp.get("command") or ""
         res = bash_protected_check(cmd)
         problems = []
         cur: str | None = cwd
-        for argv in simple_commands(cmd):
-            if argv and argv[0] in ("cd", "pushd"):
+        for argv in simple_commands(cmd, ps=tool == "PowerShell"):
+            if argv and argv[0].lower() in ("cd", "pushd", "set-location", "sl", "chdir", "push-location"):
                 cur = resolve_cd(argv, cur)
                 continue
             here = git_dash_c(argv, cur)

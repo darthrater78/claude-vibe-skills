@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.38.0
+version: 2.39.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -16,15 +16,15 @@ description: >
 # docker commands are blocked rather than let through unchecked.
 hooks:
   PreToolUse:
-    - matcher: "Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+    - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
       hooks:
         - type: command
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
-            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" pre-tool; done;
+            for py in python3 python "py -3"; do [ -f "$f" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py "$f" pre-tool; done;
             in=$(cat);
-            printf '%s' "$in" | grep -qE '"tool_name": *"mcp__[^"]*[Gg]it[Hh]ub' || { printf '%s' "$in" | grep -qE '"tool_name": *"Bash"' && printf '%s' "$in" | grep -qE '(^|[^A-Za-z])(git|gh|docker)[[:space:]]'; } || exit 0;
+            printf '%s' "$in" | grep -qE '"tool_name": *"mcp__[^"]*[Gg]it[Hh]ub' || { printf '%s' "$in" | grep -qE '"tool_name": *"(Bash|PowerShell)"' && printf '%s' "$in" | grep -qE '(^|[^A-Za-z])(git|gh|docker)[[:space:]]'; } || exit 0;
             echo "dev-skills enforcement cannot run (checks file or Python 3 missing), so git, gh and docker are blocked. Reinstall the skill (ENFORCEMENT.md)." >&2; exit 2
   PostToolUse:
     - matcher: "AskUserQuestion"
@@ -33,14 +33,14 @@ hooks:
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
-            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" post-ask; done; exit 0
+            for py in python3 python "py -3"; do [ -f "$f" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py "$f" post-ask; done; exit 0
   Stop:
     - hooks:
         - type: command
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
-            for py in python3 python; do [ -f "$f" ] && "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec "$py" "$f" stop; done; exit 0
+            for py in python3 python "py -3"; do [ -f "$f" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py "$f" stop; done; exit 0
 ---
 
 # Dev Skills
