@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.39.0
+version: 2.39.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -292,11 +292,16 @@ has to be credited.
   row** is `unchosen` until the user answers, and missing or `unchosen` blocks
   every git write (Operating modes).
 - **Read it** before every git write operation, and whenever asked for status.
-- **It ships inside the release PR** with gates 1–5 ✅ and SHIP ⏳. The
-  post-tag SHIP ✅ line folds into the next release's PR. **Never open a PR
-  whose only content is tracker bookkeeping** (`SHIP_REFERENCE.md`, step 7).
-- **Local sessions:** gitignore it. **Remote containers:** commit it to the
-  working branch (`git add -f` if gitignored), or it dies with the container.
+- **Local sessions: gitignored and never committed.** Every session rewrites
+  it, so a tracked copy leaves the tree dirty and blocks `git checkout`. Where
+  an earlier release committed it, untrack it (`SESSION_START.md`, "Write the
+  gate state file").
+- **Remote containers: commit it to the working branch** (`git add -f` if
+  gitignored), or it dies with the container. It ships inside the release PR
+  with gates 1–5 ✅ and SHIP ⏳, and the post-tag SHIP ✅ line folds into the
+  next release's PR.
+- **Never open a PR whose only content is tracker bookkeeping**
+  (`SHIP_REFERENCE.md`, step 7).
 - **Keep it small**, one line per gate with the evidence indented below it.
   **Close an absorbed section in the step that absorbs it**, never in a later
   cleanup pass.

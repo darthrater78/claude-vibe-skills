@@ -9,7 +9,7 @@ it writes is a small status marker in the temp directory, so the session
 banner can say whether enforcement is active.
 
 Modes (argv[1]):
-  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5)
+  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5 B6)
   stop       Stop: the reply Claude is about to end with            (C1 C2 C3 C4 C5 C7)
   post-ask   PostToolUse on AskUserQuestion: unanswered questions   (D1)
 
@@ -1024,9 +1024,12 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
 
 # --- B5: protected files ------------------------------------------------------
 
+# Gate rows and the Mode: line pass without a prompt in both modes: the mode is
+# the user's answer to the session-start question, and a gate passing is shown
+# on the tracker and backed by the commit approval. What asks is the short list
+# of lines that switch a check off or grant an exception, which only the user
+# can decide.
 SENSITIVE = [
-    (re.compile(r"^\s*(🔢|🔨|🔒|📄|📦|🚀)️?\s*[A-Z]+\b.*(✅|➖)"), "a gate marked passed or N/A"),
-    (re.compile(r"^Mode:\s*(manual|semi-autonomous)"), "the operating mode"),
     (re.compile(r"^(Hook )?[Ee]nforcement:\s*declined"), "declining hook enforcement"),
     (re.compile(r"^Host network:.*approved"), "a host-network approval"),
     (re.compile(r"waive", re.I), "a finding waiver"),
@@ -1080,14 +1083,6 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
     current = read(path)
     new = new_content(tool, inp, current)
     added = sensitive_lines(new) - sensitive_lines(current)
-    semi = re.compile(r"^Mode:\s*semi-autonomous(\s|$)", re.M)
-    if semi.search(current or "") and semi.search(new):
-        # Semi-autonomous before and after: gate rows pass without a prompt (the
-        # commit approval and the pre-tag report are the user's checkpoints).
-        # Mode, decline, host network and waiver lines still ask, and an edit
-        # that leaves semi-autonomous shows every gate row it passes.
-        added = {line for line in added
-                 if not SENSITIVE[0][0].search(line) or any(pat.search(line) for pat, _ in SENSITIVE[1:])}
     if not added:
         return None
     return ("ask", "the gate file change needs the user's OK:\n" + "\n".join(f"  + {line}" for line in sorted(added)))
@@ -1104,6 +1099,9 @@ WRITE_HINT = re.compile(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-[a-z]*i|\bcp\b|\bmv\b|
 def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     home = os.path.expanduser("~")
     cmd = re.sub(r"(?<![\w/])~(?=/|\s|$)", home, cmd).replace("${HOME}", home).replace("$HOME", home)
+    # `git rm --cached` only untracks the file (SESSION_START.md); it never writes it.
+    cmd = re.sub(r"\bgit\s+(-C\s+\S+\s+)?rm\s+(-r\s+)?--cached\s+(-r\s+)?(--\s+)?[^\s;&|<>`$()]*dev-skills-gates\.md(?=\s|$|[;&|])",
+                 "", cmd)
     touches = "dev-skills-gates.md" in cmd or re.search(r"\.claude[^/\\\s]*[/\\]settings(\.local)?\.json", cmd)
     plugin = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if plugin and plugin in cmd:
@@ -1111,6 +1109,28 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     if touches and WRITE_HINT.search(cmd.replace("2>&1", "").replace(">/dev/null", "").replace("2>/dev/null", "")):
         return ("ask", "this shell command may write the gate file, a settings file, or the enforcement checks. "
                        "Edit the gate file with the Edit/Write tools so the change can be shown line by line.")
+    return None
+
+
+GATE_FILE_SPEC = re.compile(r"(^|[/\\])dev-skills-gates\.md$")
+CLAUDE_DIR_SPEC = re.compile(r"^(\.|\./|:/|\.claude[/\\]?(\*)?|\./\.claude[/\\]?(\*)?)$")
+
+
+def gate_file_add_check(argv: list[str]) -> str | None:
+    """B6: on a local session the gate file is never staged (every session rewrites
+    it, so a tracked copy blocks git checkout). Remote containers commit it."""
+    g = git_argv(argv)
+    if not g or g[0] != "add" or os.environ.get("CLAUDE_CODE_REMOTE", "").lower() in ("1", "true", "yes"):
+        return None
+    args = g[1:]
+    short = "".join(a[1:] for a in args if re.match(r"^-[a-zA-Z]+$", a))
+    force = "f" in short or "--force" in args
+    every = "A" in short or "--all" in args
+    specs = [a for a in args if not a.startswith("-")]
+    if any(GATE_FILE_SPEC.search(s) for s in specs) or (force and any(CLAUDE_DIR_SPEC.match(s) for s in specs)) \
+            or (force and every and not specs):
+        return ("this stages .claude/dev-skills-gates.md on a local session. The gate file stays untracked "
+                "locally: every session rewrites it, so a committed copy blocks git checkout (SKILL.md §2).")
     return None
 
 
@@ -1151,6 +1171,9 @@ def pre_tool(payload: dict) -> NoReturn:
                                 "which repo's gates apply. Use a literal path.")
             elif ops:
                 problems.extend(gate_problems(ops, here_gates, presented=False, text_for_fork=cmd))
+            staged = gate_file_add_check(argv)
+            if staged:
+                problems.append(staged)
             problems.extend(docker_checks(argv, cmd, here or cwd, here_gates))
         if problems:
             pre_decision("deny", "blocked:\n- " + "\n- ".join(problems))

@@ -284,8 +284,9 @@ looks fine and is not:
    > git push origin v1.2.3
    > ```
 
-7. **The SHIP ✅ record does not get its own PR.** The gate state file rode in
-   with the release PR (Gate 5) and is already on the default branch carrying
+7. **The SHIP ✅ record does not get its own PR.** On a local session the
+   gate state file is untracked, so SHIP ✅ is written to it and nothing more.
+   On a remote container it rode in with the release PR (Gate 5) and is already on the default branch carrying
    gates 1–5 ✅ and SHIP ⏳ with the plan. What is left after the tag is the
    one line that could not have existed before it — and that line is folded
    into **the next release's PR**, by the same close-as-you-go rule that
@@ -462,8 +463,9 @@ gh release create v1.2.3 <artifacts> --title "v1.2.3" --notes "..."
 4. **Assets match:** expected artifacts are attached per detection above
 
 **Do not open a tracker-only PR to record SHIP ✅.** Same rule as the
-CI-driven path above (step 7): the state file shipped inside the release PR
-at ⏳, and the post-tag line folds into the next release's PR. The tag, the
+CI-driven path above (step 7): locally the state file is untracked; on a
+remote container it shipped inside the release PR at ⏳, and the post-tag line
+folds into the next release's PR. The tag, the
 release and the changelog entry are the durable record in the meantime.
 
 > ✅ **SHIP GATE PASSED** — PR merged, tag v1.2.3 pushed, release published
