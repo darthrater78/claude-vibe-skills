@@ -28,7 +28,12 @@ in either mode.**
   start untracks it (`git rm --cached`, with the next commit) where an earlier
   release committed it. Remote containers still commit it, since theirs dies
   with the container. A new check, **B6**, denies a `git add` that would
-  stage the gate file on a local session.
+  stage the gate file on a local session. **One-time side effect:** in a
+  clone where an earlier release committed the gate file, pulling the
+  untracking commit deletes the local copy, or refuses with "would be
+  overwritten" if it has local edits. Run `git stash push
+  .claude/dev-skills-gates.md` first; the next session rewrites the file
+  anyway.
 
 ## [2.39.0] — 2026-09-24
 

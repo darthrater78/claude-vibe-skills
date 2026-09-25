@@ -391,7 +391,12 @@ sessions add the file to `.gitignore` and keep it untracked. **`gate_tracked=yes
 on a local session** means an earlier release committed it (2.28.0–2.39.0 did),
 which blocks `git checkout` whenever the session has rewritten it. Untrack it:
 `git rm --cached .claude/dev-skills-gates.md` plus the `.gitignore` line, staged
-with the session's first commit and named in its approval. On remote
+with the session's first commit and named in its approval. **Once that
+commit reaches the default branch, every other clone meets it once:** a pull
+deletes that clone's gate file, or refuses with "would be overwritten" if the
+file has local edits. Say so in the approval. The fix is `git stash push
+.claude/dev-skills-gates.md` (or discard it) before pulling. Nothing durable is
+lost, since each session rewrites the file. On remote
 containers it is committed with the work. This file, not the conversation, is the source of truth for gate
 state and mode for the rest of the session.
 
