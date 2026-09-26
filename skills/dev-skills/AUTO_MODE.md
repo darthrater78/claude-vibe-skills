@@ -39,7 +39,7 @@ it:
 
 Write `Mode: semi-autonomous (approved <date>) — commits and the tag still
 require the user's approval` into
-`.claude/dev-skills-gates.md` in the same turn. A mode that is agreed to in
+`.dev-skills-gates.md` in the same turn. A mode that is agreed to in
 conversation and not written down is a mode that disappears at the next
 compaction.
 
@@ -48,7 +48,7 @@ session every executed git command is a round trip that resends the
 conversation, where a pasted block costs nothing.
 
 On a remote container, nothing extra needs asking: the tag block this mode still
-hands over carries no `cd` and no shell-specific syntax (`SESSION_START.md`, step 0,
+hands over carries no `cd` and no shell-specific syntax (`REMOTE_SESSION.md`,
 item 4).
 
 ### Checkpoint 1 — the commit approval
@@ -127,15 +127,53 @@ hand over the block:
 > **This one is yours to run** — my credentials get `403`'d on tag refs. From
 > your local clone of the repo:
 >
+> ### ▶️ RUN THIS — CI status → tag v2.26.0 · in your clone of the repo
+> ```bash
+> # ════════ ▶️ START: CI status → tag v2.26.0 ════════
+> n=48 && sha=c3a49f7e2b…full-sha && git fetch origin \
+>   && gh pr checks "$n" \
+>   && gh run watch "$(gh run list --commit "$sha" --workflow validate.yml --json databaseId -q '.[0].databaseId')" --exit-status \
+>   && git tag v2.26.0 "$sha" && git push origin v2.26.0 \
+>   && echo "✅ DONE: v2.26.0 tagged" || echo "❌ STOPPED: scroll up for the error"
+> # ════════ ⏹️ END ════════
 > ```
-> git checkout main && git pull origin main \
->   && grep -q '^2.26.0$' VERSION \
->   && git tag v2.26.0 && git push origin v2.26.0
-> ```
->
-> Tell me when it's done and I'll take it from there — watch the run, add the
-> notes, verify, and record SHIP ✅ (it ships in the next release's PR). The branch deletion is yours too;
-> I'll give you that block at the end.
+> ### ⏹️ END — nothing else to run
+> No need to reply. Your next message starts with me checking the tag, then I
+> watch the release run, add the notes, verify, and record SHIP ✅ (it ships in
+> the next release's PR). The branch deletion is yours too; I'll give you that
+> block at the end.
+
+**The block repeats the CI status in the user's own terminal when the project
+has CI and the user's shell can run it**, as manual mode's merge-to-tag block
+does (`SHIP_REFERENCE.md`, step 3). Claude has already confirmed CI green on
+the merge commit, and the report says so, but the user is about to publish on
+that word alone. `gh pr checks` prints the PR's check table, and
+`gh run watch --exit-status` prints the CI run on the merge commit (it returns
+at once for a finished run) and stops the chain on anything but success, so
+the tag never lands on red. Fill in the PR number, the CI workflow file and
+the version from this project.
+
+Both blocks tag the merge commit by the SHA Claude confirmed, after checking
+the version in it (`git show <sha>:VERSION`, in the report), so neither needs
+a checkout, a pull or a clean working tree (`SHIP_REFERENCE.md`, step 3).
+
+**Use the plain block instead** (fetch, tag by SHA, push: three plain `git`
+lines that run in any shell) when any of these holds, because the CI lines
+are bash and need `gh` on the user's machine:
+- the project has no CI workflow that runs on the default branch (`gh run
+  watch` on an empty run list fails the chain and would block the tag);
+- the user's shell is Windows PowerShell, or unknown (a remote container never
+  asks it, `REMOTE_SESSION.md` item 4);
+- the user has said they don't have `gh` where they tag.
+
+```
+git fetch origin
+git tag v2.26.0 c3a49f7e2b…full-sha
+git push origin v2.26.0
+```
+
+With the plain block, put the CI result in the report (it is there anyway) and
+keep the labels and "No need to reply" around it.
 
 **Rules for this report:**
 
@@ -224,7 +262,7 @@ checkpoint 2's evidence, which is one read, not one per source:
 
 ```
 git log --oneline <base>..HEAD && gh pr view --json state,mergeCommit,url \
-  && gh run list --limit 5 && cat .claude/dev-skills-gates.md
+  && gh run list --limit 5 && cat .dev-skills-gates.md
 ```
 
 ### When it stops

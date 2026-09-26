@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.39.1
+version: 2.40.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -13,12 +13,14 @@ description: >
 # Enforcement checks (ENFORCEMENT.md). Claude Code registers these when the
 # skill loads and runs them until the session ends. They only read and answer
 # allow / deny / ask. If Python 3 or the checks file is missing, git, gh and
-# docker commands are blocked rather than let through unchecked.
+# docker commands are blocked rather than let through unchecked. On Windows they
+# run in Git Bash (Git for Windows), which Claude Code finds on its own.
 hooks:
   PreToolUse:
     - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
       hooks:
         - type: command
+          shell: bash
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
@@ -30,6 +32,7 @@ hooks:
     - matcher: "AskUserQuestion"
       hooks:
         - type: command
+          shell: bash
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
@@ -37,6 +40,7 @@ hooks:
   Stop:
     - hooks:
         - type: command
+          shell: bash
           timeout: 15
           command: >-
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
@@ -108,7 +112,7 @@ stays semi-autonomous.** A blocked gate, a Critical/High finding, a failed CI
 or release run, a `403` on a branch push: stop, surface it, let the user decide.
 
 **Record the mode where session state lives**: the `Mode:` row of
-`.claude/dev-skills-gates.md` (Section 2), shown on every tracker display, e.g.
+`.dev-skills-gates.md` (Section 2), shown on every tracker display, e.g.
 `Mode: semi-autonomous (approved 2026-09-19) — commits and the tag still
 require the user's approval`. A mode held only in conversation dies at
 compaction.
@@ -136,7 +140,8 @@ explicit approval. Violations of this rule break trust.
   "Ready to commit these changes? Here's what's staged: [summary]"
 - Wait for an explicit "yes", "commit", or "go ahead" before running `git commit`.
 - NEVER create a PR until the Release Gate (Gate 5) is reached.
-- NEVER push to remote without passing through the Ship Gate (Gate 6).
+- NEVER push to the default branch or push a tag outside Gate 6. Branch pushes
+  follow the track's gates (Section 2).
 - NEVER commit directly to `main` or `master`. All work happens on branches.
   If the user is on the default branch, create a working branch before committing.
 - A vague "ok" or "sure" in response to something else is NOT commit approval.
@@ -208,7 +213,7 @@ nothing tracked have no gates. That is the entire exemption.
 their GitHub MCP equivalents — **whether you execute it or present it for the
 user to run** (Section 1), STOP and do all four:
 
-1. **Read the gate state file** (`.claude/dev-skills-gates.md`). If it is missing
+1. **Read the gate state file** (`.dev-skills-gates.md`). If it is missing
    or stale, re-derive state from evidence (`GATE_REFERENCE.md`, "Gate state
    file"). Unknown is never "passed."
 2. **Name the track.** Work commit, or release sequence? (below)
@@ -271,9 +276,14 @@ tags or publishes, it is a release sequence, even if the user calls it "just a
 quick push."
 
 **A merge to the default branch with no publishing intent is a work commit.**
-Say so: a tracker update or a docs typo gets RELEASE and SHIP ➖ N/A with the
-reason stated ("no version/artifact/tag involved"). Six-gate ceremony there is
-the friction that gets real ambiguous cases waved through. **"Default branch"
+Say so, and record `Track: work commit`. VERSION, RELEASE and SHIP get
+`➖ no publishing intent` (these words, on the row's first line). BUILD, SECURITY
+and DOCS still run on the merged code: BUILD is ➖ only for a structural reason
+(no build system, a docs-only diff), DOCS checks doc claims without a changelog
+entry, and SECURITY reads `0 open`. The checks accept this only with that
+`Track:` row, and deny any tag or release while it holds (`ENFORCEMENT.md`,
+A4). Six-gate ceremony there is the friction that gets real ambiguous cases
+waved through. **"Default branch"
 is whatever the remote reports** (`git remote show origin`), never an assumed
 name. **When this repo's convention is genuinely unclear, ask once, at session
 start**, not mid-gate with a PR already blocked.
@@ -282,7 +292,8 @@ start**, not mid-gate with a PR already blocked.
 
 The tracker is a file, not a message: history gets compacted, and a tracker
 rebuilt from memory is rebuilt optimistically. **File:**
-`.claude/dev-skills-gates.md` in the repo root. Its format and row rules are
+`.dev-skills-gates.md` in the repo root, not under `.claude/`, where Claude
+Code asks before every edit. Its format and row rules are
 in `SESSION_START.md`, where it is first written. The re-derivation table and
 resume procedure are in `GATE_REFERENCE.md`, "Gate state file": load it
 whenever the file is missing, stale or compacted away, or a user-driven action
@@ -292,10 +303,11 @@ has to be credited.
   row** is `unchosen` until the user answers, and missing or `unchosen` blocks
   every git write (Operating modes).
 - **Read it** before every git write operation, and whenever asked for status.
-- **Local sessions: gitignored and never committed.** Every session rewrites
-  it, so a tracked copy leaves the tree dirty and blocks `git checkout`. Where
-  an earlier release committed it, untrack it (`SESSION_START.md`, "Write the
-  gate state file").
+- **Local sessions: gitignored and never committed**, like handoffs (§5.6).
+  **Nothing the skill writes locally may stand in the way of a commit, PR,
+  checkout or pull**: both are gitignored, so they are never staged and never
+  make the tree dirty, and a tracked copy from an earlier release is untracked
+  at session start (`SESSION_START.md`, "Write the gate state file").
 - **Remote containers: commit it to the working branch** (`git add -f` if
   gitignored), or it dies with the container. It ships inside the release PR
   with gates 1–5 ✅ and SHIP ⏳, and the post-tag SHIP ✅ line folds into the
@@ -320,7 +332,8 @@ scanner that never ran and a disabled Dependabot feed all look like success.
 
 **Marking a gate ➖ N/A:** state the structural reason on the tracker, then move
 on. A gate can only be N/A for structural reasons (no build system, no compiled
-artifacts, no app UI). "We'll do it later" is a skip attempt, and skips are
+artifacts, no app UI), or as `➖ no publishing intent` on a work-commit merge
+(above). "We'll do it later" is a skip attempt, and skips are
 blocked.
 
 **User-driven operations.** A commit, push, PR or merge the user did outside
@@ -582,13 +595,14 @@ in one block (`SHIP_REFERENCE.md`, step 3).
 
 **Treat Sonnet as the maximum model for the session** unless the user has
 explicitly approved something stronger. If the system prompt names a model
-above Sonnet (Opus, Fable), say so at the start of work: "This session is
-running on [model], which exceeds the Sonnet cost ceiling. Run `/model sonnet`
-to switch down, or tell me you want to stay on [model] for this task." Do not
-proceed with substantial work on an above-ceiling model until the user switches
-or approves. Approval covers the current task only; re-raise on a new one. If
-a task genuinely warrants a stronger model (architecture, root-cause debugging,
-security analysis), say so and ask. Only the user can switch (`/model`); offer
+above Sonnet (Opus, Fable), ask once, with the session-start questions: switch
+down (`/model sonnet`) or stay on [model]. **The answer covers the whole
+session.** Record it as the gate file's `Model:` row (`Model: Opus 5.5 —
+approved for this session`) and never raise it again that session: not at the
+end of replies, not on a new task. A new session, or a switch to a different
+above-ceiling model, asks again. Do not proceed with substantial work on an
+above-ceiling model until the user switches or approves. If a task genuinely warrants a stronger model
+(architecture, root-cause debugging, security analysis), say so once. Only the user can switch (`/model`); offer
 once to set `"model": "sonnet"` in `~/.claude/settings.json` if they keep
 landing on expensive models.
 
@@ -632,6 +646,22 @@ Say it in one line, not as an open question that is easy to drop:
 
 > This session is carrying [N] turns and the release is done — a fresh one would
 > be cheaper. Want a handoff summary?
+
+**One handoff, always replaced.** Write it to `.dev-skills-handoff.md` in the
+repo root (gitignored; never under `.claude/`, which prompts on every edit),
+overwriting the last one. **Local sessions: commit it locally, never push it**:
+save it as a parentless commit on the local-only ref `refs/dev-skills/handoff`,
+outside every branch, so no normal push sends it, it never touches the index,
+and the one it replaces is garbage-collected. This bookkeeping needs no commit
+approval. One call:
+
+```
+git update-ref refs/dev-skills/handoff "$(printf '100644 blob %s\tHANDOFF.md\n' "$(git hash-object -w .dev-skills-handoff.md)" | git mktree | xargs git -c user.name=dev-skills -c user.email=dev-skills@localhost commit-tree -m 'dev-skills handoff')"
+```
+
+Session start reads it back (`git show refs/dev-skills/handoff:HANDOFF.md`).
+**Remote containers: commit and push the file on the working branch**, or it
+dies with the container. The user can override either way.
 
 **Handoff format** (also used by Section 5.9). Keep it under ~30 lines:
 
@@ -722,30 +752,18 @@ Offer once. Don't nag.
 ## 6. Session start
 
 When this skill loads, **read `SESSION_START.md` from this skill's base
-directory** and follow it in order:
-- the self-check
-- **the version check** against the latest upstream tag. If this copy is
-  behind, the loud bracketed warning goes first, then the update choice (Claude
-  installs the whole release, the user runs one command, or continue), and
-  `⚠️ outdated` rides on every later tracker
-- step 0 environment detection (local / remote container / Termux). It decides
-  who runs git, whether to ask the shell question, `gh` vs MCP, and where the
-  state file lives. A native Linux local session also gets a one-line
-  `claude --rc` offer
-- **step 1a, the fork check**
-- steps 1–6 (repo, shell, sync, branch, state, local-dev and CI workflow
-  detection)
-- step 7, the unfinished-release check
-- **the mode choice**, which blocks until answered
-- the gate state file
-- the banner and the MCP check
+directory** and follow it in order: the one-call probe, then the **version
+check** (an outdated copy is the first thing reported), environment detection
+(it decides who runs git), the **fork check**, the repo steps, the questions
+(enforcement, **mode**, which blocks until answered), the gate state file, the
+banner and the MCP check.
 
 Then: "What are we building?"
 
 ## 7. Workflow status
 
 When asked "status", "where are we", or at any natural checkpoint, read
-`.claude/dev-skills-gates.md` and show the full gate tracker with current state,
+`.dev-skills-gates.md` and show the full gate tracker with current state,
 naming the active track (work commit / release sequence) and the active mode
 (manual / semi-autonomous). If the file is missing
 or stale, re-derive from evidence per Section 2 before answering — do not
@@ -755,13 +773,12 @@ reconstruct the tracker from memory.
 
 ## 8. Session-end checkpoint
 
-**Fires when the session is winding down**: "thanks", "that's all", "looks
-good", silence, or any sign the work is done. Before wrapping up, read the
+**Fires when the session is winding down**: "thanks", "that's all", silence, or any sign the work is done. Before wrapping up, read the
 evidence for steps 1–5 in one call (§5.1). It is `;`-separated so that one
 failure cannot hide the rest, and each failure is itself a finding:
 
 ```
-git status -sb; git diff --stat <start-commit>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .claude/dev-skills-gates.md; docker ps --format '{{.Names}}'
+git status -sb; git diff --stat <start-commit>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .dev-skills-gates.md; docker ps --format '{{.Names}}'
 ```
 
 1. **Were source files modified this session?** (`git status`, `git diff`
@@ -778,6 +795,9 @@ git status -sb; git diff --stat <start-commit>; git log --oneline origin/<defaul
    testing must be gone from `docker ps`. Remove it now if not.
 6. **Token impact estimate** (Section 5.7). This checkpoint is its firm
    trigger.
+7. **Lessons for the skill itself.** If this session showed a rule, check or
+   gap in *this skill* that should change, list them and ask once whether to
+   record them (`LESSONS_REFERENCE.md`). A no drops them.
 
 **Remote containers: uncommitted work is destroyed, not pending.** Escalate:
 
@@ -791,93 +811,36 @@ Semi-autonomous mode does not skip this checkpoint. Uncommitted changes still
 need the user's yes, and Claude then finishes the open gates itself instead of
 handing back a block.
 
-## 9. Audit mode
+## 9. Audit mode and workflows
 
-On "audit my project", "scan this codebase", "security review", or "check my
-code": first read `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`, and every
-platform file the project matches (`WORKFLOW_REFERENCE.md` Step 1 signals):
-`SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, `SECURITY_ANDROID.md` (+
-`QUALITY_ANDROID.md`). Then:
-1. Discover source files via Glob
-2. Triage: read high-risk files first (auth, login, upload, config, api,
-   routes, crypto, token, secret, password)
-3. Grep for dangerous patterns (`eval(`, `shell=True`, `pickle.loads`, `md5`,
-   `Invoke-Expression`, `innerHTML`, hardcoded strings, `.env` files)
-4. Apply every security rule from Section 4
-5. Output findings by severity (🚨 Critical, ⚠️ High, 📝 Medium, 💡 Low) with
-   file:line, description, and fix
-6. End with a summary: files scanned, findings by severity, top 3 next steps
-
-### 9.1 Workflow audit
-
-On "audit my workflows", "review my CI", "check my GitHub Actions", or when a
-full audit finds `.github/workflows/`: **load `WORKFLOW_REFERENCE.md`** and
-follow its **Workflow audit** procedure (the checklist on every workflow file,
-findings by severity, missing workflows for the environment, CI/local-dev
-drift). As part of a full audit, fold its findings into the summary.
-
-### 9.2 Guided workflow creation
-
-On any request to create, add or set up a GitHub Actions workflow or CI/CD
-("create a workflow", "set up CI", "add a release workflow", "I need a
-pipeline", …): **load `WORKFLOW_REFERENCE.md`** and follow its **Workflow
-selection procedure**: detect the environment, check existing workflows, ask
-every configuration question in one turn, generate from the matching template,
-validate against best practices. Generated workflows are SHA-pinned,
-least-privilege, and concurrency- and timeout-guarded by default. Recommend
-Dependabot for action SHAs whenever creating or auditing workflows.
+- **Audit** ("audit my project", "scan this codebase", "security review",
+  "check my code"): read `SECURITY_REFERENCE.md` and follow its "Audit mode"
+  procedure.
+- **Workflow audit** ("audit my workflows", "review my CI", "check my GitHub
+  Actions", or a full audit that finds `.github/workflows/`) and **workflow
+  creation** ("create a workflow", "set up CI", "add a release workflow", …):
+  load `WORKFLOW_REFERENCE.md` and follow its procedure. Generated workflows
+  are SHA-pinned, least-privilege, and concurrency- and timeout-guarded.
 
 ---
 
 ## 10. Project standards — every project
 
-The user's standing requirements for every project this skill touches. Raise
-each one **when the project or feature it applies to is being designed**, not
-first at a gate. Record the user's answer on the tracker's `Standards:` row, so
-a declined item is a decision on the record and not a gap.
+The user's standing requirements. Raise each **when the project or feature it
+applies to is being designed**, not first at a gate, and record the answer on
+the tracker's `Standards:` row, so a declined item is a decision on the record.
+**Before designing, read `STANDARDS_REFERENCE.md`**: what each one requires in
+full, and how to build it.
 
-1. **Encryption at rest is always considered.** The security section of every
-   project (design notes, README "Security", Gate 3 output) states what is
-   stored (database, config, uploads, tokens, backups), whether each is
-   encrypted at rest, how, and where the key lives. "Not needed, because …" is
-   an answer. Silence is not.
-2. **Login means TOTP, 30-day trust, and a rescue path, offered.** Any project
-   with user authentication gets all three offered: **TOTP 2FA**, a **"trust
-   this device for 30 days"** option, and an **unlock / rescue feature** for a
-   locked-out user. The user decides. Record which were accepted or declined.
+1. **Encryption at rest is always considered**: what is stored, whether it is
+   encrypted, how, and where the key lives. "Not needed, because …" is an
+   answer; silence is not.
+2. **Login offers TOTP 2FA, "trust this device for 30 days", and a rescue
+   path.** The user decides each.
 3. **The main page links to GitHub and the latest release notes, without
-   exception.** The README's top section, and the app's main page or screen
-   when it has a UI, links to the GitHub repo and to the release notes for the
-   current version (`GATE_REFERENCE.md`, Gate 1, checks 5–6). Gate 1 blocks
-   without both.
-4. **Docker projects offer Apprise notifications.** When the project ships as
-   a Docker container, offer notifications through
-   [Apprise](https://github.com/caronc/apprise): an `APPRISE_URLS` setting
-   (env var or settings page, treated as a secret and never logged), the
-   events worth sending (errors, updates, security events such as lockouts
-   and new-device logins), and a "send test notification" action. The user
-   decides. Record it.
-5. **Docker projects document a compose quickstart.** The README's install
-   section is a copy-paste quickstart, in this order:
-   - **A one-line directory setup** that creates every host directory the
-     compose file mounts and `cd`s into it.
-   - **The compose block, with its explanations as `#` comments at the
-     bottom of the YAML**, below the last setting, never inline or above it.
-     There is one comment line per setting worth explaining (ports, env vars,
-     each mount). The settings read clean, and the notes travel with the file.
-   - **The filename, stated outright:** save it as `compose.yaml`. Then the
-     start command.
-
-   **Every volume is a bind mount under `/opt/docker/<container-name>/`**
-   (the user's convention, and the example path). Never a named volume.
-   **Never `network_mode: host` without the user's explicit permission** for
-   that container, recorded with its reason; use `ports:` instead
-   (`SECURITY_LINUX.md`). **The
-   image tag is pinned to the current version**, never `latest`. Gate 1 treats
-   it as a version reference, so a release that bumps the version bumps the
-   compose file too (`GATE_REFERENCE.md`, Gate 1, check 2). Gate 4 checks the
-   quickstart.
-
-**Before designing a project or a feature these apply to, read
-`STANDARDS_REFERENCE.md`**: how each login piece is built, and the compose
-quickstart example.
+   exception.** Gate 1 blocks without both.
+4. **Docker projects offer Apprise notifications** (`APPRISE_URLS`, a secret).
+5. **Docker projects document a compose quickstart.** Every volume is a bind
+   mount under `/opt/docker/<container-name>/`. Never `network_mode: host`
+   without the user's explicit permission for that container. The image tag
+   is pinned to the current version, never `latest`.

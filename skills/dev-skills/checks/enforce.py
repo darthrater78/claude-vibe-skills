@@ -34,7 +34,7 @@ import tempfile
 import time
 from typing import NoReturn
 
-STATE_REL = os.path.join(".claude", "dev-skills-gates.md")
+STATE_REL = ".dev-skills-gates.md"
 GATE_EMOJI = {
     "VERSION": "🔢", "BUILD": "🔨", "SECURITY": "🔒",
     "DOCS": "📄", "RELEASE": "📦", "SHIP": "🚀",
@@ -42,13 +42,18 @@ GATE_EMOJI = {
 WORK = ["SECURITY"]
 PR = ["VERSION", "BUILD", "SECURITY", "DOCS"]
 RELEASE = ["VERSION", "BUILD", "SECURITY", "DOCS", "RELEASE"]
+NO_INTENT = re.compile(r"no publishing intent", re.I)
+NO_INTENT_GATES = {"VERSION", "RELEASE", "SHIP"}
 MAX_STOP_BLOCKS = 2  # per user prompt, then the reply goes through with a visible warning
 
 
 # --- output -------------------------------------------------------------------
 
 def emit(obj: dict) -> NoReturn:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    # Bytes, not text: on Windows sys.stdout encodes with the ANSI code page
+    # (cp1252), which can't carry the emoji in these messages. Claude Code reads UTF-8.
+    sys.stdout.buffer.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+    sys.stdout.flush()
     sys.exit(0)
 
 
@@ -159,6 +164,14 @@ class Gates:
             out.append(line)
         return "\n".join(out)
 
+    @property
+    def work_track(self) -> bool:
+        return bool(re.match(r"Track:\s*work commit", self.first("Track:") or "", re.I))
+
+    def no_intent_rows(self) -> list[str]:
+        return [line.strip() for gate in GATE_EMOJI if (line := self.row(gate))
+                and "➖" in line and NO_INTENT.search(line)]
+
     def missing(self, required: list[str]) -> list[str]:
         out = []
         for gate in required:
@@ -167,6 +180,13 @@ class Gates:
                 out.append(f"{gate} — no '{GATE_EMOJI[gate]} {gate}' row")
             elif "✅" not in line and "➖" not in line:
                 out.append(line.strip())
+            elif "✅" not in line and NO_INTENT.search(line):
+                # ➖ "no publishing intent" is only for VERSION, RELEASE and SHIP, on the
+                # work-commit track (SKILL.md §2, "A merge ... with no publishing intent").
+                if gate not in NO_INTENT_GATES:
+                    out.append(f"{line.strip()} (➖ no publishing intent covers only VERSION, RELEASE and SHIP)")
+                elif not self.work_track:
+                    out.append(f"{line.strip()} (➖ no publishing intent needs 'Track: work commit')")
         return out
 
     def origin(self) -> tuple[str | None, bool]:
@@ -468,6 +488,7 @@ class Op:
         self.remote = None
         self.gh_repos = []
         self.is_gh = False
+        self.publishes = False  # a tag or a GitHub release: never on the work-commit track
 
 
 def classify(argv: list[str], root: str | None) -> list["Op"]:
@@ -484,6 +505,7 @@ def classify(argv: list[str], root: str | None) -> list["Op"]:
                 pass  # local tag deletion, not a ref on the remote
             elif names and not any(TAG_READ_FLAGS.match(f) for f in flags):
                 ops.append(Op("user_only", "creating a tag", "tag creation"))
+                ops[-1].publishes = True
         elif sub == "push":
             ops.extend(classify_push(args, root))
     base = os.path.basename(argv[0]) if argv else ""
@@ -498,7 +520,9 @@ def classify_push(args: list[str], root: str | None) -> list["Op"]:
     flags = [a for a in args if a.startswith("-")]
     pos = [a for a in args if not a.startswith("-")]
     if any(f in ("--tags", "--follow-tags", "--mirror", "--delete", "-d", "--prune") for f in flags):
-        return [Op("user_only", "pushing tags or deleting a ref", "tag push / ref deletion")]
+        op = Op("user_only", "pushing tags or deleting a ref", "tag push / ref deletion")
+        op.publishes = any(f in ("--tags", "--follow-tags", "--mirror") for f in flags)
+        return [op]
     remote = pos[0] if pos else None
     refspecs = pos[1:]
     branch = git_head_branch(root)
@@ -514,7 +538,9 @@ def classify_push(args: list[str], root: str | None) -> list["Op"]:
         src, _, dst = spec.partition(":")
         dst = dst or src
         if "refs/tags/" in spec or VERSIONISH.match(dst):
-            return [Op("user_only", "pushing a tag", "tag push")]
+            op = Op("user_only", "pushing a tag", "tag push")
+            op.publishes = True
+            return [op]
         dst = dst.replace("refs/heads/", "")
         if dst == "HEAD":
             dst = branch or "HEAD"
@@ -547,6 +573,7 @@ def classify_gh(args: list[str]) -> list["Op"]:
             op.targets_default = True
     elif head == ["release", "create"]:
         op = Op("release", "creating a release")
+        op.publishes = True
     elif head == ["release", "delete"]:
         op = Op("user_only", "deleting a release", "release deletion")
     elif words[:1] == ["api"]:
@@ -567,6 +594,7 @@ def classify_gh(args: list[str]) -> list["Op"]:
                 op.targets_default = True
             elif re.search(r"/releases(/|$)", endpoint):
                 op = Op("user_only" if method == "DELETE" else "release", "a release through gh api")
+                op.publishes = method != "DELETE"
     if op:
         op.is_gh = True
         op.gh_repos = gh_repo_flags(args)
@@ -609,6 +637,10 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
     problems = []
     slug, is_fork = gates.origin()
     for op in ops:
+        if op.publishes and (gates.work_track or gates.no_intent_rows()):
+            problems.append(f"{op.label} publishes, but the gate file is on the work-commit track "
+                            "(Track: work commit, or a ➖ no publishing intent row). A release runs all six gates.")
+            continue
         if op.kind == "user_only":
             if not presented:
                 problems.append(f"{op.label} is the user's to run in both modes (SKILL.md §5.8). "
@@ -667,12 +699,17 @@ def lan_ip() -> str | None:
         return None
 
 
-ROUTE_RECIPE = re.compile(r"HOST_IP=\"?\$\(\s*ip\s+-4\s+route\s+get\s+1\.1\.1\.1")
+# The documented ways to read the host's LAN IP from its default route: `ip` on
+# Linux, Find-NetRoute on Windows (from PowerShell, or through powershell.exe in Git Bash).
+ROUTE_RECIPE = re.compile(r"HOST_IP=\"?\$\(\s*ip\s+-4\s+route\s+get\s+1\.1\.1\.1"
+                          r"|HOST_IP\s*=\s*\"?\$?\(\s*(powershell(\.exe)?\s+(-NoProfile\s+)?-Command\s+[\"']?\(?)?"
+                          r"\(?\s*Find-NetRoute\s+-RemoteIPAddress\s+1\.1\.1\.1", re.I)
 
 
 def port_problem(spec: str, env: dict[str, str], recipe_ok: bool) -> str | None:
     """Problem with one published-port spec, or None."""
     spec = spec.strip().strip("'\"")
+    spec = re.sub(r"\$\(\$(\w+)\)", r"${\1}", spec)  # PowerShell "$($HOST_IP):8080:80"
     for var in re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?", spec):
         if var in env:
             spec = re.sub(r"\$\{?" + var + r"\}?", env[var], spec)
@@ -739,6 +776,8 @@ def mkdir_targets(text: str, base: str) -> set[str]:
 def temp_mount_problems(who: str, sources: list[str], as_user: bool, text: str, base: str) -> list[str]:
     """A10: a bind mount under a temp folder must never end up owned by root."""
     problems = []
+    if os.name == "nt":
+        return problems  # Docker Desktop creates missing mount folders as the Windows user, not root
     for src in sources:
         if not in_temp(src, base):
             continue
@@ -761,6 +800,8 @@ def temp_mount_problems(who: str, sources: list[str], as_user: bool, text: str, 
 
 
 def restart_mount_problem(who: str, restart: str | None, sources: list[str], base: str) -> str | None:
+    if os.name == "nt":
+        return None  # A9 is about a Linux reboot wiping /tmp; Windows doesn't clear %TEMP% on boot
     restart = (restart or "").strip("'\" ").split(":")[0]
     temp = [src for src in sources if in_temp(src, base)]
     if restart in RESTARTS and temp:
@@ -1112,7 +1153,7 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     return None
 
 
-GATE_FILE_SPEC = re.compile(r"(^|[/\\])dev-skills-gates\.md$")
+GATE_FILE_SPEC = re.compile(r"(^|[/\\])\.?dev-skills-gates\.md$")
 CLAUDE_DIR_SPEC = re.compile(r"^(\.|\./|:/|\.claude[/\\]?(\*)?|\./\.claude[/\\]?(\*)?)$")
 
 
@@ -1129,8 +1170,29 @@ def gate_file_add_check(argv: list[str]) -> str | None:
     specs = [a for a in args if not a.startswith("-")]
     if any(GATE_FILE_SPEC.search(s) for s in specs) or (force and any(CLAUDE_DIR_SPEC.match(s) for s in specs)) \
             or (force and every and not specs):
-        return ("this stages .claude/dev-skills-gates.md on a local session. The gate file stays untracked "
+        return ("this stages the gate file (.dev-skills-gates.md) on a local session. The gate file stays untracked "
                 "locally: every session rewrites it, so a committed copy blocks git checkout (SKILL.md §2).")
+    return None
+
+
+HANDOFF_SPEC = re.compile(r"(^|[/\\])(\.dev-skills-handoff\.md$|\.dev-skills-handoffs([/\\]|$)|\.claude[/\\]handoffs([/\\]|$))")
+HANDOFF_REF = re.compile(r"refs/dev-skills/")
+
+
+def handoff_add_check(argv: list[str]) -> str | None:
+    """Handoffs stay local unless the session is a remote container, where they'd
+    die with it. The user can still say yes to committing one, so this asks."""
+    g = git_argv(argv)
+    if not g or os.environ.get("CLAUDE_CODE_REMOTE", "").lower() in ("1", "true", "yes"):
+        return None
+    specs = [a for a in g[1:] if not a.startswith("-")]
+    if g[0] == "add" and any(HANDOFF_SPEC.search(sp) for sp in specs):
+        return ("this stages the handoff on a branch on a local session. Locally it's committed to the "
+                "local-only ref refs/dev-skills/handoff, never to a branch that gets pushed (SKILL.md §5.6). "
+                "Approve only if the user asked for this.")
+    if g[0] == "push" and any(HANDOFF_REF.search(sp) for sp in specs):
+        return ("this pushes the local handoff ref. Handoffs stay local unless the user asks (SKILL.md §5.6). "
+                "Approve only if the user asked for this.")
     return None
 
 
@@ -1179,6 +1241,10 @@ def pre_tool(payload: dict) -> NoReturn:
             pre_decision("deny", "blocked:\n- " + "\n- ".join(problems))
         if res:
             pre_decision(*res)
+        for argv in simple_commands(cmd, ps=tool == "PowerShell"):
+            handoff = handoff_add_check(argv)
+            if handoff:
+                pre_decision("ask", handoff)
         allow()
 
     m = re.match(r"^mcp__(.+)__([a-z_]+)$", tool)
@@ -1192,6 +1258,8 @@ def pre_tool(payload: dict) -> NoReturn:
         if kind:
             op = Op(kind, name)
             op.is_gh = True
+            op.publishes = name == "create_release"
+            op.targets_default = name == "merge_pull_request"
             owner, repo = inp.get("owner"), inp.get("repo")
             if owner and repo:
                 op.gh_repos = [f"{owner}/{repo}"]
@@ -1205,9 +1273,25 @@ def pre_tool(payload: dict) -> NoReturn:
 
 FENCE = re.compile(r"^(\s*)(```|~~~)")
 BAD_URL = re.compile(r"https?://(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\]|172\.1[7-9](?:\.\d{1,3}){2})(?=[:/\s)`'\"\]]|$)", re.I)
-GIT_CMD = re.compile(r"(^|&&|\|\||[;|(])\s*(sudo\s+|env\s+)?(git\s+(-C\s+\S+\s+)?(add|commit|push|pull|fetch|checkout|switch|"
-                     r"branch|merge|rebase|tag|reset|status|log|diff|clone|remote|stash|cherry-pick|revert|rev-parse|ls-remote)"
+GIT_CMD = re.compile(r"(^|&&|\|\||[;|(])\s*(sudo\s+|env\s+)?(git\s+(-C\s+\S+\s+)?(add|commit|push|pull|checkout|switch|"
+                     r"branch|merge|rebase|tag|reset|clone|remote|stash|cherry-pick|revert)"
                      r"|gh\s+(pr|release|api|repo|run|issue|auth|workflow))\b", re.M)
+# A block of reads only (git status/log/diff/fetch, ls-remote) is not policed as a run block
+# unless it is labeled one: a bounce costs a whole model request.
+NO_REPLY = re.compile(r"no need to reply|(don'?t|do not) need to (reply|tell me|answer)|nothing (you need )?to reply", re.I)
+ASKS = re.compile(r"\?\s*(\*\*)?\s*$|^\s*(\*\*)?(tell me|reply with|answer|let me know|say )", re.I | re.M)
+SKELETON = """
+Run-block shape (ENFORCEMENT.md C3-C7):
+`<one-line tracker>`
+
+### ▶️ RUN THIS — <what it does> · in <repo>
+```bash
+# ════════ ▶️ START: <what>
+<commands chained with &&>
+# ════════ ⏹️ END
+```
+### ⏹️ END — nothing else to run
+No need to reply."""
 TRACKER = re.compile(r"🔢.*🔒|🔒️?\s*SECURITY")
 
 
@@ -1272,7 +1356,9 @@ def stop_check(payload: dict) -> NoReturn:
         if not any(TRACKER.search(l) for l in lines[:first]):
             problems.append("C5: no gate tracker line above the first ▶️ RUN THIS block.")
         after_last = "\n".join(lines[run[-1][1] + 1:])
-        if "no need to reply" not in after_last.lower():
+        # A reply that asks the user something after the block needs their answer, so
+        # "No need to reply" would be false there.
+        if not NO_REPLY.search(after_last) and not ASKS.search(after_last):
             problems.append("C7: say 'No need to reply' under the last ▶️ RUN THIS block.")
         for k, (start, end, body, label) in enumerate(run, 1):
             tag = f"block {k}"
@@ -1288,8 +1374,10 @@ def stop_check(payload: dict) -> NoReturn:
             if "⏹️ END" not in near(lines, end, 1):
                 problems.append(f"C3: {tag} needs a '### ⏹️ END' line directly below it.")
             body_text = "\n".join(body)
-            cmds = simple_commands(body_text)
-            if any(argv and argv[0] == "cd" for argv in cmds):
+            fence_lang = lines[start].strip().lstrip("`~").strip().lower()
+            cmds = simple_commands(body_text, ps=fence_lang in ("powershell", "pwsh", "ps1", "ps"))
+            if any(argv and argv[0].lower() in ("cd", "set-location", "sl", "chdir", "pushd", "push-location")
+                   for argv in cmds):
                 problems.append(f"C4: {tag} contains a cd. Blocks assume the terminal is already in the repo.")
             ops = []
             for argv in cmds:
@@ -1304,9 +1392,10 @@ def stop_check(payload: dict) -> NoReturn:
         emit({"systemMessage": "dev-skills enforcement: this reply still breaks these rules after "
                                f"{MAX_STOP_BLOCKS} fixes and was let through so the session isn't stuck:\n- "
                                + "\n- ".join(problems)})
+    shape = SKELETON if any(p.startswith(("C3", "C5", "C7")) for p in problems) else ""
     emit({"decision": "block",
           "reason": "dev-skills enforcement — fix the reply before ending it (see ENFORCEMENT.md):\n- "
-                    + "\n- ".join(problems)})
+                    + "\n- ".join(problems) + shape})
 
 
 def stop_counter(payload: dict) -> int:
@@ -1383,7 +1472,9 @@ RAW = {"text": ""}
 
 def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
-    RAW["text"] = sys.stdin.read()
+    # Claude Code sends UTF-8. Decode it as such: Windows' default stdin encoding
+    # (cp1252) garbles emoji and raises on some bytes (▶️ contains 0x8F).
+    RAW["text"] = sys.stdin.buffer.read().decode("utf-8", errors="replace")
     try:
         payload = json.loads(RAW["text"] or "{}")
     except ValueError:

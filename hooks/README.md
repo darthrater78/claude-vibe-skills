@@ -17,10 +17,9 @@ session on a machine, including sessions that never load the skill.
   for anything else. The skill-loaded default doesn't have this problem.
 - **Declining still works.** It's the same `Hook enforcement: declined` row in the
   project's gate file.
-- **They need Python 3.** Unlike the skill-loaded version, the commands here
-  have no fallback: if `python3` is missing, the check errors and Claude Code
-  lets the action through. The skill-loaded version blocks git, gh and docker
-  instead.
+- **They need Python 3**, found as `python3`, `python` or `py -3`, the same
+  as the skill-loaded version. Without it, git, gh and docker commands are
+  blocked, not let through. On Windows they run in Git Bash (Git for Windows).
 
 ## Install
 

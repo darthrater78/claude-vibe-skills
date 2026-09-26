@@ -27,7 +27,8 @@ sessions never need it. Section numbers point at `SKILL.md`.
    | `gh pr create` | `create_pull_request` |
    | `gh pr list` / `gh pr view` | `list_pull_requests` / `pull_request_read` |
    | `gh pr merge` | `merge_pull_request` |
-   | `gh release create` / `gh release view` | `list_releases` / `get_release_by_tag` + release API |
+   | `gh release create` | `create_release` (where the server has it; otherwise the user runs it) |
+   | `gh release view` | `get_release_by_tag` / `list_releases` |
    | `gh run list` / `gh run view` | `actions_list` / `actions_get` / `get_job_logs` |
 
    If neither `gh` nor GitHub MCP tools are present, say so *before* Gate 5
@@ -37,7 +38,7 @@ sessions never need it. Section numbers point at `SKILL.md`.
    container's own bash. The tag-push and ref-deletion carve-out (Section 5.8)
    still hands the user a block to run on their own machine, but that block
    carries no `cd` and nothing else that varies by shell: it is plain
-   single-line `git` commands (`git checkout`, `git pull`, `git tag`,
+   single-line `git` commands (`git fetch`, `git tag <sha>`,
    `git push`) that run unmodified in every shell `SHELL_REFERENCE.md` lists.
    So there is no clone path to ask for and no shell to ask about — put "run
    this from your local clone" in the prose above the block and leave the block
@@ -53,8 +54,8 @@ sessions never need it. Section numbers point at `SKILL.md`.
    that fires the release workflow. Present the tag block to the user even
    though everything else runs here — Section 5.8, "Tag pushes and ref
    deletions are the exceptions." Semi-autonomous mode does not change this;
-   it only adds the full pre-tag report above the block ("Semi-autonomous mode
-   — execution", below).
+   it only adds the full pre-tag report above the block (`AUTO_MODE.md`,
+   checkpoint 2).
 8. **Docker in a web container: only for projects with a Docker build
    signal** (`Dockerfile`, `docker-compose.yml`/`compose.yaml`). Measure the
    daemon, not the binary: `docker info`. A web container often ships the

@@ -4,6 +4,125 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.40.0] — 2026-09-26
+
+**Updating the gate file no longer stops for a permission prompt, the
+semi-autonomous tag block shows CI status in your own terminal, the checks
+work on Windows, tags are made from the merge commit's SHA, handoffs stay
+local, and a cost and logic review cut bounced replies, a question round
+trip, about 6KB from every release and 3KB from every request.**
+
+### Added
+- **One handoff, committed locally, never pushed** (`SKILL.md` §5.6,
+  `ENFORCEMENT.md` B7). It's written to `.dev-skills-handoff.md` (gitignored)
+  and committed to the local-only ref `refs/dev-skills/handoff` as a single
+  parentless commit, replaced each time, so handoffs never build up and the
+  last one survives `git clean`, branch switches and stashes. The commit is on
+  no branch, so it never rides along with a push or PR and never touches the
+  index. Session start reads it back. Remote containers commit the file on the
+  working branch instead, since the container is reclaimed. Staging it on a
+  branch or pushing the ref locally asks you first. Session start offers to
+  fold older committed handoffs (`.claude/handoffs/`, `HANDOFF.md`) into the
+  ref and untrack them; your answer stands.
+- **Lessons for the skill, from any project** (`LESSONS_REFERENCE.md`,
+  `SKILL.md` §8). When a session shows a rule, check or gap in the skill itself
+  that should change, Claude notes it and asks once, at the session-end
+  checkpoint or handoff. On a yes, and with this repo cloned on the machine,
+  the lessons are appended to its local-only ref `refs/dev-skills/lessons`,
+  without touching its working tree, branches or handoff. Otherwise they're
+  shown as a blurb to keep or file as an issue. A no drops them. Session start
+  here lists waiting lessons, and the ref is cleared once they're taken up or
+  dismissed. Lessons describe the skill's behavior, never the project's code
+  or data.
+- **Nothing the skill writes locally can block a commit, PR, checkout or
+  pull.** The gate file and handoffs are gitignored, a tracked copy is
+  untracked at session start, and a presented block that switches branches
+  or pulls over uncommitted changes stashes them first (`SHELL_REFERENCE.md`).
+- **A Windows Docker test recipe** (`DOCKER_TEST.md`): the LAN IP from
+  `Find-NetRoute`, from Git Bash or PowerShell, which A1 accepts like the
+  Linux `ip route` recipe.
+- **A merge with no publishing intent can go through without the release
+  gates** (`SKILL.md` §2, `ENFORCEMENT.md` A4). With `Track: work commit`,
+  VERSION, RELEASE and SHIP take `➖ no publishing intent`. BUILD, SECURITY
+  (`0 open`) and DOCS still run. The checks used to demand VERSION through
+  RELEASE on every merge, so a docs-typo merge either ran all six gates or got
+  a ➖ the rules forbade. While that track holds, a tag, a tag push or a GitHub
+  release is denied.
+- **The semi-autonomous tag block repeats the CI status before tagging**
+  (`AUTO_MODE.md`, checkpoint 2), as manual mode's merge-to-tag block already
+  did. When the project has CI, the block runs `gh pr checks` and
+  `gh run watch --exit-status` on the merge commit's run ahead of the version
+  guard and the tag, so the user sees the result themselves and the chain
+  stops before tagging on anything but success. Without CI the two lines are
+  left out. The example block also now carries the run-block labels and
+  "No need to reply" that the reply checks (C3, C7) require.
+
+### Changed
+- **The tag block tags the merge commit by SHA** (`SHIP_REFERENCE.md`, step
+  3): `git fetch origin`, `git tag vX.Y.Z <sha>`, `git push origin vX.Y.Z`.
+  Three plain lines that run in every shell, Windows PowerShell 5.1 included
+  (the old block's `grep` and `&&` didn't), with no checkout or pull, so a
+  stale or dirty local `main` can't stop it or put the tag on the wrong
+  commit. Claude checks the version in that commit before handing it over.
+  Manual mode's merge-to-tag block works the same way.
+- **Model approval covers the whole session** (`SKILL.md` §5.2). It's asked
+  once with the session-start questions, recorded on a new `Model:` row, and
+  not raised again that session.
+- **SKILL.md is ~3KB smaller on every request.** Audit mode moved to
+  `SECURITY_REFERENCE.md` and the full project standards to
+  `STANDARDS_REFERENCE.md`; §10 keeps the list that has to fire at design time.
+- **The checks send fewer replies back** (`ENFORCEMENT.md`, C3 and C7). Each
+  bounce is a full model request. C3 no longer polices code blocks that only
+  read (`git status`, `log`, `diff`, `fetch`, `ls-remote`) unless they're
+  labeled ▶️. C7 accepts other wording for "no need to reply", and skips a
+  reply that asks the user something after the block, which does need an
+  answer (one ha-dockge reply was bounced six times on this). A bounce for
+  C3, C5 or C7 now includes the block shape to copy.
+- **The session start usually asks in one call, not two.** The probe runs
+  `git fetch`, so the sync question is only asked when the branch is behind.
+  Model ceiling and branch are asked only when they apply.
+- **Gate 2's Docker test-run rules moved to `DOCKER_TEST.md`**, loaded only
+  before a Docker test container starts. `GATE_REFERENCE.md`, read for gates
+  1, 2, 4 and 5 in every project, drops from ~33KB to ~26KB.
+- **`SESSION_START.md` and `SKILL.md` §6 no longer repeat the probe**: the
+  self-check list, the version, fork and unfinished-release commands, and the
+  step list are read from the probe or `SESSION_START.md` instead. The probe
+  now also checks the eight `WORKFLOW_*.md` files, and `validate.sh` checks the
+  probe against every reference file.
+- **The semi-autonomous CI tag block needs bash and `gh`**, so it's used only
+  when the user's shell is known to run it. Windows PowerShell, an unknown
+  shell (remote containers never ask), or no CI gets the plain block.
+
+### Fixed
+- **The checks work on Windows.** They read and wrote text in the Windows
+  code page, not UTF-8, so the emoji in gate files and replies crashed them:
+  git commands were denied, replies went unchecked, and a crash while
+  reporting a problem let the action through. They now read and write UTF-8,
+  and the tests run the way Windows does. The hooks are pinned to bash (Git
+  Bash on Windows), so a machine without it gets Claude Code's "install Git
+  for Windows" error instead of PowerShell failing on bash syntax. PowerShell
+  run blocks are read as PowerShell, `Set-Location` counts as a `cd` (C4),
+  and A9/A10's temp-mount rules, which are about Linux hosts, don't apply on
+  Windows. The optional always-on install (`hooks/settings.example.json`)
+  now covers the PowerShell tool and finds Python the same way.
+- **Contradictions and stale references.** `SKILL.md` §1 no longer says every
+  push waits for Gate 6 (only default-branch pushes and tags do). Remote
+  containers never ask the shell question, where `SESSION_START.md` said they
+  asked it later. Four references to "`SESSION_START.md` step 0, item N" now
+  point at `REMOTE_SESSION.md`, where those items moved. `gh release create`
+  maps to `create_release`, not `list_releases`. "Looks good" is feedback on
+  a diff, not a session-end trigger. GitHub MCP merges now get the same
+  test-artifact check as `gh pr merge`.
+- **The gate file moved from `.claude/dev-skills-gates.md` to
+  `.dev-skills-gates.md` in the repo root.** Claude Code asks before every
+  edit under a project's `.claude/` folder, in every permission mode, and no
+  hook or allow rule lifts that. So after 2.39.1 stopped the checks' own
+  prompts, each gate update still stopped for Claude Code's. The checks, the
+  B6 staging guard and `.gitignore` follow the new path, and the
+  `gate_tracked` probe reports either path so a committed copy of the old one
+  is still untracked. An old `.claude/dev-skills-gates.md` is left in place
+  (removing it would prompt) and is never read again; delete it by hand.
+
 ## [2.39.1] — 2026-09-25
 
 **Passing a gate or setting the mode no longer stops for a permission prompt,

@@ -50,6 +50,18 @@ GATES_SEMI = GATES_NONE.replace("Mode: manual", "Mode: semi-autonomous (approved
 GATES_UNCHOSEN = GATES_ALL.replace("Mode: manual", "Mode: unchosen")
 GATES_DECLINED = GATES_NONE.replace("Mode: manual", "Mode: manual\nHook enforcement: declined (2026-09-24)")
 GATES_FORK = GATES_ALL.replace("owner/repo (not a fork)", "me/repo (fork of up/repo)")
+GATES_WORK_MERGE = """# Dev Skills gate state
+Track: work commit
+Mode: manual
+Origin: owner/repo (not a fork)
+
+🔢 VERSION    ➖ no publishing intent — docs typo
+🔨 BUILD      ➖ N/A — no build system
+🔒 SECURITY   ✅ 0 open
+📄 DOCS       ✅ claims checked
+📦 RELEASE    ➖ no publishing intent
+🚀 SHIP       ➖ no publishing intent
+"""
 GATES_HOSTNET = GATES_ALL + "Host network: hass approved 2026-09-24 — mDNS discovery\n"
 
 
@@ -78,7 +90,7 @@ def repo(gates: str | None, branch: str = "feat/x", compose: str | None = None) 
     with open(os.path.join(d, ".git", "refs", "remotes", "origin", "HEAD"), "w", encoding="utf-8") as fh:
         fh.write("ref: refs/remotes/origin/master\n")
     if gates is not None:
-        with open(os.path.join(d, ".claude", "dev-skills-gates.md"), "w", encoding="utf-8") as fh:
+        with open(os.path.join(d, ".dev-skills-gates.md"), "w", encoding="utf-8") as fh:
             fh.write(gates)
     if compose:
         with open(os.path.join(d, "compose.yaml"), "w", encoding="utf-8") as fh:
@@ -91,12 +103,16 @@ def run(mode: str, payload: dict, env: dict | None = None) -> str:
     e.pop("CLAUDE_PLUGIN_ROOT", None)
     e.pop("CLAUDE_CODE_REMOTE", None)
     e["TMPDIR"] = TMP  # keep the checks' marker and counters out of the real temp folder
+    # Windows: Python's stdin/stdout use the ANSI code page, not UTF-8, while Claude
+    # Code sends raw UTF-8 JSON (emoji not escaped). Every case runs that way.
+    e["PYTHONIOENCODING"] = "cp1252"
+    e["PYTHONUTF8"] = "0"
     e.update(env or {})
-    p = subprocess.run([sys.executable, ENFORCE, mode], input=json.dumps(payload), capture_output=True,
-                       text=True, env=e, timeout=20)
+    p = subprocess.run([sys.executable, ENFORCE, mode], input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                       capture_output=True, env=e, timeout=20)
     if p.returncode != 0:
-        return "error:" + p.stderr
-    out = p.stdout.strip()
+        return "error:" + p.stderr.decode("utf-8", "replace")
+    out = p.stdout.decode("utf-8").strip()
     if not out:
         return "allow"
     obj = json.loads(out)
@@ -200,6 +216,12 @@ CASES = [
     ("A1 LAN IP ok", lambda: bash(f"docker run --label dev-skills.test=t -d -p {LAN}:8080:8080 img"), "allow"),
     ("A1 route recipe ok", lambda: bash('HOST_IP="$(ip -4 route get 1.1.1.1 | sed -n \'s/.* src \\([0-9.]*\\).*/\\1/p\')" '
                                         '&& docker run --label dev-skills.test=t -d -p "$HOST_IP:8080:8080" img'), "allow"),
+    ("A1 Windows recipe, Git Bash ok", lambda: bash('HOST_IP=$(powershell.exe -NoProfile -Command '
+        '"(Find-NetRoute -RemoteIPAddress 1.1.1.1)[0].IPAddress" | tr -d \'\\r\') '
+        '&& docker run --label dev-skills.test=t -d -p "$HOST_IP:8080:8080" img'), "allow"),
+    ("A1 Windows recipe, PowerShell ok", lambda: pwsh('$HOST_IP = (Find-NetRoute -RemoteIPAddress 1.1.1.1)[0].IPAddress; '
+        'docker run --label dev-skills.test=t -d -p "$($HOST_IP):8080:8080" img'), "allow"),
+    ("A1 PowerShell HOST_IP without recipe", lambda: pwsh('docker run --label dev-skills.test=t -d -p "$($HOST_IP):8080:8080" img'), "deny"),
     ("A1 unknown var", lambda: bash('docker run -d -p "$IP:8080:8080" img'), "deny"),
     ("A1 no ports ok", lambda: bash("docker run --label dev-skills.test=t --rm img echo hi"), "allow"),
     ("A1 compose loopback", lambda: bash("docker compose up -d",
@@ -277,6 +299,16 @@ CASES = [
     ("A4 GH_REPO merge", lambda: bash("GH_REPO=owner/repo gh pr merge 5 --merge", gates=GATES_WORK), "deny"),
     ("A4 gh api merge", lambda: bash("gh api -X PUT repos/owner/repo/pulls/5/merge", gates=GATES_WORK), "deny"),
     ("A4 merge all gates ok", lambda: bash("gh pr merge 5 --merge"), "allow"),
+    ("A4 work-commit merge ok", lambda: bash("gh pr merge 5 --merge", gates=GATES_WORK_MERGE), "allow"),
+    ("A4 work-commit PR ok", lambda: bash("gh pr create --title x --body y", gates=GATES_WORK_MERGE), "allow"),
+    ("A4 no-intent ➖ needs work track", lambda: bash("gh pr merge 5 --merge",
+        gates=GATES_WORK_MERGE.replace("Track: work commit", "Track: release sequence")), "deny"),
+    ("A4 no-intent ➖ not for DOCS", lambda: bash("gh pr merge 5 --merge",
+        gates=GATES_WORK_MERGE.replace("📄 DOCS       ✅ claims checked", "📄 DOCS       ➖ no publishing intent")), "deny"),
+    ("A4 work track can't create a release", lambda: bash("gh release create v1.2.0", gates=GATES_WORK_MERGE), "deny"),
+    ("C2 work track can't hand over a tag", lambda: stop(RUN_OK.replace(
+        'git add -A && git commit -m "feat: x" && git push -u origin feat/x', "git tag v1.2.0 && git push origin v1.2.0"),
+        gates=GATES_WORK_MERGE), "block"),
     ("A4 pr create needs docs", lambda: bash("gh pr create --title x", gates=GATES_WORK), "deny"),
     ("A4 docker repo: no handoff/artifact/creds", lambda: bash("gh pr merge 5 --merge",
                                                              gates=GATES_ALL.replace("🔨 BUILD      ➖ N/A — no build system", "🔨 BUILD      ✅ built"),
@@ -319,61 +351,62 @@ CASES = [
     ("declined: commit allowed", lambda: bash("git commit -m x", gates=GATES_DECLINED), "allow"),
     ("declined: docker allowed", lambda: bash("docker run -p 127.0.0.1:80:80 img", gates=GATES_DECLINED), "allow"),
     # --- B5: gate file and settings edits
-    ("B5 manual gate to ✅ ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 manual gate to ✅ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                             "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 0 open"},
                                    gates=GATES_NONE), "allow"),
-    ("B5 mode set ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 mode set ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                           "old_string": "Mode: unchosen", "new_string": "Mode: manual"},
                                  gates=GATES_UNCHOSEN), "allow"),
-    ("B5 decline", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 decline", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                          "old_string": "Mode: manual", "new_string": "Mode: manual\nHook enforcement: declined"}), "ask"),
-    ("B5 host net approval", lambda: edit("Write", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 host net approval", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                     "content": GATES_ALL + "Host network: x approved today\n"}), "ask"),
-    ("B5 gate to ⏳ ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 gate to ⏳ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ⏳ scanning"},
                                       gates=GATES_NONE), "allow"),
-    ("B5 declined can't skip B5", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 declined can't skip B5", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                         "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
                                                gates=GATES_DECLINED), "ask"),
     ("B5 settings file", lambda: edit("Write", {"file_path": ".claude/settings.json", "content": "{}"}), "ask"),
-    ("B5 bash write to gate file", lambda: bash("echo 'x' >> .claude/dev-skills-gates.md"), "ask"),
+    ("B5 bash write to gate file", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "ask"),
     ("B5 bash write into checks via ~", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
                                                                   "tool_input": {"command": "cp x ~/.claude/skills/dsk/checks/enforce.py"}},
                                                      env={"CLAUDE_PLUGIN_ROOT": os.path.expanduser("~/.claude/skills/dsk")}), "ask"),
     ("B5 bash write into checks via $HOME", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
                                                                       "tool_input": {"command": "cp x $HOME/.claude/skills/dsk/checks/enforce.py"}},
                                                          env={"CLAUDE_PLUGIN_ROOT": os.path.expanduser("~/.claude/skills/dsk")}), "ask"),
-    ("B5 bash read gate file ok", lambda: bash("cat .claude/dev-skills-gates.md"), "allow"),
-    ("B5 semi-auto gate to ✅ ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 bash read gate file ok", lambda: bash("cat .dev-skills-gates.md"), "allow"),
+    ("B5 semi-auto gate to ✅ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                      "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 0 open"},
                                             gates=GATES_SEMI), "allow"),
-    ("B5 semi-auto waiver still asks", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 semi-auto waiver still asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                              "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
                                                     gates=GATES_SEMI), "ask"),
-    ("B5 semi-auto mode change ok", lambda: edit("Edit", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 semi-auto mode change ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                                   "old_string": "Mode: semi-autonomous", "new_string": "Mode: manual"},
                                                          gates=GATES_SEMI), "allow"),
-    ("B5 leaving semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 leaving semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                                            "content": GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
                                                                   gates=GATES_SEMI), "allow"),
-    ("B5 switching to semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".claude/dev-skills-gates.md",
+    ("B5 switching to semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                                                  "content": GATES_SEMI.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
                                                                         gates=GATES_NONE), "allow"),
     # --- B6: the gate file stays out of local commits
-    ("B6 git add gate file", lambda: bash("git add .claude/dev-skills-gates.md"), "deny"),
-    ("B6 git add -f gate file", lambda: bash("git add -f .claude/dev-skills-gates.md"), "deny"),
-    ("B6 git -C add gate file", lambda: bash("git -C . add -f .claude/dev-skills-gates.md && git commit -m x"), "deny"),
+    ("B6 git add gate file", lambda: bash("git add .dev-skills-gates.md"), "deny"),
+    ("B6 git add -f gate file", lambda: bash("git add -f .dev-skills-gates.md"), "deny"),
+    ("B6 git add ./gate file", lambda: bash("git add ./.dev-skills-gates.md"), "deny"),
+    ("B6 git add legacy .claude gate file", lambda: bash("git add -f .claude/dev-skills-gates.md"), "deny"),
+    ("B6 git -C add gate file", lambda: bash("git -C . add -f .dev-skills-gates.md && git commit -m x"), "deny"),
     ("B6 git add -f .claude", lambda: bash("git add -f .claude/"), "deny"),
     ("B6 git add -Af", lambda: bash("git add -Af"), "deny"),
     ("B6 git add -f . ", lambda: bash("git add --force ."), "deny"),
-    ("B6 PowerShell git add gate file", lambda: pwsh("git add .claude\\dev-skills-gates.md"), "deny"),
+    ("B6 PowerShell git add gate file", lambda: pwsh("git add .dev-skills-gates.md"), "deny"),
     ("B6 git add -A ok", lambda: bash("git add -A"), "allow"),
-    ("B6 git add .claude handoff ok", lambda: bash("git add .claude/handoffs/h.md"), "allow"),
-    ("B6 git rm --cached ok", lambda: bash("git rm --cached .claude/dev-skills-gates.md"), "allow"),
-    ("B5 git rm --cached then rm still asks", lambda: bash("git rm --cached .claude/dev-skills-gates.md; rm .claude/dev-skills-gates.md"), "ask"),
-    ("B5 git rm (not cached) gate file asks", lambda: bash("git rm .claude/dev-skills-gates.md"), "ask"),
+    ("B6 git rm --cached ok", lambda: bash("git rm --cached .dev-skills-gates.md"), "allow"),
+    ("B5 git rm --cached then rm still asks", lambda: bash("git rm --cached .dev-skills-gates.md; rm .dev-skills-gates.md"), "ask"),
+    ("B5 git rm (not cached) gate file asks", lambda: bash("git rm .dev-skills-gates.md"), "ask"),
     ("B6 remote container may stage it", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
-                                                                 "tool_input": {"command": "git add -f .claude/dev-skills-gates.md"}},
+                                                                 "tool_input": {"command": "git add -f .dev-skills-gates.md"}},
                                                     env={"CLAUDE_CODE_REMOTE": "true"}), "allow"),
     ("B5 Windows settings path", lambda: edit("Write", {"file_path": "C:\\Users\\me\\.claude\\settings.json", "content": "{}"}), "ask"),
     ("B5 bash write to Windows settings path", lambda: bash("copy x C:\\Users\\me\\.claude\\settings.local.json > out"), "ask"),
@@ -415,11 +448,11 @@ CASES = [
     ("A4 command after heredoc checked", lambda: bash("cat <<'EOF' > x\nhi\nEOF\ngit push", gates=GATES_NONE), "deny"),
     ("A4 quoted << is not a heredoc", lambda: bash('python3 -c "x=1<<y"\ngit push\ny', gates=GATES_NONE), "deny"),
     ("A4 <<- heredoc with tab delimiter", lambda: bash("cat <<-EOF > x\n\tgit push\n\tEOF\ngit push", gates=GATES_NONE), "deny"),
-    ("B5 PowerShell Set-Content gate file", lambda: pwsh('Set-Content .claude\\dev-skills-gates.md "x"'), "ask"),
-    ("B5 PowerShell Out-File gate file", lambda: pwsh("'x' | Out-File .claude/dev-skills-gates.md"), "ask"),
+    ("B5 PowerShell Set-Content gate file", lambda: pwsh('Set-Content .dev-skills-gates.md "x"'), "ask"),
+    ("B5 PowerShell Out-File gate file", lambda: pwsh("'x' | Out-File .dev-skills-gates.md"), "ask"),
     ("B5 PowerShell Copy-Item settings", lambda: pwsh("Copy-Item x C:\\Users\\me\\.claude\\settings.json"), "ask"),
-    ("B5 PowerShell .NET write gate file", lambda: pwsh("[IO.File]::WriteAllText('.claude/dev-skills-gates.md', 'x')"), "ask"),
-    ("B5 PowerShell read gate file ok", lambda: pwsh("Get-Content .claude/dev-skills-gates.md"), "allow"),
+    ("B5 PowerShell .NET write gate file", lambda: pwsh("[IO.File]::WriteAllText('.dev-skills-gates.md', 'x')"), "ask"),
+    ("B5 PowerShell read gate file ok", lambda: pwsh("Get-Content .dev-skills-gates.md"), "allow"),
     ("B5 other file ok", lambda: edit("Write", {"file_path": "README.md", "content": "hi"}), "allow"),
     # --- C: replies
     ("C ok reply", lambda: stop(RUN_OK, gates=GATES_WORK), "allow"),
@@ -446,6 +479,31 @@ CASES = [
     ("C4 cd in block", lambda: stop(RUN_OK.replace("git add -A", "cd ~/repo && git add -A"), gates=GATES_WORK), "block"),
     ("C5 no tracker", lambda: stop(RUN_OK.split("\n", 2)[2], gates=GATES_WORK), "block"),
     ("C7 no 'no need to reply'", lambda: stop(RUN_OK.replace("No need to reply.", ""), gates=GATES_WORK), "block"),
+    ("C7 question after the block ok", lambda: stop(RUN_OK.replace("No need to reply.", "Fix or waive #17?"),
+                                                     gates=GATES_WORK), "allow"),
+    ("C7 'tell me' after the block ok", lambda: stop(RUN_OK.replace("No need to reply.", "Tell me **fix or waive**."),
+                                                      gates=GATES_WORK), "allow"),
+    ("C7 other wording ok", lambda: stop(RUN_OK.replace("No need to reply.", "You don't need to reply."),
+                                          gates=GATES_WORK), "allow"),
+    ("C3 PowerShell block, push inside if ($?)", lambda: stop("`🔢✅ 🔒✅`\n```powershell\ngit add -A; if ($?) { git push -u origin feat/x }\n```\nNo need to reply."), "block"),
+    ("C4 Set-Location in a PowerShell block", lambda: stop(RUN_OK.replace("```bash", "```powershell").replace(
+        'git add -A && git commit -m "feat: x" && git push -u origin feat/x', "Set-Location C:\\src\\x; git status"),
+        gates=GATES_WORK), "block"),
+    ("handoff git add asks", lambda: bash("git add -f .dev-skills-handoff.md"), "ask"),
+    ("lessons append to another repo ok", lambda: bash("R=/home/me/claude-vibe-skills; { git -C \"$R\" show refs/dev-skills/lessons:LESSONS.md "
+        "2>/dev/null; cat <<'EOF'\n## 2026-09-26 · from x\n- $(git push origin master)\nEOF\n} | git -C \"$R\" hash-object -w --stdin "
+        "| xargs printf '100644 blob %s\\tLESSONS.md\\n' | git -C \"$R\" mktree | xargs git -C \"$R\" commit-tree -m l "
+        "| xargs git -C \"$R\" update-ref refs/dev-skills/lessons"), "allow"),
+    ("lessons ref push asks", lambda: bash("git push origin refs/dev-skills/lessons"), "ask"),
+    ("handoff ref push asks", lambda: bash("git push origin refs/dev-skills/handoff"), "ask"),
+    ("handoff ref save ok", lambda: bash("git update-ref refs/dev-skills/handoff \"$(printf '100644 blob %s\\tHANDOFF.md\\n' "
+        "\"$(git hash-object -w .dev-skills-handoff.md)\" | git mktree | xargs git -c user.name=dev-skills "
+        "-c user.email=dev-skills@localhost commit-tree -m 'dev-skills handoff')\""), "allow"),
+    ("handoff legacy path asks", lambda: bash("git add .claude/handoffs/h.md"), "ask"),
+    ("handoff in a remote container ok", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
+        "tool_input": {"command": "git add -f .dev-skills-handoff.md"}}, env={"CLAUDE_CODE_REMOTE": "true"}), "allow"),
+    ("C3 read-only block ok", lambda: stop("```bash\ngit status -sb && git log --oneline -3\n```\n"), "allow"),
+    ("C3 labeled read block still checked", lambda: stop("### ▶️ RUN THIS — check\n```bash\ngit status\n```\n"), "block"),
     ("C declined ok", lambda: stop("http://127.0.0.1:1", gates=GATES_DECLINED), "allow"),
     # --- header fallback (checks file missing): only Bash git/gh/docker and GitHub MCP tools stop
     ("fallback bash git blocked", lambda: header_fallback({"tool_name": "Bash", "tool_input": {"command": "git status"}}), "block"),
