@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.39.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.40.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.39.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.40.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.40.0)
 
 ---
 
@@ -124,7 +124,13 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   settings paths. A gate passing or the mode being recorded no longer stops
   for a prompt in either mode; declines, host-network approvals and waivers
   still ask. On local sessions the gate file is no longer committed, so it
-  can't block `git checkout`. *(2.39.0, 2.39.1)*
+  can't block `git checkout`, and it now lives in the repo root
+  (`.dev-skills-gates.md`), outside the `.claude/` folder Claude Code prompts
+  for on every edit. *(2.39.0, 2.39.1, 2.40.0)*
+- **See CI before you tag, in either mode.** The tag block handed over in
+  semi-autonomous mode now shows the PR checks and the merge commit's CI run
+  in your terminal and stops before tagging unless it passed, as the manual
+  block does. *(2.40.0)*
 - **LTS stays LTS.** A package or runtime on a long-term-support line
   (Node.js, .NET, Java, Ubuntu, Debian, …) upgrades to the newest patch of the
   newest *settled* LTS line, never to the newest release overall. A brand-new
@@ -336,7 +342,7 @@ you ▸ just push it
 Gate state lives in a file, not in Claude's memory:
 
 ```
-# .claude/dev-skills-gates.md
+# .dev-skills-gates.md
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
@@ -693,7 +699,7 @@ Two notes worth knowing:
 
 ## How gates are enforced
 
-**Gate state is a file, not a memory.** `.claude/dev-skills-gates.md` is written
+**Gate state is a file, not a memory.** `.dev-skills-gates.md` is written
 at session start and updated on every transition. Long sessions get compacted,
 and a tracker rebuilt from memory is rebuilt optimistically ("security ran
 earlier, I think"). If the file is missing or stale, Claude re-derives each gate
@@ -965,10 +971,12 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~43KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~29KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `ENFORCEMENT.md` | ~13KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
-| `GATE_REFERENCE.md` | ~31KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
+| `SKILL.md` | ~40KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SESSION_START.md` | ~28KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `ENFORCEMENT.md` | ~16KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
+| `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
+| `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
@@ -1070,4 +1078,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.39.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.40.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

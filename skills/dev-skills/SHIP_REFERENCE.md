@@ -93,8 +93,10 @@ looks fine and is not:
    container, presents it locally):
    ```
    gh pr merge <number> --merge --delete-branch
-   git checkout main && git pull origin main
    ```
+   No `git checkout` or `git pull` after it: the tag is made from the merge
+   commit's SHA (step 3), so the user's local branch, and anything
+   uncommitted in it, never has to move.
 
    **When Claude is the one executing this — a remote container, or a
    semi-autonomous session — drop `--delete-branch` and hand the branch
@@ -157,8 +159,10 @@ looks fine and is not:
    (`SKILL.md`, Operating modes), and step 2's checks are mechanical. So the
    merge, both checks, the version guard and the tag can go in one `&&` chain
    that fails closed. It **replaces** the stop only when every link below is
-   present: PR checks green before the merge, `HEAD` equal to the merge commit,
-   and a CI run *on that commit* watched to success. A missing run makes
+   present: PR checks green before the merge, the merge commit read back from
+   GitHub, and a CI run *on that commit* watched to success. It never checks
+   out or pulls, so uncommitted or untracked files in the user's clone can't
+   stop it, and it tags the merge commit by SHA. A missing run makes
    `gh run watch` fail, which stops the chain, so an empty run list cannot
    read as a pass. Fill in the number, branch, workflow and version from this
    project:
@@ -168,13 +172,12 @@ looks fine and is not:
    ```bash
    # ════════ ▶️ START: merge → tag v1.2.3 ════════
    n=<pr-number> && gh pr checks "$n" --watch --fail-fast \
-     && gh pr merge "$n" --merge --delete-branch \
-     && git checkout main && git pull --ff-only origin main \
-     && sha=$(gh pr view "$n" --json mergeCommit -q .mergeCommit.oid) \
-     && [ "$(git rev-parse HEAD)" = "$sha" ] && sleep 20 \
+     && gh pr merge "$n" --merge \
+     && sha=$(gh pr view "$n" --json mergeCommit -q .mergeCommit.oid) && [ -n "$sha" ] \
+     && git fetch origin && [ "$(git show "$sha:VERSION")" = "1.2.3" ] && sleep 20 \
      && gh run watch "$(gh run list --commit "$sha" --workflow <ci-workflow>.yml --json databaseId -q '.[0].databaseId')" --exit-status \
-     && grep -qx '1.2.3' VERSION \
-     && git tag v1.2.3 && git push origin v1.2.3 \
+     && git tag v1.2.3 "$sha" && git push origin v1.2.3 \
+     && git push origin --delete <branch> \
      && echo "✅ DONE: v1.2.3 tagged" || echo "❌ STOPPED: scroll up for the error"
    # ════════ ⏹️ END ════════
    ```
@@ -197,21 +200,27 @@ looks fine and is not:
    pushing a release tag knows where their checkout is
    (`SHELL_REFERENCE.md`, "Tag and ref-deletion blocks carry no `cd`").
 
+   **The standard tag block: tag the merge commit by its SHA.** Three plain
+   `git` lines, which run the same in every shell, Windows PowerShell 5.1
+   included, and need no checkout, no pull and no clean working tree:
+
    ```
-   git checkout main && git pull origin main \
-     && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
-     && git tag v1.2.3 && git push origin v1.2.3
+   git fetch origin
+   git tag v1.2.3 <full merge-commit SHA from step 2>
+   git push origin v1.2.3
    ```
-   The literal string to grep for is whatever this project's version lives
-   as — the same value and the same file the release workflow's own version
-   check reads (`WORKFLOW_REFERENCE.md`'s per-ecosystem extractors: a
-   `package.json` field, a `pyproject.toml` table, a `VERSION` file). Write
-   this line from that same source, not a second hand-rolled check — two
-   independently written version checks drift apart exactly the way CI and
-   local dev drift apart (`SESSION_START.md`, step 6). If the
-   project's versioning is tag-derived or computed (`setuptools-scm`, a
-   `git describe`-based Android `versionName`), there is nothing to grep for
-   — drop this clause and say so.
+
+   - **Safe without chaining.** If the fetch fails, the commit isn't local,
+     so `git tag` fails, and then the push fails with `src refspec … does not
+     match any`. Nothing wrong can be published.
+   - **It can't land on the wrong commit.** The tag names the commit step 2
+     confirmed, however stale or dirty the user's local `main` is.
+   - **The version guard is Claude's, before the block goes out:**
+     `git show <sha>:<version-file>` must read the version being tagged,
+     from the same file and field the release workflow's own version check
+     reads (`WORKFLOW_REFERENCE.md`'s per-ecosystem extractors). Say the
+     result above the block. A tag-derived or computed version
+     (`setuptools-scm`, `git describe`) has nothing to read: say so.
 
    > 📌 **Pushing that tag is what starts the release build.** Run the block
    > above. No need to reply just to say it's done: I'll check the tag and the
@@ -228,8 +237,7 @@ looks fine and is not:
    a stale local branch. Check both the tag and what it points at, and
    compare that SHA against the merge commit from step 2:
    ```
-   git ls-remote --tags origin v1.2.3
-   git rev-parse v1.2.3^{}          # what the tag actually points at, locally after fetch
+   git ls-remote --tags origin v1.2.3   # the peeled ^{} line, or the tag line, is the commit
    ```
    🚀 SHIP stays ⏳ until the tag is confirmed on the remote *and* its target
    commit matches the one confirmed merged in step 2 — not just that some
@@ -278,9 +286,9 @@ looks fine and is not:
    > ```
    > git tag -d v1.2.3
    > git push origin :refs/tags/v1.2.3
-   > # after the fix is merged to the default branch:
-   > git checkout main && git pull origin main
-   > git tag v1.2.3
+   > # after the fix is merged to the default branch, tag the new merge commit:
+   > git fetch origin
+   > git tag v1.2.3 <new merge-commit SHA>
    > git push origin v1.2.3
    > ```
 
@@ -410,7 +418,6 @@ deletions are the exceptions"), in both modes, so this splits into two blocks:
 Claude runs (or presents, on a local session):
 ```
 gh pr merge <number> --merge --delete-branch
-git checkout main && git pull origin main
 ```
 
 Same caveat as the CI-driven path's step 2: when Claude is executing this
@@ -430,20 +437,18 @@ pre-tag report goes above this block (`AUTO_MODE.md`,
 checkpoint 2). From the user's local clone of the repo — no `cd`, same reason
 as the CI-driven path:
 ```
-git checkout main && git pull origin main \
-  && grep -q '^VERSION_STRING = "1.2.3"$' <version-file> \
-  && git tag v1.2.3 && git push origin v1.2.3
+git fetch origin
+git tag v1.2.3 <full merge-commit SHA>
+git push origin v1.2.3
 ```
-As in the CI-driven path, the `grep` clause is the version guard — same
-literal value and file this project's version actually lives in, chained
-with `&&` so a mismatch stops the block before `git tag` runs. Drop it only
-if versioning is tag-derived/computed.
+The same standard block as the CI-driven path, with the version guard run by
+Claude first (`git show <sha>:<version-file>`) and its result said above the
+block.
 
 Once pushed, don't take "done" at face value — confirm the tag exists *and*
 points at the merge commit, not just that some tag by that name exists:
 ```
 git ls-remote --tags origin v1.2.3
-git rev-parse v1.2.3^{}
 ```
 
 If the push instead reports `error: src refspec v1.2.3 does not match any`

@@ -20,11 +20,9 @@ When the skill loads:
 
 **Probe first: one read-only call answers every check below.** It is the
 first action of the session; the version check below is the first thing
-*reported*, and step 0 is the first *decision*. The self-check,
-the version check, step 0's environment signals and steps 1, 1a, 4, 6 and 7
-used to be separate calls, and each one resent the whole conversation. Run this
-block once from anywhere in the project (it moves to the repo root itself), as a single Bash call, with `B` set to this skill's base directory,
-then read every step's answer from its `key=value` output:
+*reported*, and step 0 is the first *decision*. Run this
+block once, as a single Bash call, with `B` set to this skill's base
+directory, then read every step's answer from its `key=value` output:
 
 ```bash
 export B="<this skill's base directory>"
@@ -32,12 +30,13 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_PYTHON WORKFLOW_NODEJS; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
 p origin bash -o pipefail -c "git remote get-url origin | sed -E 's#://[^/@]+@#://#'"
 p branch git branch --show-current
+p fetch git fetch --quiet origin
 p status git status -sb
 p gh_installed bash -o pipefail -c 'command -v gh || echo no'
 p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission,defaultBranchRef'
@@ -49,9 +48,17 @@ p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
 p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
 p enforcement bash -o pipefail -c '[ -f "$B/checks/enforce.py" ] || echo checks-file-missing; for py in python3 python "py -3"; do $py -c "import getpass,os,re,sys,tempfile; u=re.sub(r\"[^A-Za-z0-9_.-]\",\"\",getpass.getuser())[:64]; f=os.path.join(tempfile.gettempdir(),\"dev-skills-enforcement-\"+u,os.environ.get(\"CLAUDE_CODE_SESSION_ID\",\"none\")); print(\"active\" if os.path.isfile(f) else \"NOT-ACTIVE\")" 2>/dev/null && exit 0; done; echo NOT-ACTIVE-no-python3'
 p leftover_tests bash -c 'command -v docker >/dev/null 2>&1 || { echo no-docker; exit 0; }; docker ps -a --filter label=dev-skills.test --format "{{.Names}} ({{.Status}})"; docker ps -a --filter label=com.docker.compose.project --format "{{.Names}} {{.Label \"com.docker.compose.project\"}} ({{.Status}})" | grep " dev-skills-test" || true'
-p gate_tracked bash -c 'git ls-files --error-unmatch .claude/dev-skills-gates.md >/dev/null 2>&1 && echo yes || echo no'
+p local_tracked bash -c 'git ls-files -- .dev-skills-gates.md .claude/dev-skills-gates.md .dev-skills-handoff.md .claude/handoffs HANDOFF.md | tr "\n" " "; echo'
+p handoff bash -c 'git log -1 --format="%cs %h" refs/dev-skills/handoff 2>/dev/null || echo none'
+p lessons bash -c 'git log -1 --format="%cs" refs/dev-skills/lessons 2>/dev/null || echo none'
 p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
 ```
+
+**On Windows the probe runs in the Bash tool, which is Git Bash.** If Claude
+Code has no Bash tool here (Git for Windows missing), the probe and the
+enforcement checks can't run: say so first, with the fix (install Git for
+Windows, or set `CLAUDE_CODE_GIT_BASH_PATH`), and run the session on
+instructions only until it's fixed.
 
 Reading it:
 
@@ -62,7 +69,8 @@ Reading it:
 - **Git keys with `ERROR` when `repo_root=ERROR`** mean no git repo. The git
   steps do not apply.
 - **`gh_installed=no` or `gh_repo=ERROR`** → use the GitHub MCP equivalents
-  (step 0) for step 1a, and for anything the probe could not answer.
+  (`REMOTE_SESSION.md`, item 3) for step 1a, and for anything the probe could
+  not answer.
 - **`untagged` lists changelog versions with no remote tag.** The version being
   built right now shows there too, and that is expected. Step 7 is about the
   versions before it.
@@ -71,49 +79,39 @@ Reading it:
 - **`enforcement=active`**: the checks ran on this very probe. Anything else
   (`NOT-ACTIVE`, `checks-file-missing`) is `⚠️ Hook enforcement: not active — instructions still apply` in
   the banner, with the reason.
+- **`handoff` is the last session's handoff** (`SKILL.md` §5.6): a date, or
+  `none`. When there is one, read it (`git show
+  refs/dev-skills/handoff:HANDOFF.md`) before the questions, and say in one
+  line what it picks up. It is replaced when this session writes its own.
+- **`lessons` is a date only in the skill's own repo**, when other sessions
+  recorded lessons for it: read `LESSONS_REFERENCE.md`, "In the skill's repo".
 - **`leftover_tests` lists test containers an earlier session left behind**
   (`ENFORCEMENT.md`, A12). The banner shows `⚠️ Leftover test containers: N`,
   and before any new work, present a ▶️ RUN THIS block that removes them
   (`docker rm -f …`) and their temp mount folders
   (`docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}'` lists them).
-- **The probe only reads.** It fetches nothing, so `status`'s ahead/behind
-  counts are as of the last fetch, and step 3's sync offer still stands.
+- **The probe only reads, plus one `git fetch`**, which updates the
+  remote-tracking refs and nothing in the working tree. So `status`'s
+  ahead/behind counts are current, and step 3 asks only when they say behind.
 
 Steps 2 and 3 are questions for the user, not reads. Every step below still
 applies: the probe changes how many calls it takes, never what gets checked.
 
-**Self-check:** Verify that `GATE_REFERENCE.md`, `SECURITY_GATE.md`,
-`SHIP_REFERENCE.md`,
-`AUTO_MODE.md`, `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md`,
-`SHELL_REFERENCE.md`, `WORKFLOW_REFERENCE.md`, `SECURITY_WINDOWS.md`,
-`SECURITY_LINUX.md`, `SECURITY_ANDROID.md`, `QUALITY_ANDROID.md`,
-`UPDATE_REFERENCE.md`, `REMOTE_SESSION.md`, `STANDARDS_REFERENCE.md` and
-`ENFORCEMENT.md` exist in this skill's base directory (shown when the
-skill loaded, e.g. "Base directory for this skill: ..."). If any is missing,
-warn immediately:
+**Self-check:** `skill_missing` from the probe. If it names any file, warn
+immediately:
 
 > ⚠️ **Skill self-check failed:** [filename] not found in [base directory].
 > The security/quality gate cannot run properly without it.
 
-**Version check — run every time the skill loads, and report it before anything else.**
-Running an outdated copy means gates in this session can be missing fixes,
-tightened checks, or corrected mistakes that already shipped upstream — this
-is not optional and does not wait for the user to ask.
+**Version check — every session, reported before anything else**, even with no
+git repo in the project (it checks the skill's own upstream).
 
 1. **Installed version** — the `version:` field in this skill's own
    `SKILL.md` frontmatter (e.g. `2.19.0`).
-2. **Latest published version** — read the upstream remote directly, the same
-   way every other ref check in this skill works (never a cached local
-   clone, never a number from memory):
-
-   ```
-   git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git \
-     | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1
-   ```
-
-   If this can't reach the network (offline, sandboxed, egress blocked), say
-   so once in the banner ("⚠️ version check skipped — no network access") and
-   continue. A session isn't blocked entirely by a check it has no way to make.
+2. **Latest published version** — `skill_latest` from the probe, read from the
+   upstream remote (never a cached clone, never a number from memory). On
+   `ERROR`, say once in the banner "⚠️ version check skipped — no network
+   access" and continue.
 3. **Compare** (strip the leading `v`, semver order).
    - **Current:** fold a single confirmed line into the banner — no separate
      callout needed.
@@ -122,12 +120,6 @@ is not optional and does not wait for the user to ask.
      banner. **Read `UPDATE_REFERENCE.md` first**: it has the bracketed
      callout, the options the install location allows, and the
      `⚠️ outdated` marker every later tracker carries if the user continues.
-
-
-4. This check is unconditional — it runs even in sessions with no git repo
-   detected for the *host* project (step 0 below is about that project's own
-   repo; this check targets the skill's own upstream repo, which is unrelated
-   and always checked the same way).
 
 **Step 0 — Execution environment detection. Decide this before any other step;
 it changes how git works for the rest of the session.**
@@ -179,18 +171,13 @@ daemon unreachable", "push to `fix/x` succeeded"), and re-measure every session
 and whenever the execution context changes. A capability noted in a prior
 session or handoff describes *that* context, not this one.
 
-**Git repo detection — run at session start.** Check if the current working
-directory is inside a git repository (`git rev-parse --is-inside-work-tree`).
-If yes:
-
-**Every read in steps 1, 1a, 4, 6 and 7 comes from the probe** (top of this
+**Git repo steps — when `repo_root` is not `ERROR`.** **Every read in steps 1, 1a, 4, 6 and 7 comes from the probe** (top of this
 section). Run a command below separately only when the probe printed `ERROR`
 for it or it needs something the probe does not read.
 
-1. **Detect and store the repo URL.** Run `git remote -v` to capture the origin
-   URL. Store it for the session — this URL is used in clone commands (Termux),
-   `git remote add` recovery, release URLs, and PR links. Never assume or
-   hardcode a repo URL — always derive from `git remote -v`.
+1. **Store the repo URL** from the probe's `origin` for the session: clone
+   commands (Termux), `git remote add` recovery, release URLs and PR links.
+   Never assume or hardcode one.
 
    If no remote is configured:
 
@@ -201,15 +188,8 @@ for it or it needs something the probe does not read.
    command block presented to the user.
 
 1a. **Fork check: `origin` must be the fork, never upstream.** Resolve what
-   `origin` points at and whether a fork is involved. The probe already ran both
-   of these (`gh_repo`, `gh_login`):
-
-   ```
-   gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission
-   gh api user -q .login
-   ```
-
-   (Without `gh`, use the GitHub MCP `get_repository` equivalent.) **The
+   `origin` points at and whether a fork is involved, from the probe's `gh_repo`
+   and `gh_login` (without `gh`, use the GitHub MCP `get_repository` equivalent). **The
    common case:** `isFork: false`, and the owner in `nameWithOwner` is the
    `gh_login` user, so no fork of it can exist. Record `Origin: <owner>/<repo>
    (not a fork)` and move on. **Anything else** (a fork, someone else's repo,
@@ -219,11 +199,10 @@ for it or it needs something the probe does not read.
    **Re-check after a fix, don't assume it worked.** `git remote -v` and the
    `gh repo view` call must now both name the fork. Record what they returned.
 
-2. **Shell environment detection.** *Local and Termux sessions ask this now.
-   Remote containers defer it until a tag block is due (step 0, item 4) — they
-   do need it eventually, just not yet.* Ask the user which shell they work in —
-   this determines how all git commands are formatted for the rest of the
-   session:
+2. **Shell environment detection.** *Local and Termux sessions only. Remote
+   containers never ask it, not even for the tag block (`REMOTE_SESSION.md`,
+   item 4).* Ask the user which shell they work in. It sets how every presented
+   command is formatted for the rest of the session:
 
    > **Which shell will you be running these commands in?**
    > 1. Windows PowerShell
@@ -236,9 +215,10 @@ for it or it needs something the probe does not read.
 
    Store the answer for the rest of the session — don't ask again.
 
-3. **Offer to sync with origin.** The user may be working with outdated files.
-   Present the option before any work begins, formatted for the user's detected
-   shell (Section 5.8):
+3. **Offer to sync with origin, only when `status` says behind.** Up to date
+   or only ahead: say "in sync with origin" in the banner and don't ask. When
+   behind, present the option before any work begins, formatted for the user's
+   detected shell (Section 5.8):
 
    > 📡 **Git repo detected:** `<repo-name>` on branch `<current-branch>`
    > Want to sync with origin before we start? This ensures we're working
@@ -289,24 +269,11 @@ for it or it needs something the probe does not read.
    the workflow from the project's real build tooling. A workflow that doesn't
    run the real build goes green without proving anything.
 
-7. **Unfinished release check — did the last release actually ship?** Gate 6 has
-   four parts (merge, tag, publish, verify) and a session can die between any two
-   of them: a container reclaimed, a usage limit, or a tag push denied `403`
-   (Section 5.8). When that happens the work is stranded on the default branch
-   and **nothing in a later session goes looking for it** — the next session
-   starts with all gates ⬜ pending *for the version it is about to build*, and
-   never asks about the one before.
-
-   Section 8's session-end check only covers the current version, and only if the
-   session gets a chance to wind down. A container that is simply reclaimed never
-   winds down. So the check belongs here, at start, where it always runs.
-
-   Compare released versions against tags on the remote:
-
-   ```
-   git ls-remote --tags origin | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V
-   git log --oneline -- VERSION        # or the project's version file
-   ```
+7. **Unfinished release check — did the last release actually ship?** A session
+   can die between merge and tag (a reclaimed container, a usage limit, a
+   `403` on the tag push), and nothing later goes looking for it. The probe's `untagged` key compares `CHANGELOG.md` versions against the
+   remote's tags. Section 8's end-of-session check only runs if the session
+   winds down, so this start-of-session check is the one that always runs.
 
    Every version with a changelog entry and no tag is an unfinished Gate 6:
 
@@ -329,20 +296,18 @@ disclosure, then **"Keep the enforcement checks on for this session?"** in the
 same `AskUserQuestion` call as the mode question. It is all or nothing, never
 defaulted, and asked again if skipped.
 
-**Mode choice — ask every session, and block until it is answered.** This is
-the question the skill used to leave to the user to volunteer. In practice
-that meant it was never asked, and every session ran manual whether or not
-the user wanted that. Now it is asked every time:
+**Mode choice — ask every session, and block until it is answered.**
 
 - **Ask it in the first message that asks the user anything**, in the same
-  `AskUserQuestion` call as the shell, sync and branch questions (steps 2–4)
-  and the model-ceiling question (`SKILL.md` §5.2). It is one more question in
-  a call that is already being made, so it adds no extra round trip. If there
-  is nothing else to ask (a remote container with a clean, current branch),
-  ask it on its own. Never skip it.
-- **At most four questions per call**: enforcement, mode, model ceiling and
-  shell first, with sync and branch in the next. Nothing is edited until every
-  question has an answer.
+  `AskUserQuestion` call as the others. If there is nothing else to ask, ask
+  it on its own. Never skip it.
+- **One call when it fits, and it usually does.** A call holds at most four
+  questions. In order: enforcement, mode, shell (local and Termux), then
+  whichever of model ceiling (only above Sonnet, `SKILL.md` §5.2; the answer
+  goes on the `Model:` row and covers the session), branch
+  (only on the default branch) and sync (only when behind) apply. Only when
+  more than four apply does the rest go in a second call. Nothing is edited
+  until every question has an answer.
 - **Word it neutrally, with manual first and no recommendation:**
 
   > **Operating mode for this session?**
@@ -378,24 +343,35 @@ the user wanted that. Now it is asked every time:
   semi-autonomous, give the one-message confirmation from `AUTO_MODE.md`
   ("Entering the mode").
 
-**Write the gate state file.** Create `.claude/dev-skills-gates.md` with all
+**Write the gate state file.** Create `.dev-skills-gates.md` in the repo root with all
 six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
 (format below), and a `Standards:` row for the project standards that apply
 (`SKILL.md` §10; `n/a` when none do). Replace `unchosen` with the user's answer as soon as it
 arrives. The checks deny git writes while it reads `unchosen`. **Edit this
 file with the Write/Edit tools, never the shell**, so the checks can show the
 user each line that declines enforcement, approves host networking or waives
-a finding (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
+a finding (`ENFORCEMENT.md`, B5). **It lives in the repo root, not in
+`.claude/`:** Claude Code asks before every edit under `.claude/` whatever the
+permission mode, so a gate file there cost the user a prompt per gate
+(2.39.1 and earlier). A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
-sessions add the file to `.gitignore` and keep it untracked. **`gate_tracked=yes`
-on a local session** means an earlier release committed it (2.28.0–2.39.0 did),
-which blocks `git checkout` whenever the session has rewritten it. Untrack it:
-`git rm --cached .claude/dev-skills-gates.md` plus the `.gitignore` line, staged
-with the session's first commit and named in its approval. **Once that
+sessions add `.dev-skills-gates.md` and `.dev-skills-handoff.md` to
+`.gitignore` and keep them untracked, so neither can ever block a commit, PR,
+checkout or pull (the handoff is committed to its own local ref instead). An
+old `.claude/dev-skills-gates.md` is never read again; leave it alone (deleting
+it is an edit under `.claude/`, so it would prompt) and tell the user once that
+they can delete it. **`local_tracked` naming paths on a local session** means
+an earlier session committed them. A tracked gate file blocks `git checkout`
+whenever a session rewrites it (2.28.0–2.39.0 committed it): untrack it. For
+older handoffs (`.claude/handoffs/`, `HANDOFF.md`), ask once whether to move
+the newest into `refs/dev-skills/handoff` and untrack them all, since the
+user may want them kept in the repo; their answer stands. Untrack with `git rm -r --cached <path>` plus the
+`.gitignore` line, staged with the session's first commit and named in its
+approval. **Once that
 commit reaches the default branch, every other clone meets it once:** a pull
-deletes that clone's gate file, or refuses with "would be overwritten" if the
+deletes that clone's copy, or refuses with "would be overwritten" if the
 file has local edits. Say so in the approval. The fix is `git stash push
-.claude/dev-skills-gates.md` (or discard it) before pulling. Nothing durable is
+<path>` (or discard it) before pulling. Nothing durable is
 lost, since each session rewrites the file. On remote
 containers it is committed with the work. This file, not the conversation, is the source of truth for gate
 state and mode for the rest of the session.
@@ -406,6 +382,7 @@ state and mode for the rest of the session.
 # Dev Skills gate state
 Track: release sequence
 Mode: manual
+Model: Sonnet 5 (within ceiling)
 Origin: owner/repo (not a fork)
 Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅
 Version: 2.12.0
@@ -434,7 +411,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.39.1 active.
+Dev Skills v2.40.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -469,7 +446,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.39.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.40.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

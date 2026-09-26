@@ -20,6 +20,7 @@ the pre-flight says one is owed.
 | `AUTO_MODE.md` | the user has opted into semi-autonomous mode |
 | `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md` | Gate 3 (via `SECURITY_GATE.md`), and audit mode |
 | `SHELL_REFERENCE.md` | before composing any command block |
+| `DOCKER_TEST.md` | Gate 2, before a Docker test container starts or a run command is handed over |
 | `WORKFLOW_REFERENCE.md` | a CI workflow is missing, or the user asks for workflow help |
 
 Do not load a file this session has no use for. Each of these is read in full;
@@ -32,7 +33,7 @@ Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 ## Gate state file — re-derivation and resuming
 
-The rules for `.claude/dev-skills-gates.md` are in `SKILL.md` Section 2 ("Gate
+The rules for `.dev-skills-gates.md` are in `SKILL.md` Section 2 ("Gate
 state"). This is the detail: load it when the file is missing, stale or
 compacted away, or when a user-driven action has to be credited.
 
@@ -67,7 +68,7 @@ Any gate you cannot prove from evidence is ⬜ pending and must be run.
 **Resuming, or crediting user-driven work:**
 1. Run `git log`, `git ls-remote --heads origin`, `git ls-remote --tags
    origin`, and `gh pr list` / `gh pr view` (or the GitHub MCP equivalents when
-   `gh` is unavailable, `SESSION_START.md` step 0). Chain them into one call
+   `gh` is unavailable, `REMOTE_SESSION.md` item 3). Chain them into one call
    (`SKILL.md` §5.1).
 2. Credit completed mechanical steps on the tracker (✅ "user-driven" or
    "already done").
@@ -280,9 +281,9 @@ means a new artifact.
 
 **No way to produce one is a blocked merge, not a skipped step.** If CI has no
 job that publishes a test artifact for a PR, offer to create one (`SKILL.md`
-§9.2) or a dev pre-release, and hold the merge until one exists. A container
-that cannot build Docker at all is the earlier problem in `SESSION_START.md`,
-step 0, item 8.
+§9) or a dev pre-release, and hold the merge until one exists. A container
+that cannot build Docker at all is the earlier problem in `REMOTE_SESSION.md`,
+item 8.
 
 Hand it over after the smoke test passes, before this gate is marked passed:
 
@@ -294,113 +295,11 @@ Hand it over after the smoke test passes, before this gate is marked passed:
   <tag> .`, then `docker run ...` with the ports and volumes the project needs,
   and the credentials below.
 
-**Docker test runs get fresh credentials, every run.** Each time a container
-is started for testing — by Claude, or in a run command handed to the user —
-generate a new username and password for that run and show them to the user
-in the same message as the run command:
-
-```bash
-TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
-TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
-# the address the host actually uses on the LAN, not the first of `hostname -I`,
-# which can be a Docker bridge (172.17.0.1). macOS: ipconfig getifaddr en0
-HOST_IP="$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
-case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) echo "not a private LAN IP: $HOST_IP" >&2; false ;; esac \
-  && ! ip -4 -o addr show | grep -E 'docker0|br-|veth' | grep -qwF "$HOST_IP" \
-  && docker run -d --rm --name <app>-test --label dev-skills.test="$CLAUDE_CODE_SESSION_ID" -p "$HOST_IP:8080:8080" \
-  -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image> \
-  && sleep 3 && docker port <app>-test \
-  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
-```
-
-> 🔑 **Test login for this run**: throwaway, reachable on your network,
-> and gone when the container is removed.
-> URL: http://192.168.1.50:8080 · User: `test-k3xm` · Password: `Hq7vT2mWz9Ka`
-
-- **Simple on purpose:** letters and digits only, with look-alikes (`0 O 1 l
-  I`) left out, so they can be read off the screen and typed.
-- **Passed to the variables the app actually reads for its login.** Find them
-  in the Dockerfile `ENV`, the compose file, `.env.example`, or the docs; never
-  guess a name. For compose, set them on the command line
-  (`TEST_USER=… TEST_PASS=… docker compose up -d`) for a compose file that
-  interpolates them. A compose file with credentials written into it is a
-  Gate 3 finding (hardcoded secret), not something to work around.
-- **Reachable on the network, always.** The user tests from other machines
-  and devices, so a loopback-only container is useless to them.
-  - **Never use `-p 127.0.0.1:…`**, and never hand over a `127.0.0.1` or
-    `localhost` URL.
-  - **Read the host's LAN IP from the default route** (`ip -4 route get
-    1.1.1.1`, its `src`). Never guess it, and never take the first field of
-    `hostname -I`: its order isn't fixed, and on a Docker host it lists
-    bridge addresses (`172.17.0.1`, `172.18.0.1`, …) that pass the private-IP
-    check but can't be reached from another machine. Reject an IP that
-    belongs to `docker0`, a `br-*` bridge or a `veth`.
-  - **Publish on that IP only** (`-p "$HOST_IP:8080:8080"`; for compose,
-    `ports: - "${HOST_IP}:8080:8080"` with `HOST_IP` set on the command line).
-  - **The app inside the container listens on `0.0.0.0`**, not `127.0.0.1`.
-    An app bound to loopback inside the container is unreachable however the
-    port is published. Set its host/bind variable (`HOST=0.0.0.0`,
-    `--host 0.0.0.0`, …) from the Dockerfile, the compose file or the docs.
-  - **A compose file that pins `127.0.0.1:` in `ports:`** is overridden for
-    the test run with `${HOST_IP}`, and flagged to the user, never used as is.
-  - **Read the binding back before handing over the URL.** `docker port
-    <name>` (or `docker compose port <service> <port>`) must show the LAN IP.
-    If it shows `127.0.0.1`, `localhost` or `0.0.0.0`, the run is wrong: fix
-    it and restart. Then **check that the app answers** on
-    `http://<LAN IP>:<port>`.
-  - **The URL handed over is the one that `curl` just reached**, copied from
-    that command's output, never retyped. A message that shows `127.0.0.1`,
-    `localhost` or a bridge IP as the test URL is a Gate 2 failure, not a
-    typo.
-  - **On a remote container, where no LAN exists**, say so instead of showing
-    a loopback URL.
-- **Mounts are never root's in temp.** A bind mount under a temp folder is
-  created first with `mkdir -p` and used by a container running as you
-  (`--user "$(id -u):$(id -g)"`, or `PUID`/`PGID`). A container that has to
-  run as root mounts from outside temp (`/opt/docker/<name>-test/`). Label
-  every test container (`--label dev-skills.test=…`, or compose
-  `-p dev-skills-test-<name>`) so leftovers are found (`ENFORCEMENT.md`,
-  A10 and A12).
-- **Gone when it stops.** Test containers run with `--rm` and **no restart
-  policy**, and never bind-mount from a temp folder (`/tmp`, Claude's
-  `/tmp/claude-*` scratchpad) with one. A reboot wipes `/tmp`, Docker
-  restarts the container, and it recreates the mount as root, breaking Claude
-  Code's temp directory for every later session (`ENFORCEMENT.md`, A9).
-- **LAN only, never the internet.** A bare `-p 8080:8080` publishes on every
-  interface, and Docker's published ports bypass host firewalls such as ufw.
-  So bind to the LAN IP, and **if that IP is not private** (outside
-  `10/8`, `172.16/12` and `192.168/16`, for example on a VPS), **stop and ask**
-  rather than publish. Never set up a port-forward, tunnel or public bind.
-  With the random single-run credentials and the teardown below, that is
-  exposure enough for a test.
-- **Never** written to a file in the repo, baked into the image (`ENV`/`ARG`),
-  reused across runs or sessions, or the project's real credentials.
-  Displaying them is the point: they die with the container.
-- **An app with no login** needs none: say so, and record `test creds n/a (no
-  login)`.
-
-**Echo the login every time the test container changes, as the last thing in
-the message.** Testing is iterative: fix, rebuild, restart, re-check. A login
-shown once scrolls out of sight after the first round. So the 🔑 block above is
-repeated, in full (URL, user and password), at the **bottom** of every message
-in which the test container was started, rebuilt, restarted or recreated, or
-in which the user is asked to try it again. That includes a rebuild after a
-one-line fix. The bottom of the message is where the user's eye lands, so
-nothing goes below it. A pointer such as "same login as before" or "see
-above" does not count. When the credentials changed with the new container,
-say so on the block's first line (`🔑 **New test login, the previous one no
-longer works**`). If the current credentials are no longer in context, for
-example after compaction, never reconstruct them from memory. Recreate the
-container with fresh ones and show those.
-
-**Tear it down once its purpose is served.** A container started here — or for
-the "prove a never-run release step" check above, or for any other Gate 2
-testing — is a running resource, not a fire-and-forget check. Stop and remove
-it after the commit it verified is submitted, or immediately if the user
-declines to try it: `docker stop <name>` (or `docker compose down` for a
-compose stack), then `docker rm <name>` if it wasn't started with `--rm`.
-Before the session ends (Section 8) or this gate closes, `docker ps` to
-confirm nothing test-related is still running. Its credentials go with it.
+**Docker test runs: read `DOCKER_TEST.md` first**, before starting any test
+container or handing over a run command. It has the fresh per-run
+credentials (shown in a 🔑 block at the bottom of every message where the
+container changed), LAN-only publishing, the temp-mount and restart rules, and
+teardown.
 
 The handover is repeated **every time the build changes**, not only the first
 time in a session. **Proceeding without trying it counts as declining to try
@@ -529,7 +428,7 @@ Execution (merge, tag, publish) happens in Gate 6.
    tracked copy is rewritten by every session and blocks `git checkout`. The
    release record is the commit, `CHANGELOG.md`, the tag and the handoff.
    **Remote containers: stage it with the release — it ships inside this PR**
-   (`git add -f .claude/dev-skills-gates.md` where gitignored), because the
+   (`git add -f .dev-skills-gates.md` where gitignored), because the
    container's copy dies with the container.
 
    SHIP is ⏳ here and that is correct, not a gap: the tag does not exist yet,

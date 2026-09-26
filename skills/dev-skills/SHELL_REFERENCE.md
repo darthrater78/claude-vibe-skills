@@ -31,7 +31,7 @@ file applies:
   session ends. Claude commits and pushes from inside the container, after
   approval (Section 1).
 - **`gh` is usually absent.** Use the GitHub MCP mapping table in
-  `SESSION_START.md`, step 0.
+  `REMOTE_SESSION.md`, item 3.
 
 Showing the user a summary of what you are about to run is fine. Handing them
 commands *instead of* pushing is not.
@@ -54,7 +54,7 @@ covers the case where their terminal is sitting somewhere else; the block covers
 the part that is actually worth copying.
 
 This also means these blocks need no shell question. Everything in them is a
-plain single-line `git` invocation — `git checkout`, `git pull`, `git tag`,
+plain single-line `git` invocation — `git fetch`, `git tag <sha>`,
 `git push` — with no heredocs, no multi-line strings and no shell-specific
 syntax, so with the `cd` gone there is nothing left that varies between the
 seven shells above. Remote container sessions, which skip the shell question at
@@ -167,6 +167,15 @@ prevents the error on subsequent pushes.
 block, using the URL stored at session start (`SESSION_START.md`, step 1). This
 prevents the "default repo has not been set" error.
 
+**Local files never stop a block.** Before handing over a block that switches
+branches or pulls, read `git status` (Claude already has it from the chained
+read). If uncommitted changes would stop `git checkout` or `git pull`, say so
+and put `git stash push -u -m "dev-skills: <why>"` first and `git stash pop`
+last, or leave the step out: a tag never needs it (it is made from the merge
+commit's SHA, `SHIP_REFERENCE.md` step 3). Files the skill writes (the gate
+file, the handoff) are gitignored and never in the way; the handoff's commit
+lives on its own local ref, outside every branch.
+
 **Explanation goes above or below the block, never inside it** as interleaved
 prose. Brief `#` comments within the block are fine.
 
@@ -223,7 +232,9 @@ inspect by eye.
 user looks at the PR. Block 2 runs checks → merge → confirm the merge
 commit → CI on it → version guard → tag (`SHIP_REFERENCE.md`, step 3).
 
-**No "done" turn.** Say "No need to reply" under every run block. The
+**No "done" turn.** Say "No need to reply" under every run block, unless the
+message then asks the user to decide something (then ask it plainly, and
+don't claim no reply is needed). The
 user's next message, about anything, starts with one chained read that
 verifies the block's result from git state. **When that read finds the block
 failed or never ran, raise it first**, before the new request, with the
@@ -247,8 +258,10 @@ chain with `; if ($?) { … }` and end with
   macOS/Linux use heredocs or `$'...'`, Git Bash follows Bash rules
 - **Variable expansion:** PowerShell uses `$var`, Bash uses `$var` or `${var}` —
   but quoting rules differ
-- **Command chaining:** PowerShell uses `;` (no `&&`), Bash/Git Bash/Termux use
-  `&&`
+- **Command chaining:** Windows PowerShell 5.1 has no `&&`, and `;` runs the
+  next command even after a failure, so chain with `; if ($?) { … }` (above).
+  pwsh 7, Bash, Git Bash and Termux use `&&`. Fence a PowerShell block as
+  `powershell` so the checks read it as PowerShell
 - **Line continuation:** PowerShell uses backtick (`` ` ``), Bash uses backslash
   (`\`)
 - **Path separators:** PowerShell and Windows use `\`, everything else uses `/`
@@ -292,7 +305,7 @@ Rules for a split run:
 - **A partial run is never a pass.** Output that got as far as "OK" on three
   checks proves those three checks, and nothing about the ones after it. This
   is the failure mode the split is guarding against, so do not re-introduce it.
-- **Record that it was split** in `.claude/dev-skills-gates.md`, with the
+- **Record that it was split** in `.dev-skills-gates.md`, with the
   sections covered and the total error count. A later session reading "BUILD
   PASSED" needs to know the verification was complete, not merely started.
 - **Do not defer to CI instead.** CI runs after the commit Gate 2 exists to

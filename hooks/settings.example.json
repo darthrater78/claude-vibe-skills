@@ -2,11 +2,12 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/skills/dev-skills/checks/enforce.py\" pre-tool",
+            "shell": "bash",
+            "command": "f=\"$HOME/.claude/skills/dev-skills/checks/enforce.py\"; for py in python3 python \"py -3\"; do [ -f \"$f\" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py \"$f\" pre-tool; done; in=$(cat); printf '%s' \"$in\" | grep -qE '\"tool_name\": *\"mcp__[^\"]*[Gg]it[Hh]ub' || { printf '%s' \"$in\" | grep -qE '\"tool_name\": *\"(Bash|PowerShell)\"' && printf '%s' \"$in\" | grep -qE '(^|[^A-Za-z])(git|gh|docker)[[:space:]]'; } || exit 0; echo \"dev-skills enforcement cannot run (checks file or Python 3 missing), so git, gh and docker are blocked.\" >&2; exit 2",
             "timeout": 15
           }
         ]
@@ -18,7 +19,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/skills/dev-skills/checks/enforce.py\" post-ask",
+            "shell": "bash",
+            "command": "f=\"$HOME/.claude/skills/dev-skills/checks/enforce.py\"; for py in python3 python \"py -3\"; do [ -f \"$f\" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py \"$f\" post-ask; done; exit 0",
             "timeout": 15
           }
         ]
@@ -29,7 +31,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/skills/dev-skills/checks/enforce.py\" stop",
+            "shell": "bash",
+            "command": "f=\"$HOME/.claude/skills/dev-skills/checks/enforce.py\"; for py in python3 python \"py -3\"; do [ -f \"$f\" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py \"$f\" stop; done; exit 0",
             "timeout": 15
           }
         ]

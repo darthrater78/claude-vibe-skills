@@ -9,6 +9,8 @@ Desktop.ini
 ehthumbs.db
 
 # Dev Skills gate state (local sessions; remote containers commit it instead)
+.dev-skills-gates.md
+.dev-skills-handoff.md
 .claude/dev-skills-gates.md
 
 # Editor / IDE

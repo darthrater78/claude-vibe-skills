@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md checks/enforce.py)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -54,14 +54,14 @@ echo ""
 echo "=== Session-start probe vs self-check ==="
 ss=skills/dev-skills/SESSION_START.md
 probe_list=$(grep -oP 'p skill_missing .*for f in \K[A-Z_ ]+(?=; do)' "$ss" | tr ' ' '\n' | sed '/^$/d' | sed 's/$/.md/' | sort)
-# shellcheck disable=SC2016 # literal backticks, not an expansion
-check_list=$(sed -n '/^\*\*Self-check:\*\*/,/^$/p' "$ss" | grep -oE '`[A-Z_]+\.md`' | tr -d '`' | sort)
+# Every reference file except the two that are already loaded when the probe runs.
+check_list=$(find skills/dev-skills -maxdepth 1 -name '*.md' ! -name SKILL.md ! -name SESSION_START.md -printf '%f\n' | sort)
 if [ -z "$probe_list" ] || [ "$probe_list" != "$check_list" ]; then
-  echo "  FAIL: probe skill_missing list differs from the Self-check list"
+  echo "  FAIL: probe skill_missing list differs from the skill's reference files"
   diff <(echo "$check_list") <(echo "$probe_list") | sed 's/^/    /'
   errors=$((errors + 1))
 else
-  echo "  OK: probe and self-check name the same $(echo "$probe_list" | wc -l) files"
+  echo "  OK: probe checks all $(echo "$probe_list" | wc -l) reference files"
 fi
 
 # Rule phrases (scripts/rule-phrases.txt) must survive every edit: SKILL|
@@ -157,7 +157,9 @@ ceiling_for() {
     # trimmed it from ~54KB to ~40KB, and this keeps the saving from drifting
     # back without a decision on the record. Lowered to 43 in 2.38.0 when
     # §10's example and login details moved to STANDARDS_REFERENCE.md.
-    SKILL.md) echo 43 ;;
+    # Lowered to 41 in 2.40.0: audit mode moved to SECURITY_REFERENCE.md and
+    # §10's full rules to STANDARDS_REFERENCE.md.
+    SKILL.md) echo 41 ;;
     # Still carries the best-practices and Dependabot sections; it is the next
     # extraction candidate, and this number comes down when they move.
     WORKFLOW_REFERENCE.md) echo 44 ;;

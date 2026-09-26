@@ -12,6 +12,27 @@ loaded alongside this one only when project environment detection
 
 ---
 
+## Audit mode
+
+On "audit my project", "scan this codebase", "security review", or "check my
+code", `SKILL.md` §9): with this file loaded, also read `QUALITY_REFERENCE.md` and every
+platform file the project matches (`WORKFLOW_REFERENCE.md` Step 1 signals):
+`SECURITY_WINDOWS.md`, `SECURITY_LINUX.md`, `SECURITY_ANDROID.md` (+
+`QUALITY_ANDROID.md`). Then:
+1. Discover source files via Glob
+2. Triage: read high-risk files first (auth, login, upload, config, api,
+   routes, crypto, token, secret, password)
+3. Grep for dangerous patterns (`eval(`, `shell=True`, `pickle.loads`, `md5`,
+   `Invoke-Expression`, `innerHTML`, hardcoded strings, `.env` files)
+4. Apply every security rule from `SKILL.md` Section 4 and this file
+5. Output findings by severity (🚨 Critical, ⚠️ High, 📝 Medium, 💡 Low) with
+   file:line, description, and fix
+6. End with a summary: files scanned, findings by severity, top 3 next steps.
+   A full audit that finds `.github/workflows/` also runs the workflow audit
+   (`WORKFLOW_REFERENCE.md`) and folds its findings in.
+
+---
+
 ## Rules — flag on sight during any coding session
 
 These rules apply as code is written, not just during Gate 3 scans.
