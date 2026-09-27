@@ -30,18 +30,19 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
 p origin bash -o pipefail -c "git remote get-url origin | sed -E 's#://[^/@]+@#://#'"
 p branch git branch --show-current
+p head git rev-parse --short HEAD
 p fetch git fetch --quiet origin
 p status git status -sb
 p gh_installed bash -o pipefail -c 'command -v gh || echo no'
 p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission,defaultBranchRef'
 p gh_login gh api user -q .login
-p default_branch bash -o pipefail -c "git remote show origin | sed -n 's/.*HEAD branch: //p'"
+p default_branch bash -o pipefail -c "git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##' || git remote show origin | sed -n 's/.*HEAD branch: //p'"
 p latest_tag bash -o pipefail -c "git ls-remote --tags origin | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
 p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | grep -v '\^{}'); grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
 p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
@@ -90,6 +91,9 @@ Reading it:
   and before any new work, present a ▶️ RUN THIS block that removes them
   (`docker rm -f …`) and their temp mount folders
   (`docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}'` lists them).
+- **`head` is the commit this session starts on.** Write it to the gate file's
+  `Start:` row: the session-end checkpoint diffs against it (`SKILL.md` §8),
+  and a row survives compaction where a remembered hash does not.
 - **The probe only reads, plus one `git fetch`**, which updates the
   remote-tracking refs and nothing in the working tree. So `status`'s
   ahead/behind counts are current, and step 3 asks only when they say behind.
@@ -300,7 +304,7 @@ for it or it needs something the probe does not read.
 
 **Enforcement disclosure — every session, before the mode question.** Read
 only `ENFORCEMENT.md`'s "At session start" section (`sed -n '/^## At session
-start/,/^## The checks/p'`, about 2KB of a 12KB file; the rest loads when a
+start/,/^## The checks/p'`, about 2KB of a 19KB file; the rest loads when a
 check blocks) and follow it: the short
 disclosure, then **"Keep the enforcement checks on for this session?"** in the
 same `AskUserQuestion` call as the mode question. It is all or nothing, never
@@ -326,9 +330,9 @@ defaulted, and asked again if skipped.
   >    outside me, and you never need to reply just to say "done".
   > 2. **Semi-autonomous:** I run git myself after your approval of each
   >    commit. The tag push and any ref deletion are still yours to run.
-  >    *Cost:* every command I run is a tool call that resends the whole
-  >    conversation. I chain steps to keep that down, and the output lands
-  >    in context.
+  >    *Cost:* every command I run is one more turn: the conversation is
+  >    resent at the cached rate, and the command's output lands in context.
+  >    I chain steps to keep that down.
 
   **The cost line is part of each option and is shown every time.** A picker
   that shows only what a mode does, without its cost, is the wrong question.
@@ -338,7 +342,7 @@ defaulted, and asked again if skipped.
   | Option label | Description, local and Termux sessions | Description, remote container |
   |---|---|---|
   | `Manual` | I present git commands and you run them, one block per decision. Cost: the commands run outside me, so they cost no tokens; you never need to reply just to say "done". | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
-  | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run resends the whole conversation; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
+  | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run is one more turn, with its output in context; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
 
   In a remote container Claude runs git in both modes (`SKILL.md` §5.8), so the
   difference there is only the number of stops.
@@ -354,7 +358,8 @@ defaulted, and asked again if skipped.
   ("Entering the mode").
 
 **Write the gate state file.** Create `.dev-skills-gates.md` in the repo root with all
-six gates ⬜ pending, the `Origin:` row from step 1a, and `Mode: unchosen`
+six gates ⬜ pending, the `Origin:` row from step 1a, the `Start:` row from the
+probe's `head`, and `Mode: unchosen`
 (format below), and a `Standards:` row for the project standards that apply
 (`SKILL.md` §10; `n/a` when none do). Replace `unchosen` with the user's answer as soon as it
 arrives. The checks deny git writes while it reads `unchosen`. **Edit this
@@ -394,6 +399,7 @@ Track: release sequence
 Mode: manual
 Model: Sonnet 5 (within ceiling)
 Origin: owner/repo (not a fork)
+Start: 1a2b3c4
 Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅
 Version: 2.12.0
 Updated: 2026-09-07
@@ -421,7 +427,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.43.0 active.
+Dev Skills v2.44.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -456,7 +462,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.43.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.44.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

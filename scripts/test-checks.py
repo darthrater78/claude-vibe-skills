@@ -391,6 +391,36 @@ CASES = [
                                                     "cwd": repo(GATES_ALL), "tool_input": {}}), "deny"),
     ("A4 MCP other server name", lambda: run("pre-tool", {"session_id": "t", "tool_name": "mcp__claude_ai_GitHub__merge_pull_request",
                                                           "cwd": repo(GATES_WORK), "tool_input": {"owner": "owner", "repo": "repo"}}), "deny"),
+    # --- A4: writes that commit, merge or publish without `git commit` / `gh pr merge`
+    ("A4 git merge commits", lambda: bash("git merge origin/master", gates=GATES_NONE), "deny"),
+    ("A4 git merge -n still commits", lambda: bash("git merge -n origin/master", gates=GATES_NONE), "deny"),
+    ("A4 git merge, SECURITY ok", lambda: bash("git merge origin/master", gates=GATES_WORK), "allow"),
+    ("A4 git merge --ff-only ok", lambda: bash("git merge --ff-only origin/feat/x", gates=GATES_NONE), "allow"),
+    ("A4 git merge --abort ok", lambda: bash("git merge --abort", gates=GATES_NONE), "allow"),
+    ("A4 git merge-base ok", lambda: bash("git merge-base HEAD origin/master", gates=GATES_NONE), "allow"),
+    ("A4 cherry-pick commits", lambda: bash("git cherry-pick abc123", gates=GATES_NONE), "deny"),
+    ("A4 cherry-pick -n ok", lambda: bash("git cherry-pick -n abc123", gates=GATES_NONE), "allow"),
+    ("A4 revert commits", lambda: bash("git revert HEAD", gates=GATES_NONE), "deny"),
+    ("A4 am commits", lambda: bash("git am fix.patch", gates=GATES_NONE), "deny"),
+    ("A4 gh release edit", lambda: bash("gh release edit v1.2.0 --notes x", gates=GATES_NONE), "deny"),
+    ("A4 gh release edit after gates ok", lambda: bash("gh release edit v1.2.0 --notes x"), "allow"),
+    ("A4 gh release upload on work track", lambda: bash("gh release upload v1 a.zip", gates=GATES_WORK_MERGE), "deny"),
+    ("A4 gh repo sync remote", lambda: bash("gh repo sync owner/repo --source up/repo", gates=GATES_WORK), "deny"),
+    ("A4 gh repo sync local ok", lambda: bash("gh repo sync --source up/repo", gates=GATES_NONE), "allow"),
+    ("A4 gh api merges", lambda: bash("gh api -X POST repos/o/r/merges -f base=master -f head=x", gates=GATES_WORK), "deny"),
+    ("A4 gh api update-branch", lambda: bash("gh api -X PUT repos/o/r/pulls/5/update-branch", gates=GATES_NONE), "deny"),
+    ("A4 gh api create PR", lambda: bash("gh api repos/o/r/pulls -f head=x -f base=master", gates=GATES_WORK), "deny"),
+    ("A4 gh api contents, default branch", lambda: bash("gh api -X PUT repos/o/r/contents/a.md -f message=x -f content=eA==", gates=GATES_WORK), "deny"),
+    ("A4 gh api contents, on a branch ok", lambda: bash("gh api -X PUT repos/o/r/contents/a.md -f message=x -f content=eA== -f branch=feat/x", gates=GATES_WORK), "allow"),
+    ("A4 gh api contents read ok", lambda: bash("gh api repos/o/r/contents/a.md", gates=GATES_NONE), "allow"),
+    ("A4 MCP auto-merge", lambda: run("pre-tool", {"session_id": "t", "tool_name": "mcp__github__enable_pr_auto_merge",
+                                                   "cwd": repo(GATES_WORK), "tool_input": {"owner": "owner", "repo": "repo"}}), "deny"),
+    ("A4 MCP auto-merge after gates ok", lambda: run("pre-tool", {"session_id": "t", "tool_name": "mcp__github__enable_pr_auto_merge",
+                                                                  "cwd": repo(GATES_ALL), "tool_input": {"owner": "owner", "repo": "repo"}}), "allow"),
+    ("A4 MCP update branch", lambda: run("pre-tool", {"session_id": "t", "tool_name": "mcp__github__update_pull_request_branch",
+                                                      "cwd": repo(GATES_NONE), "tool_input": {"owner": "owner", "repo": "repo"}}), "deny"),
+    ("C2 presented git merge", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x', "git merge origin/master"),
+                                            gates=GATES_NONE), "block"),
     # --- declined
     ("declined: commit allowed", lambda: bash("git commit -m x", gates=GATES_DECLINED), "allow"),
     ("declined: docker allowed", lambda: bash("docker run -p 127.0.0.1:80:80 img", gates=GATES_DECLINED), "allow"),
@@ -636,7 +666,17 @@ def main() -> None:
     if seq != ["block", "block", "warn"]:
         fails += 1
         print(f"FAIL stop loop guard: want block, block, warn, got {seq}")
-    total = len(CASES) + 1
+    # Without prompt_id (Claude Code before 2.1.196) the limit is still per reply: a new
+    # reply's first stop (stop_hook_active false) starts the count over.
+    d = repo(GATES_ALL)
+    p = {"session_id": "t-noid" + d[-6:], "cwd": d, "last_assistant_message": "http://127.0.0.1:1",
+         "stop_hook_active": False}
+    seq = [run("stop", p), run("stop", dict(p, stop_hook_active=True)), run("stop", dict(p, stop_hook_active=True)),
+           run("stop", p)]
+    if seq != ["block", "block", "warn", "block"]:
+        fails += 1
+        print(f"FAIL stop loop guard without prompt_id: want block, block, warn, block, got {seq}")
+    total = len(CASES) + 2
     print(f"enforcement checks: {total - fails}/{total} passed")
     sys.exit(1 if fails else 0)
 

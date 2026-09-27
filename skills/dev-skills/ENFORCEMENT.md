@@ -17,7 +17,7 @@ own** at fixed points:
 
 | When | What Claude Code hands the checks |
 |---|---|
-| Before Claude runs a command or edits a file | the command, or the file path and the new text |
+| Before Claude runs a command, edits a file, or calls a GitHub tool | the command, the file path and the new text, or the tool's arguments |
 | When Claude is about to end a reply | the reply text |
 | After the user answers Claude's multiple-choice questions | the questions and the answers |
 
@@ -27,7 +27,7 @@ command is about to start. They answer **allow**, **deny** (the action doesn't
 happen, and Claude sees why), **ask** (Claude Code asks the user), or **fix the
 reply** (Claude has to correct the reply before it ends). **They never run a
 command.** The one thing they write is a status marker in the system temp
-folder (`dev-skills-enforcement/<session id>`), so the session banner can say
+folder (`dev-skills-enforcement-<user>/<session id>`), so the session banner can say
 whether they are active.
 
 **The hooks are one layer, not the only guardrail.** Every gate, approval and
@@ -149,8 +149,10 @@ matters because a session that crashes or is cut off never reaches its own
 cleanup. The checks never remove anything themselves.
 
 **A4. Gates before git writes.** A Bash or PowerShell command containing `git commit`,
-`git push`, `gh pr create|merge`, `gh release create`, or a `gh api` merge or
-release, even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
+anything else that writes a commit (`git merge`, `cherry-pick`, `revert`, `am`,
+except `--ff-only`, `--no-commit`, `--squash` and `--abort`), `git push`,
+`gh pr create|merge`, `gh release create|edit|upload`, `gh repo sync <repo>`,
+or a `gh api` merge, release, pull request, branch update or contents write, even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
 or `;`, is checked against the gate file. So is the PowerShell and Windows
 spelling of each: `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`,
 `pwsh`/`powershell -Command` or `-EncodedCommand`, `cmd /c`,
@@ -158,10 +160,12 @@ spelling of each: `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`
 another repo. A heredoc or here-string (`<<<`) fed to a shell is checked as
 commands. Any other heredoc is data: a quoted one (`python3 - <<'EOF'`) is
 not read, and an unquoted one is read only for `$( )`. The gates it needs:
-- commit, or a push to a non-default branch: **SECURITY**
+- commit, a PR branch update, or a push to a non-default branch: **SECURITY**
 - opening a PR: **VERSION, BUILD, SECURITY, DOCS**
-- a merge, a release, or **any push that lands on the default branch**
-  (`master`, `HEAD:master`, `feat:master`, a bare `git push` while on it):
+- a merge, **turning on auto-merge** (a merge that later runs unchecked), a
+  release or an edit to one, or **any write that lands on the default branch**
+  (`master`, `HEAD:master`, `feat:master`, a bare `git push` while on it, a
+  `gh api` contents write with no `branch`):
   those plus **RELEASE**, and the SECURITY row must say `0 open`
 
 **A merge with no publishing intent** (`SKILL.md` §2) passes with VERSION,
@@ -176,7 +180,9 @@ image, `.exe` or `.apk`, a ✅ BUILD needs a `handoff` note, and a merge needs
 `test artifact:` (plus `test creds` for Docker) on the BUILD row. In a fork,
 every `gh` write must name the fork with `--repo` and every push must go to
 `origin`. GitHub MCP tools are checked the same way, whatever the server is
-named.
+named: `create_pull_request`, `merge_pull_request`, `enable_pr_auto_merge`,
+`create_release`, `push_files`, `create_or_update_file`, `delete_file` and
+`update_pull_request_branch`. Other MCP servers never start the checks.
 
 **A5. No git writes until the mode is chosen.** A `Mode:` row that is
 missing, `unchosen`, or anything but `manual`/`semi-autonomous` denies A4's
@@ -289,7 +295,10 @@ after the block (a line ending in `?`, or starting "Tell me", "Let me know",
 
 A reply is sent back for fixing at most twice per user message. The third
 time it goes through with a visible warning listing what's still wrong, so a
-check that misfires can't trap the session.
+check that misfires can't trap the session. The count starts over with each
+new reply, on every Claude Code version. Each send-back makes Claude write the
+reply again, so it costs a full reply's output: the block shape in the
+message is there to make the first fix the last one.
 
 ### D. The user's answers
 
