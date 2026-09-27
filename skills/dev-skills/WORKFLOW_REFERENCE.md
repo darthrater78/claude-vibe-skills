@@ -4,7 +4,7 @@ This is a reference file — not a standalone skill. It is loaded on demand by
 the dev-skills skill (`SKILL.md`) in the same way as `SECURITY_REFERENCE.md`,
 `QUALITY_REFERENCE.md`, and `SHELL_REFERENCE.md`. It provides the workflow
 selection and audit procedures, the linting rules, and the best practices that
-apply to every template. The eight templates themselves are separate
+apply to every template. The nine templates themselves are separate
 `WORKFLOW_<ENVIRONMENT>.md` files, loaded one at a time by the environment
 detection in Step 1 — see "Workflow templates" below. The primary skill decides
 when to load this file; this file decides which template comes with it.
@@ -46,26 +46,58 @@ session start detects workflows that exist but may have issues — read every
      tag-on-default-branch check in release workflows, missing tag/version
      match check in release workflows (same class of failure: something
      gets published that was never the release), `${{ }}` expression
-     interpolated directly into a `run:` script instead of passed through `env:`
+     interpolated directly into a `run:` script instead of passed through `env:`,
+     a secret written to disk (keystore, `.npmrc`, credentials file) before a
+     dependency install step, where every package's install scripts can read it
    - ⚠️ **High** — `persist-credentials: true` (or missing, which defaults to
      true), no concurrency groups (race conditions), no timeouts (stuck builds
      waste runner minutes), release workflow with `cancel-in-progress: true`
      (can cancel a release mid-flight), release workflow that checks the tag is
      on the default branch but never checks whether CI actually passed for that
-     commit
+     commit (unless it runs the project's full validation itself and a
+     comment says so — the CI-passed exemption below), no `permissions:`
+     block (every job gets the repo's default token scope), a first-party
+     action (`actions/*`, `github/*`) on a branch ref such as `@main`, a
+     Docker release that puts a version tag on an image no scan has passed
+     (`WORKFLOW_DOCKER.md`: push by digest, Trivy gate, then tag)
    - 📝 **Medium** — CI reimplements build inline instead of calling project
      scripts, no `set -euo pipefail` in multi-line run blocks, no artifact
      verification after upload, CI trigger is a bare `push:` (also matches tag
      pushes — runs the suite twice on release) instead of `branches: ['**']`,
      no `lint-workflows.yml` for a repo with multiple workflow files, a
      release job re-running a check (lint, shellcheck, full suite) the gate
-     job already required CI to have passed for that exact commit
+     job already required CI to have passed for that exact commit, a Gradle
+     build with no wrapper validation (`setup-gradle` with
+     `validate-wrappers: false`, or no `setup-gradle`/`wrapper-validation`
+     step before the first `./gradlew`)
    - 💡 **Low** — missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
 
 4. **Check for missing workflows.** After auditing what exists, check what's
-   missing per the environment detection table and report the gaps.
+   missing per the environment detection table and report the gaps. Then
+   check the four supply-chain guards below. Each one is an **offer, not a
+   finding**: ask once, and record the answer on the audit's evidence line
+   (`SECURITY_GATE.md`, "Workflow audit"), so a declined guard is a decision
+   on the record and is not offered again until the project changes shape.
+
+   | Guard | Say it like this | Recommend it when |
+   |---|---|---|
+   | **Dependency review** | "Warns on a pull request that adds a library with a known security hole, before it's merged." Pair it with a weekly scheduled audit (`osv-scanner` or the ecosystem's own) that reports rather than blocks, for holes found after merge | the repo has a package manifest or lockfile. No packages: say it doesn't apply, don't offer it |
+   | **CodeQL** | "GitHub's free code scanner. It reads your code on every pull request and flags bug patterns attackers use." | the app takes outside input (a web server, API, login, file uploads) in a language CodeQL reads (JavaScript/TypeScript, Python, Java/Kotlin, C#, Go, Ruby, Swift, C/C++). Small scripts or docs: low value, say so |
+   | **Secret scanning** | "Blocks a push that contains a password or API key, before it reaches GitHub." Push protection is one switch in the repo settings (**Settings → Advanced Security → Push protection**), no code | always: it costs nothing on public repos and stops the most expensive mistake |
+   | **Build provenance** | "A signed record proving each download was built by your release workflow from a specific commit, so users can check it wasn't swapped." | the release publishes something people download and run (an APK, installer, binary, image, package) |
+
+   **Ask it the way the user can answer it**: one question, the recommended
+   guards first and labeled "(Recommended)", each option carrying its
+   "Say it like this" line and why it fits *this* repo's code ("your Python
+   API takes form input"). A guard that doesn't apply is stated in one line,
+   not offered. Never offer a bare list of tool names.
+
+   Settings-based guards (CodeQL default setup, push protection) aren't
+   visible in `.github/workflows/`: check them through the API where a
+   credential reaches it, and otherwise ask the user instead of reporting
+   them missing.
 
 5. **Check for drift.** If both a local dev workflow and CI exist, verify
    that CI calls the project's own scripts rather than reimplementing inline.
@@ -88,6 +120,7 @@ session start detects workflows that exist but may have issues — read every
    
    Missing:
      None — both build check and release workflows present
+     Offered: dependency review, CodeQL — declined 2026-09-27 (no manifest, Bash only)
    
    Summary: 1 Critical, 1 High, 1 Medium, 1 Low across 2 workflows
    ```
@@ -119,6 +152,7 @@ the others):
 |---|---|---|
 | **Docker** | `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `compose.yaml` | `WORKFLOW_DOCKER.md` |
 | **Windows app** | `.csproj`, `.sln`, `.vbproj`, `.fsproj`, `*.xaml`, `Setup.iss`, `*.wixproj`, `*.nsis`, MSBuild files | `WORKFLOW_WINDOWS.md` |
+| **Hybrid app (Capacitor/Ionic)** | `capacitor.config.ts`/`.json`, `@capacitor/core` or `@ionic/*` in `package.json`, alongside an `android/` Gradle project | `WORKFLOW_HYBRID.md` |
 | **Android app** | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `AndroidManifest.xml`, `app/` directory with Gradle wrapper | `WORKFLOW_ANDROID.md` |
 | **Linux app** | `Makefile`, `CMakeLists.txt`, `meson.build`, `configure.ac`, `.deb`/`.rpm` packaging, `setup.py`/`pyproject.toml` with entry points | `WORKFLOW_LINUX.md` |
 | **Home Assistant** | `manifest.json` with `"domain"` key, `hacs.json`, `custom_components/` directory | `WORKFLOW_HOMEASSISTANT.md` |
@@ -130,7 +164,7 @@ If no signal matches, ask what the project is.
 
 **Read only the matching template file(s).** Each is read in full, so loading a
 template the project does not match costs the tokens for content that is never
-used. A project spanning two environments loads two; never all eight.
+used. A project spanning two environments loads two; never all nine.
 
 ### Step 2 — Check for existing workflows
 
@@ -523,7 +557,7 @@ and match the patterns already used in this repo's own workflows.
 
 ## Workflow templates — one file per environment
 
-The eight templates live in their own files so a project loads only the one it
+The nine templates live in their own files so a project loads only the one it
 matches. Detect the environment first (Step 1 of the selection procedure
 above), then read **only** the matching file — a Node.js project has no use for
 the Android template, and each of these is read in full.
@@ -535,6 +569,7 @@ the Android template, and each of these is read in full.
 | Linux application (binary, .deb/.rpm, AppImage) | `WORKFLOW_LINUX.md` |
 | Home Assistant integration / HACS | `WORKFLOW_HOMEASSISTANT.md` |
 | Script collection (shell, PowerShell, Python scripts) | `WORKFLOW_SCRIPTS.md` |
+| Hybrid app (Capacitor/Ionic → APK) | `WORKFLOW_HYBRID.md` |
 | Android app (Gradle, APK/AAB) | `WORKFLOW_ANDROID.md` |
 | Python package (PyPI) | `WORKFLOW_PYTHON.md` |
 | Node.js / npm package | `WORKFLOW_NODEJS.md` |
@@ -833,10 +868,24 @@ every item:
       upgrade — Dependabot reads the comment, not the SHA, to decide what to
       offer next, so a stale label can hide several real versions of drift
 - [ ] `persist-credentials: false` on all checkouts
-- [ ] Least-privilege `permissions:` block
+- [ ] Least-privilege `permissions:` block — present at all: without one,
+      every job runs with the repo's default token scope
+- [ ] No action on a branch ref (`@main`, `@master`) unless it is a
+      documented exemption (`hacs/action` is the only one)
+- [ ] No secret written to disk before a dependency install: decode it after
+      `npm ci`/`pip install`/`gradle` resolution, immediately before the step
+      that uses it, and delete it in an `if: always()` step
+- [ ] Docker releases scan the pushed digest (Trivy, action SHA and binary
+      `version:` both pinned) and tag it only after the scan passes
+- [ ] Gradle builds validate the wrapper jar before running `./gradlew`
+      (`setup-gradle` v4+ does by default; don't set `validate-wrappers: false`)
 - [ ] Concurrency groups (cancel-in-progress for CI, never for release)
 - [ ] Timeouts on all jobs
 - [ ] Tag-on-default-branch verification in release workflows
+- [ ] Release workflows gate on CI having passed for the tagged commit —
+      **exempt** when the release job runs the project's full validation
+      itself (e.g. `bash scripts/validate.sh`) and a comment at the gate says
+      so; the proof is then the release run, not an earlier CI run
 - [ ] Tag/version match verification in release workflows — the tagged
       commit's own declared version equals the tag, or the version is
       tag-derived/computed and documented as exempt
