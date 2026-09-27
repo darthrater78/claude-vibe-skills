@@ -1008,7 +1008,7 @@ The skill uses tiered loading to keep token costs down:
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~16KB | Before writing any command block, and at session start when the repo is a fork or someone else's — fork targeting and the four fork cases, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
 | `WORKFLOW_REFERENCE.md` | ~43KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
-| `WORKFLOW_DOCKER.md` | ~14KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template, with the Trivy image scan |
+| `WORKFLOW_DOCKER.md` | ~17KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template, with the Trivy image scan |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
 | `WORKFLOW_LINUX.md` | ~7KB | Workflow help, only when environment detection matches a Linux application — the binary/.deb/.rpm/AppImage template |
 | `WORKFLOW_HOMEASSISTANT.md` | ~6KB | Workflow help, only when environment detection matches Home Assistant/HACS — the integration template |

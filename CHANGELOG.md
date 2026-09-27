@@ -39,7 +39,7 @@ or audited under an older checklist was never looked at again.
   line instead of offered.
 - **This repo audits its own workflows on every push** (`scripts/audit-workflows.py`,
   run by `validate.sh`). It applies the workflow-edit check's rules to the three
-  repo workflows and all 18 template workflows, so CI fails if the reference
+  repo workflows and all 19 template workflows, so CI fails if the reference
   repo or a template drifts from the checklist.
 - **`WORKFLOW_HYBRID.md`**: a CI and release template for Capacitor/Ionic apps.
   It runs `npm ci`, the web build and `cap sync android`, then decodes the
@@ -47,12 +47,17 @@ or audited under an older checklist was never looked at again.
   in an `if: always()` step. Detection checks for it before Android, because a
   Capacitor project also has an `android/` Gradle project.
 
-- **Trivy image scanning for Docker projects** (`WORKFLOW_DOCKER.md`). CI
-  scans the built image. The release pushes by digest, scans that exact
+- **Trivy image scanning for Docker projects** (`WORKFLOW_DOCKER.md`), and
+  only there: projects that don't ship an image are already covered by their
+  ecosystem audit, Dependabot and dependency review. CI scans the built image
+  and reports without failing, since a base-image CVE isn't the PR's doing.
+  A weekly scheduled workflow rescans the newest published release and uploads
+  SARIF, catching CVEs published after release. The release pushes by digest, scans that exact
   digest twice (a SARIF report for the Security tab, then a table run that
   gates), and only then tags it, so an image that fails is never published
   under a version. `trivy-action` is pinned by SHA (v0.36.0) and the Trivy
-  binary by version (v0.74.0). `trivy.yaml` fails on fixable HIGH and
+  binary by version (v0.74.0), since the action's tags were hijacked in an
+  early-2026 supply-chain attack. `trivy.yaml` fails on fixable HIGH and
   CRITICAL findings in the image's OS packages, and `.trivyignore.yaml`
   accepts one finding at a time with a reason and an `expired_at` date. Both
   were verified against the real v0.74.0 binary. Gate 3 runs the same scan
