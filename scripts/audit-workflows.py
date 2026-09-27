@@ -36,6 +36,19 @@ def targets() -> list[tuple[str, str]]:
     return found
 
 
+def snippets() -> list[tuple[str, str]]:
+    """(label, text) for every YAML fragment in every WORKFLOW_*.md, including
+    WORKFLOW_REFERENCE.md. Only the `${{ }}`-in-run: rule applies to these:
+    Claude copies snippets into workflows, and the hook would then deny them.
+    A fragment showing the wrong way on purpose opens with `# bad`."""
+    found = []
+    for doc in sorted(SKILL.glob("WORKFLOW_*.md")):
+        for i, b in enumerate(YAML_BLOCK.findall(doc.read_text(encoding="utf-8"))):
+            if not re.search(r"^jobs:", b, re.M) and not re.search(r"^\s*# bad\b", b, re.M):
+                found.append((f"{doc.name} snippet {i + 1}", b))
+    return found
+
+
 def main() -> int:
     failures = 0
     checked = targets()
@@ -44,7 +57,14 @@ def main() -> int:
         for problem in deny + ask:
             print(f"  FAIL: {label}: {problem}")
             failures += 1
-    print(f"workflow audit: {len(checked)} workflows, {failures} finding(s)")
+    fragments = snippets()
+    for label, text in fragments:
+        for problem in workflow_problems(text)[0]:
+            if "inside a run: script" in problem:
+                print(f"  FAIL: {label}: {problem}")
+                failures += 1
+    print(f"workflow audit: {len(checked)} workflows, {len(fragments)} snippets, "
+          f"{failures} finding(s)")
     return 1 if failures else 0
 
 

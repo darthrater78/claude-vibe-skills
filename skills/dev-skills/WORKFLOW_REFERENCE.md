@@ -75,7 +75,10 @@ session start detects workflows that exist but may have issues — read every
      (first-party GitHub actions)
 
 4. **Check for missing workflows.** After auditing what exists, check what's
-   missing per the environment detection table and report the gaps. Then
+   missing per the environment detection table and report the gaps. No
+   `.github/dependabot.yml`, or one missing an ecosystem the repo uses
+   (`github-actions` plus each package manager), is a 📝 Medium finding,
+   not an offer: without it SHA pins and packages drift silently. Then
    check the four supply-chain guards below. Each one is an **offer, not a
    finding**: ask once, and record the answer on the audit's evidence line
    (`SECURITY_GATE.md`, "Workflow audit"), so a declined guard is a decision
@@ -705,7 +708,7 @@ To add signing to a Docker release workflow, add these steps after the
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           set -euo pipefail
-          cosign sign --yes "ghcr.io/${{ github.repository }}@${DIGEST}"
+          cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${DIGEST}"
 ```
 
 **Required changes when adding signing:**
