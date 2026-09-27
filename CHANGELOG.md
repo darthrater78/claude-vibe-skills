@@ -27,6 +27,14 @@ it can't see the template pins inside Markdown, which is how the 2.41.0
   them. It also triggers on changes to `WORKFLOW_*.md`. The templates stay in
   Markdown, since that's what Claude loads.
 
+### Fixed
+- **A missing `VERSION` file failed the Docker, Linux and Scripts releases
+  without saying why.** `version="$(cat VERSION 2>/dev/null | tr ...)"` fails
+  under `set -euo pipefail` when the file is missing, so the job exited before
+  its "No VERSION file found" error. It now reads the file with a redirect and
+  `|| true`, which reaches the error. Found by the new template lint
+  (shellcheck SC2002).
+
 ### Changed
 - **Dependabot and dev releases have their own files.** `WORKFLOW_DEPENDABOT.md`
   holds the Dependabot config and the manual pin refresh. `WORKFLOW_DEVRELEASE.md`

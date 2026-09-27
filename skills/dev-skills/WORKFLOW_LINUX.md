@@ -183,7 +183,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          version="$(cat VERSION 2>/dev/null | tr -d '[:space:]')"
+          version="$(tr -d '[:space:]' 2>/dev/null < VERSION || true)"
           if [ -z "$version" ]; then
             echo "::error::No VERSION file found. Refusing to publish."
             exit 1
