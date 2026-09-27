@@ -498,7 +498,92 @@ COMMITTING = {"merge", "cherry-pick", "revert", "am"}
 NO_COMMIT = {"--no-commit", "-n", "--abort", "--quit", "--skip", "--ff-only", "--squash", "--show-current-patch"}
 
 
-def classify(argv: list[str], root: str | None) -> list["Op"]:
+# Subcommands git runs itself. Git ignores an alias with one of these names, so
+# only another name is looked up as an alias.
+GIT_BUILTINS = {"commit", "push", "tag", "pull", "fetch", "status", "log", "diff", "show", "add", "rm", "mv",
+                "checkout", "switch", "branch", "reset", "restore", "stash", "config", "remote", "ls-remote",
+                "rev-parse", "update-ref", "hash-object", "mktree", "commit-tree", "symbolic-ref", "ls-files",
+                "rebase", "init", "clone", "worktree", "gc", "notes", "describe", "blame", "grep", "bisect",
+                "clean", "submodule", "archive", "apply", "format-patch", "shortlog", "reflog", "cat-file",
+                *COMMITTING}
+ALIAS_HEADER = re.compile(r'^\s*\[\s*alias\s*\]\s*$', re.I)
+SECTION = re.compile(r"^\s*\[")
+ALIAS_ENTRY = re.compile(r"^\s*([A-Za-z0-9-]+)\s*=\s*(.*?)\s*$")
+
+
+def config_aliases(path: str | None) -> dict[str, str]:
+    """[alias] entries from one git config file. Includes aren't followed."""
+    out: dict[str, str] = {}
+    on = False
+    for line in (read(path) or "").splitlines():
+        if SECTION.match(line):
+            on = bool(ALIAS_HEADER.match(line))
+        elif on and (m := ALIAS_ENTRY.match(line)) and not line.lstrip().startswith(("#", ";")):
+            value = m.group(2)
+            if len(value) > 1 and value[0] == value[-1] == '"':
+                value = value[1:-1].replace('\\"', '"')
+            out[m.group(1).lower()] = value
+    return out
+
+
+def git_aliases(argv: list[str], root: str | None) -> dict[str, str]:
+    """Aliases in effect for this git invocation: user config, then the repo's, then `-c`."""
+    home = os.path.expanduser("~")
+    xdg = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+    out: dict[str, str] = {}
+    for path in (os.path.join(xdg, "git", "config"), os.path.join(home, ".gitconfig"),
+                 os.path.join(root, ".git", "config") if root else None):
+        out.update(config_aliases(path))
+    for i, a in enumerate(argv[:-1]):
+        if a == "-c" and argv[i + 1].lower().startswith("alias."):
+            name, _, value = argv[i + 1][6:].partition("=")
+            out[name.lower()] = value
+    return out
+
+
+def expand_alias(argv: list[str], root: str | None, depth: int) -> list["Op"] | None:
+    """Classify what a git alias runs, or None when this is no alias."""
+    g = git_argv(argv)
+    if not g or g[0] in GIT_BUILTINS or depth > 4:
+        return None
+    value = git_aliases(argv, root).get(g[0].lower())
+    if value is None:
+        return None
+    rest = " ".join(shlex.quote(a) for a in g[1:])
+    if value.startswith("!"):
+        # A shell alias: its text runs in a shell with the arguments appended.
+        cmds = simple_commands(f"{value[1:]} {rest}")
+    else:
+        try:
+            cmds = [["git", *shlex.split(value), *g[1:]]]
+        except ValueError:
+            # Unreadable text could run anything, so it needs everything a merge needs.
+            op = Op("release", f"git alias '{g[0]}', whose text can't be parsed")
+            op.targets_default = True
+            return [op]
+    return [op for c in cmds for op in classify(c, root, depth + 1)]
+
+
+def pull_merges(args: list[str], root: str | None) -> bool:
+    """True when `git pull` merges a branch other than the one checked out, which
+    writes a merge commit. Pulling your own branch, --ff-only and --rebase don't."""
+    if any(a in ("--ff-only", "--rebase", "-r") or a.startswith("--rebase=") for a in args):
+        return False
+    pos = [a for a in args if not a.startswith("-")]
+    if len(pos) < 2:
+        return False
+    here = git_head_branch(root)
+    for spec in pos[1:]:
+        src = spec.lstrip("+").partition(":")[0].replace("refs/heads/", "")
+        if src != here:
+            return True
+    return False
+
+
+def classify(argv: list[str], root: str | None, depth: int = 0) -> list["Op"]:
+    aliased = expand_alias(argv, root, depth)
+    if aliased is not None:
+        return aliased
     ops = []
     g = git_argv(argv)
     if g is not None and g:
@@ -518,6 +603,8 @@ def classify(argv: list[str], root: str | None) -> list["Op"]:
                 ops[-1].publishes = True
         elif sub == "push":
             ops.extend(classify_push(args, root))
+        elif sub == "pull" and pull_merges(args, root):
+            ops.append(Op("work", "git pull of another branch (a merge)"))
     base = os.path.basename(argv[0]) if argv else ""
     if base == "gh" and len(argv) > 1:
         ops.extend(classify_gh(argv[1:]))
@@ -582,6 +669,42 @@ def gh_positionals(args: list[str], valued: set[str]) -> list[str]:
     return out
 
 
+def classify_gh_api(args: list[str], words: list[str]) -> "Op | None":
+    """`gh api` writes that merge, publish, open a PR, or commit."""
+    op = None
+    method = None
+    for i, a in enumerate(args):
+        if a in ("-X", "--method") and i + 1 < len(args):
+            method = args[i + 1].upper()
+        elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
+            method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
+    if method is None and any(a in ("-f", "-F", "--field", "--raw-field", "--input") for a in args):
+        method = "POST"
+    endpoint = next((w for w in words[1:] if "/" in w), "")
+    if method in ("POST", "PATCH", "PUT", "DELETE"):
+        if re.search(r"git/refs|/git/tags", endpoint):
+            op = Op("user_only", "creating or deleting a ref through gh api", "ref operation")
+        elif re.search(r"/pulls/\d+/merge", endpoint):
+            op = Op("release", "merging a pull request through gh api")
+            op.targets_default = True
+        elif re.search(r"/releases(/|$)", endpoint):
+            op = Op("user_only" if method == "DELETE" else "release", "a release through gh api")
+            op.publishes = method != "DELETE"
+        elif re.search(r"/merges$|/pulls/\d+/update-branch$", endpoint):
+            merges = endpoint.endswith("/merges")
+            op = Op("release" if merges else "work",
+                    "a branch merge through gh api" if merges else "updating a PR branch through gh api")
+            op.targets_default = merges
+        elif re.search(r"/pulls$", endpoint) and method == "POST":
+            op = Op("pr", "opening a pull request through gh api")
+        elif re.search(r"/contents/", endpoint) and method in ("PUT", "DELETE"):
+            # A contents write is a commit. With no branch field it lands on the default branch.
+            on_branch = any(re.match(r"branch=", a) for a in args)
+            op = Op("work" if on_branch else "release", "a file commit through gh api")
+            op.targets_default = not on_branch
+    return op
+
+
 def classify_gh(args: list[str]) -> list["Op"]:
     words = [a for a in args if not a.startswith("-")]
     head = words[:2]
@@ -606,37 +729,10 @@ def classify_gh(args: list[str]) -> list["Op"]:
         # `gh repo sync <owner/repo>` updates that remote repo's default branch.
         op = Op("release", "gh repo sync to a remote repo's default branch")
         op.targets_default = True
+    elif head == ["pr", "update-branch"]:
+        op = Op("work", "gh pr update-branch")
     elif words[:1] == ["api"]:
-        method = None
-        for i, a in enumerate(args):
-            if a in ("-X", "--method") and i + 1 < len(args):
-                method = args[i + 1].upper()
-            elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
-                method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
-        if method is None and any(a in ("-f", "-F", "--field", "--raw-field", "--input") for a in args):
-            method = "POST"
-        endpoint = next((w for w in words[1:] if "/" in w), "")
-        if method in ("POST", "PATCH", "PUT", "DELETE"):
-            if re.search(r"git/refs|/git/tags", endpoint):
-                op = Op("user_only", "creating or deleting a ref through gh api", "ref operation")
-            elif re.search(r"/pulls/\d+/merge", endpoint):
-                op = Op("release", "merging a pull request through gh api")
-                op.targets_default = True
-            elif re.search(r"/releases(/|$)", endpoint):
-                op = Op("user_only" if method == "DELETE" else "release", "a release through gh api")
-                op.publishes = method != "DELETE"
-            elif re.search(r"/merges$|/pulls/\d+/update-branch$", endpoint):
-                merges = endpoint.endswith("/merges")
-                op = Op("release" if merges else "work",
-                        "a branch merge through gh api" if merges else "updating a PR branch through gh api")
-                op.targets_default = merges
-            elif re.search(r"/pulls$", endpoint) and method == "POST":
-                op = Op("pr", "opening a pull request through gh api")
-            elif re.search(r"/contents/", endpoint) and method in ("PUT", "DELETE"):
-                # A contents write is a commit. With no branch field it lands on the default branch.
-                on_branch = any(re.match(r"branch=", a) for a in args)
-                op = Op("work" if on_branch else "release", "a file commit through gh api")
-                op.targets_default = not on_branch
+        op = classify_gh_api(args, words)
     if op:
         op.is_gh = True
         op.gh_repos = gh_repo_flags(args)
