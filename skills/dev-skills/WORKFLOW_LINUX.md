@@ -4,9 +4,10 @@ Loaded on demand by the dev-skills skill, **only when project environment
 detection matches Linux application** (`WORKFLOW_REFERENCE.md`, "Workflow selection
 procedure", Step 1). A project that is not Linux application never needs this file.
 
-The selection procedure, the audit checklist, workflow linting, template best
-practices, dev releases, and the Dependabot configuration stay in
-`WORKFLOW_REFERENCE.md`. This file is the template itself.
+The selection procedure, the audit checklist, workflow linting and template
+best practices stay in `WORKFLOW_REFERENCE.md`; dev releases are in
+`WORKFLOW_DEVRELEASE.md` and the Dependabot configuration in
+`WORKFLOW_DEPENDABOT.md`. This file is the template itself.
 
 ---
 
@@ -182,7 +183,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          version="$(cat VERSION 2>/dev/null | tr -d '[:space:]')"
+          version="$(tr -d '[:space:]' 2>/dev/null < VERSION || true)"
           if [ -z "$version" ]; then
             echo "::error::No VERSION file found. Refusing to publish."
             exit 1

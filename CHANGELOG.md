@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.43.0] — 2026-09-27
+
+**The templates are linted and their pins checked in CI, and the workflow
+reference is 10KB smaller.** Dependabot keeps `.github/workflows/` current, but
+it can't see the template pins inside Markdown, which is how the 2.41.0
+`setup-gradle` pin that never existed reached users.
+
+### Added
+- **A weekly pin check** (`scripts/check-pins.py`, `.github/workflows/check-pins.yml`).
+  Every SHA-pinned action in the repo, templates included, must resolve with
+  `git ls-remote` to the tag its comment names (the peeled commit for an
+  annotated tag). A branch pin with no tag, like hassfest's, must at least be
+  a commit that exists. A mismatch, a missing tag or commit, or a pin with no
+  version comment fails the run. A newer stable release is a warning, not a
+  failure. It also runs on any pull request that touches a pin. Tested against
+  the old `setup-gradle` pin, a nonexistent tag, a missing comment, a
+  nonexistent commit and an outdated `checkout`.
+- **actionlint runs on every template** (`lint-workflows.yml`).
+  `audit-workflows.py --extract DIR` writes each full template workflow out
+  as a `.yml` file, and the lint job runs actionlint, with shellcheck, over
+  them. It also triggers on changes to `WORKFLOW_*.md`. The templates stay in
+  Markdown, since that's what Claude loads.
+
+### Fixed
+- **A missing `VERSION` file failed the Docker, Linux and Scripts releases
+  without saying why.** `version="$(cat VERSION 2>/dev/null | tr ...)"` fails
+  under `set -euo pipefail` when the file is missing, so the job exited before
+  its "No VERSION file found" error. It now reads the file with a redirect and
+  `|| true`, which reaches the error. Found by the new template lint
+  (shellcheck SC2002).
+
+### Changed
+- **Dependabot and dev releases have their own files.** `WORKFLOW_DEPENDABOT.md`
+  holds the Dependabot config and the manual pin refresh. `WORKFLOW_DEVRELEASE.md`
+  holds dev (pre-)releases and Cosign signing. Each loads only when its topic
+  comes up, so `WORKFLOW_REFERENCE.md` drops from ~44KB to ~34KB and its
+  ceiling from 44 to 36. The template best practices stay, because the
+  checklist and `SHIP_REFERENCE.md` point into them.
+
 ## [2.42.1] — 2026-09-27
 
 **Two gaps found by checking 2.42.0 against the 2026-09-26 portfolio audit.**

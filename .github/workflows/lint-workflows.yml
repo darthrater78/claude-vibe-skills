@@ -3,14 +3,20 @@ name: Lint workflows
 # Static checks on the workflow files themselves: YAML syntax, expression and
 # context typos, job wiring, and shellcheck over every run: block. Built from
 # the skill's own template (WORKFLOW_REFERENCE.md, "Workflow linting").
+# Also lints every template workflow in skills/dev-skills/WORKFLOW_*.md, so a
+# template can't ship something actionlint rejects.
 on:
   push:
     branches: ['**']
     paths:
       - '.github/workflows/**'
+      - 'skills/dev-skills/WORKFLOW_*.md'
+      - 'scripts/audit-workflows.py'
   pull_request:
     paths:
       - '.github/workflows/**'
+      - 'skills/dev-skills/WORKFLOW_*.md'
+      - 'scripts/audit-workflows.py'
 
 permissions:
   contents: read
@@ -45,3 +51,11 @@ jobs:
 
       - name: Run actionlint
         run: ./actionlint -color
+
+      # The templates live in Markdown (what Claude loads); pull each full
+      # workflow out as a .yml file and lint those too.
+      - name: Run actionlint on the templates
+        run: |
+          set -euo pipefail
+          python3 scripts/audit-workflows.py --extract "$RUNNER_TEMP/templates"
+          ./actionlint -color "$RUNNER_TEMP"/templates/*.yml
