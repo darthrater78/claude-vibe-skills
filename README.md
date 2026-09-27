@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.44.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.44.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.44.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.0)
 
 ---
 
@@ -99,8 +99,8 @@ to install.
 
 | Group | What's checked |
 |---|---|
-| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout ask you |
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
+| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
@@ -109,7 +109,7 @@ Every check, with exactly what it blocks and lets through, is in
 in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
 quietly weaken again. `scripts/audit-workflows.py` applies the workflow
 rules to this repo's own workflows and every template on each run too, and
-`scripts/check-pins.py` checks weekly that every action pin still matches its tag. **What they can't catch:** judgment (the track, N/A
+`scripts/check-pins.py` checks weekly that every action pin still matches its tag. `scripts/audit-repos.py` applies the same workflow rules weekly to every public repo you own (private ones too with an `AUDIT_TOKEN` secret), so a repo no session opens is still audited. **What they can't catch:** judgment (the track, N/A
 reasons, severity, docs accuracy), whether your "yes" meant commit approval,
 and what you actually paste. Those stay instructions. To run the checks in
 every session, including ones that don't load the skill, see
@@ -121,6 +121,11 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Idle repos get audited, and dev versions stay off the default branch.**
+  A weekly job checks every repo's workflows and keeps one issue up to date.
+  Pushing or merging a pre-release version (`-dev`, `-rc`, …) onto the default
+  branch is blocked. Every job that runs `./gradlew` must validate the wrapper
+  first. Gate-file edits stop re-asking for approved waivers. *(2.45.0)*
 - **Aliases and pulls can't slip past the gates.** A git alias (inline or in
   your git config) is expanded before it's checked, and pulling another branch
   into yours, which writes a merge commit, needs the same gate as `git merge`.
@@ -1005,7 +1010,7 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~40KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~28KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
 | `ENFORCEMENT.md` | ~19KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
@@ -1119,4 +1124,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.44.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.45.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -256,6 +256,9 @@ for it or it needs something the probe does not read.
    If yes, ask for a branch name or suggest one based on the task. Never
    proceed with implementation work directly on the default branch.
 
+   **A default branch not named `main`/`master`** gets a banner ⚠️ and one
+   question, since every release gate trusts it. Save the answer to memory.
+
 5. **Report the repo state** in the session start banner (see below).
 
 6. **Workflow detection: two workflows, both needed, both in the banner.**
@@ -427,7 +430,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.44.1 active.
+Dev Skills v2.45.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -438,6 +441,7 @@ Shell: <detected shell, or "container bash"> | Last sync: <just now / not synced
 CI: release <✅ workflow name / ❌ none> | build check <✅ workflow name / ❌ none>
 Local dev: <✅ build/test command / ❌ not found>
 Releases: <✅ all versions tagged / ⚠️ N unfinished: vX.Y.Z, ...>
+Default branch: <✅ main/master or confirmed / ⚠️ <name>, not main or master>
 Skill version: <✅ current (vX.Y.Z) / ⚠️ check skipped, no network / 🚨 see warning above>
 
 🔢 VERSION    ⬜
@@ -451,10 +455,10 @@ Commits require explicit approval. Security scan runs after every build.
 All work on branches — merge to default branch via PR only.
 ```
 
-**Fold the all-clear rows.** `Origin`, `CI`, `Local dev`, `Releases` and
-`Skill version` get their own line only when they need attention (⚠️, ❌, 🚫,
+**Fold the all-clear rows.** `Origin`, `CI`, `Local dev`, `Releases`,
+`Default branch` and `Skill version` get their own line only when they need attention (⚠️, ❌, 🚫,
 🚨). The ones that read ✅ collapse into one line, for example
-`Checks: ✅ origin, CI, local dev, releases, skill version`. `Repo`, `Mode`,
+`Checks: ✅ origin, CI, local dev, releases, default branch, skill version`. `Repo`, `Mode`,
 `Env`, `Shell` and `Enforcement` always print. They are this session's settings, not checks.
 
 **Important:** The version shown must match the `version` field in `SKILL.md`'s
@@ -462,7 +466,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.44.1
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

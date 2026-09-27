@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.45.0] — 2026-09-27
+
+**Repos nobody is working in get audited too, and a dev version can't reach
+the default branch.** Until now every workflow check ran only when a Claude
+session opened the repo. Also in this release: follow-ups from the 2.44 workflow
+audit, and a fix for gate-file edits that kept asking for approval.
+
+### Added
+- **Weekly audit of every repo's workflows** (`audit-repos.yml`,
+  `scripts/audit-repos.py`). It reads each repo's workflows on its default
+  branch, applies the rules the workflow-edit check (B8) applies, and keeps one
+  "Weekly workflow audit" issue in this repo up to date. It closes the issue when
+  the findings reach zero. It writes nothing to the audited repos:
+  `GITHUB_TOKEN` writes the issue and reads public repos, and an optional
+  read-only `AUDIT_TOKEN` secret adds private ones. Only rules a script can
+  prove from the file run there. The judgment rules stay with Gate 3.
+- **No dev version reaches the default branch.** A push, merge or `gh api`
+  merge onto the default branch is denied while the working tree declares a
+  pre-release version (`-dev`, `-alpha`, `-beta`, `-rc`, `-pre`, `-preview`,
+  `-SNAPSHOT`, PEP 440 `.devN`/`aN`/`bN`/`rcN`). The check reads `VERSION`,
+  `package.json`, `pyproject.toml`, `Cargo.toml`, the Gradle `versionName`,
+  Home Assistant `manifest.json` and the newest `CHANGELOG.md` heading. Presented
+  blocks are checked the same way. Dev tags from feature branches work as
+  before.
+- **Every job that runs `./gradlew` must validate the wrapper first.** The
+  workflow-edit check asks when a job runs `./gradlew` with no
+  `gradle/actions/wrapper-validation`, or `setup-gradle` has
+  `validate-wrappers: false`. Validating in another job doesn't count, since
+  each job runs on its own runner. The checklist says the same, and the
+  Android template shows the validation-only step for jobs that cache with
+  `setup-java`.
+- **Session start flags a default branch that isn't `main` or `master`**,
+  since every release gate trusts it.
+
+### Changed
+- **The checklist names hassfest as not exempt.** `hacs/action` is the only
+  action allowed on a branch ref. hassfest is SHA-pinned to master's head.
+
+### Fixed
+- **Gate-file edits no longer re-ask for waivers you already approved.** The
+  waiver check compared whole lines. So any update to a SECURITY or Standards
+  row that mentioned a waiver, and any mention like "fix or waive", asked
+  again. It now compares only the waiver clause itself, so adding or widening
+  a waiver still asks.
+- 26 new test cases, 319 in all. Each of the 14 cases for the new or fixed
+  behavior fails against the 2.44.1 checks.
+
 ## [2.44.1] — 2026-09-27
 
 **The security gate on 2.44.0 found three more ways around the git checks, and

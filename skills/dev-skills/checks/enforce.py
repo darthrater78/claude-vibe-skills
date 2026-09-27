@@ -32,6 +32,7 @@ import stat
 import sys
 import tempfile
 import time
+from collections import Counter
 from typing import NoReturn
 
 STATE_REL = ".dev-skills-gates.md"
@@ -764,6 +765,41 @@ def docker_repo(root: str | None) -> bool:
     return find_names(root, {"dockerfile", "compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"})
 
 
+# A dev build's version (WORKFLOW_DEVRELEASE.md) belongs on its feature branch:
+# the default branch only ever carries versions that get a full release.
+# Semver pre-releases (1.2.0-dev.1, -rc.2, -SNAPSHOT) and PEP 440 (1.2.0.dev1, 1.2.0rc1).
+PRERELEASE = re.compile(r"\b\d+\.\d+\.\d+(-(dev|alpha|beta|rc|pre|preview|snapshot)\b[0-9A-Za-z.-]*|\.?dev\d*\b|(a|b|rc)\d+\b)",
+                        re.I)
+VERSION_SOURCES = [
+    ("VERSION", re.compile(r"\A\s*v?(\S+)")),
+    ("package.json", re.compile(r'"version"\s*:\s*"([^"]+)"')),
+    ("pyproject.toml", re.compile(r'^version\s*=\s*["\']([^"\']+)', re.M)),
+    ("Cargo.toml", re.compile(r'^version\s*=\s*"([^"]+)"', re.M)),
+    ("app/build.gradle", re.compile(r'versionName\s*=?\s*["\']([^"\']+)')),
+    ("app/build.gradle.kts", re.compile(r'versionName\s*=\s*"([^"]+)"')),
+    ("CHANGELOG.md", re.compile(r"^##\s*\[?v?(\d+\.\d+\.\d+\S*?)\]?(\s|$)", re.M)),
+]
+
+
+def prerelease_versions(root: str | None) -> list[str]:
+    """`file: version` for every version file in the working tree that declares a
+    pre-release. The working tree is what a push from it, or a merge of the
+    checked-out PR, sends to the default branch."""
+    if not root:
+        return []
+    found = []
+    sources = list(VERSION_SOURCES)
+    cc = os.path.join(root, "custom_components")
+    if os.path.isdir(cc):  # Home Assistant integrations declare it in manifest.json
+        sources += [(os.path.join("custom_components", d, "manifest.json"), VERSION_SOURCES[1][1])
+                    for d in sorted(os.listdir(cc))]
+    for rel, pat in sources:
+        m = pat.search(read(os.path.join(root, rel)) or "")
+        if m and PRERELEASE.search(m.group(1)):
+            found.append(f"{rel}: {m.group(1)}")
+    return found
+
+
 def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: str = "") -> list[str]:
     """Problems for these operations against the gate file. Empty list = allowed."""
     if not ops:
@@ -805,6 +841,9 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
             if docker_repo(gates.root) and "test creds" not in notes:
                 problems.append("no 'test creds: …' note on the BUILD row. Docker test runs get fresh "
                                 "throwaway credentials, shown to the user (Gate 2).")
+        if op.targets_default and (dev := prerelease_versions(gates.root)):
+            problems.append(f"{op.label} would put a dev version on the default branch ({'; '.join(dev)}). "
+                            "Dev builds stay on their branch: set the final version first (WORKFLOW_DEVRELEASE.md).")
         if op.kind == "release":
             sec = gates.row("SECURITY") or ""
             if "✅" in sec and not re.search(r"(^|[^0-9])0\s+open", sec):
@@ -1211,16 +1250,20 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
 SENSITIVE = [
     (re.compile(r"^(Hook )?[Ee]nforcement:\s*declined"), "declining hook enforcement"),
     (re.compile(r"^Host network:.*approved"), "a host-network approval"),
-    (re.compile(r"waive", re.I), "a finding waiver"),
 ]
+# A waiver is keyed by the clause that carries it (from "waive" to the next `;`,
+# `·`, `|`, `)` or line end), not by the whole line: a SECURITY row or Standards
+# row that mentions a waiver changes every time its other evidence does, and
+# keying on the line re-asked the user for a waiver they had already approved.
+WAIVER = re.compile(r"waive[^;·|)]*", re.I)
 
 
-def sensitive_lines(text: str | None) -> set[str]:
-    out = set()
+def sensitive_lines(text: str | None) -> Counter[str]:
+    out: Counter[str] = Counter()
     for line in (text or "").splitlines():
-        for pat, _ in SENSITIVE:
-            if pat.search(line):
-                out.add(line.strip())
+        if any(pat.search(line) for pat, _ in SENSITIVE):
+            out[line.strip()] += 1
+        out.update(m.group(0).strip() for m in WAIVER.finditer(line))
     return out
 
 
@@ -1286,19 +1329,24 @@ def indent_of(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
 
 
-def step_has(lines: list[str], at: int, key: str) -> bool:
-    """Whether the list item (step) holding line `at` sets `key`."""
+def step_lines(lines: list[str], at: int) -> list[str]:
+    """The lines of the list item (step) holding line `at`."""
     start = at
     while start > 0 and not lines[start].lstrip().startswith("- "):
         start -= 1
     dash = indent_of(lines[start])
+    out = []
     for n in range(start, len(lines)):
         s = lines[n].strip()
         if n > start and s and not s.startswith("#") and indent_of(lines[n]) <= dash:
             break
-        if s.lstrip("- ").startswith(key + ":"):
-            return True
-    return False
+        out.append(lines[n])
+    return out
+
+
+def step_has(lines: list[str], at: int, key: str) -> bool:
+    """Whether the list item (step) holding line `at` sets `key`."""
+    return any(x.strip().lstrip("- ").startswith(key + ":") for x in step_lines(lines, at))
 
 
 def workflow_problems(text: str) -> tuple[list[str], list[str]]:
@@ -1340,32 +1388,79 @@ def workflow_problems(text: str) -> tuple[list[str], list[str]]:
     if not re.search(r"^\s*permissions:", text, re.M):
         ask.append("no `permissions:` block, so every job gets the repo's default token scope")
     ask.extend(f"job `{name}` has no `timeout-minutes`" for name in jobs_without_timeout(text))
+    ask.extend(f"job `{name}` runs ./gradlew without validating the wrapper jar first "
+               "(add gradle/actions/wrapper-validation, or setup-gradle without `validate-wrappers: false`)"
+               for name in jobs_running_unvalidated_gradlew(text))
     return deny, ask
 
 
-def jobs_without_timeout(text: str) -> list[str]:
-    """Jobs under `jobs:` with no timeout-minutes. A job that calls a reusable
-    workflow (`uses:` at job level) can't set one, so it isn't listed."""
+def job_bodies(text: str) -> tuple[int, dict[str, list[str]]]:
+    """(job-name column, {job name: its non-blank, non-comment lines}) under `jobs:`."""
     jobs = re.search(r"^jobs:[ \t]*\n", text, re.M)
     if not jobs:
-        return []
+        return 0, {}
     body = [x for x in text[jobs.end():].splitlines() if x.strip() and not x.strip().startswith("#")]
     if not body:
-        return []
+        return 0, {}
     col = indent_of(body[0])
-    found: dict[str, bool] = {}  # job name -> has a timeout or is exempt
+    found: dict[str, list[str]] = {}
     name = None
     for line in body:
         depth = indent_of(line)
         if depth < col:
             break
-        s = line.strip()
         if depth == col:
-            name = s.rstrip(":")
-            found[name] = False
-        elif name and depth == col + 2 and s.startswith(("timeout-minutes:", "uses:")):
-            found[name] = True
-    return [n for n, ok in found.items() if not ok]
+            name = line.strip().rstrip(":")
+            found[name] = []
+        elif name:
+            found[name].append(line)
+    return col, found
+
+
+def jobs_without_timeout(text: str) -> list[str]:
+    """Jobs under `jobs:` with no timeout-minutes. A job that calls a reusable
+    workflow (`uses:` at job level) can't set one, so it isn't listed."""
+    col, jobs = job_bodies(text)
+    return [name for name, lines in jobs.items()
+            if not any(indent_of(x) == col + 2 and x.strip().startswith(("timeout-minutes:", "uses:")) for x in lines)]
+
+
+GRADLEW = re.compile(r"(^|[\s;&|(])(\S*/)?gradlew(\.bat)?(?=[\s;&|)]|$)")
+WRAPPER_CHECK = re.compile(r"uses:\s*['\"]?(gradle/actions/(setup-gradle|wrapper-validation)|gradle/wrapper-validation-action)@")
+
+
+def scripts_by_line(lines: list[str]) -> list[str | None]:
+    """For each line, the shell text it contributes to a `run:` script, or None."""
+    out: list[str | None] = []
+    run_col: int | None = None  # column of `run:` while inside its block scalar
+    for line in lines:
+        if run_col is not None and indent_of(line) > run_col:
+            out.append(line)
+            continue
+        run_col = None
+        m = RUN_LINE.match(line)
+        if m and m.group(3)[:1] in ("|", ">"):
+            run_col = len(m.group(1)) + len(m.group(2) or "")
+        out.append(m.group(3) if m and run_col is None else None)
+    return out
+
+
+def jobs_running_unvalidated_gradlew(text: str) -> list[str]:
+    """Jobs that run ./gradlew before any step validates the wrapper jar. Each
+    job is a fresh runner, and parallel jobs don't wait on each other, so a
+    check in one job protects no other (WORKFLOW_REFERENCE.md, checklist).
+    setup-gradle validates by default; `validate-wrappers: false` turns it off."""
+    out = []
+    for name, lines in job_bodies(text)[1].items():
+        validated = False
+        for n, script in enumerate(scripts_by_line(lines)):
+            if script is None and WRAPPER_CHECK.search(lines[n]):
+                validated = "setup-gradle" not in lines[n] or not any(
+                    re.match(r"\s*validate-wrappers:\s*['\"]?false", x) for x in step_lines(lines, n))
+            elif script is not None and not validated and GRADLEW.search(script.split("#", 1)[0]):
+                out.append(name)
+                break
+    return out
 
 
 def workflow_edit_check(tool: str, inp: dict) -> tuple[str, str] | None:
