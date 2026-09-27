@@ -94,6 +94,8 @@ jobs:
   # place that checks both before anything gets built or published.
   gate:
     runs-on: ubuntu-latest
+    # The CI wait loop below gives up after 30 minutes; this is the backstop.
+    timeout-minutes: 35
     permissions:
       actions: read
       contents: read
@@ -203,7 +205,7 @@ jobs:
       # - name: Package scripts
       #   run: |
       #     version="${GITHUB_REF_NAME#v}"
-      #     tar czf "${{ github.event.repository.name }}-v${version}.tar.gz" \
+      #     tar czf "${GITHUB_REPOSITORY#*/}-v${version}.tar.gz" \
       #       --exclude='.git' --exclude='.github' .
 
       - name: Create GitHub release
@@ -213,7 +215,7 @@ jobs:
           set -euo pipefail
           # ADAPT: add artifact path if attaching a tarball:
           #   gh release create "$GITHUB_REF_NAME" \
-          #     "${{ github.event.repository.name }}-v${version}.tar.gz" \
+          #     "${GITHUB_REPOSITORY#*/}-v${version}.tar.gz" \
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md

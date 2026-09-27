@@ -43,13 +43,20 @@ jobs:
           persist-credentials: false
 
       - name: Set up JDK
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # Also validates every Gradle wrapper jar in the repo against Gradle's
+      # published checksums (validate-wrappers defaults to true), so a
+      # tampered gradle-wrapper.jar fails here instead of running.
+      # cache-provider: basic is the MIT-licensed actions/cache provider; the
+      # default "enhanced" one is proprietary and free only on public repos.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ac638b010cf753c3731813f9302c85b32d0b30b0 # v4.4.1
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
@@ -89,6 +96,8 @@ jobs:
   # place that checks both before anything gets built or published.
   gate:
     runs-on: ubuntu-latest
+    # The CI wait loop below gives up after 30 minutes; this is the backstop.
+    timeout-minutes: 35
     permissions:
       actions: read
       contents: read
@@ -185,13 +194,20 @@ jobs:
           fi
 
       - name: Set up JDK
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # Also validates every Gradle wrapper jar in the repo against Gradle's
+      # published checksums (validate-wrappers defaults to true), so a
+      # tampered gradle-wrapper.jar fails here instead of running.
+      # cache-provider: basic is the MIT-licensed actions/cache provider; the
+      # default "enhanced" one is proprietary and free only on public repos.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ac638b010cf753c3731813f9302c85b32d0b30b0 # v4.4.1
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
 
       # ADAPT: for signed release builds, decode the keystore from a secret:
       # - name: Decode keystore
@@ -241,9 +257,12 @@ jobs:
             echo "Release $version" > release-notes.md
           fi
 
+      # The path goes through env:, never ${{ }} inside run: -- an expression
+      # there is pasted into the script as code before bash ever sees it.
       - name: Create GitHub release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APK_PATH: ${{ steps.apk.outputs.path }}
         run: |
           set -euo pipefail
           prerelease_flag=""
@@ -251,7 +270,7 @@ jobs:
             *-dev.*|*-alpha.*|*-beta.*|*-rc.*) prerelease_flag="--prerelease" ;;
           esac
           gh release create "$GITHUB_REF_NAME" \
-            "${{ steps.apk.outputs.path }}" \
+            "$APK_PATH" \
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md \
             $prerelease_flag
@@ -260,6 +279,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           assets="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
           echo "Assets: $assets"
           echo "$assets" | grep -q '\.apk$' || {

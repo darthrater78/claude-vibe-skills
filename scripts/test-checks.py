@@ -183,6 +183,50 @@ def edit(tool: str, inp: dict, gates: str | None = GATES_ALL) -> str:
     return run("pre-tool", {"session_id": "t", "tool_name": tool, "cwd": d, "tool_input": inp})
 
 
+GOOD_WF = """name: CI
+on: [push]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "$REF"
+"""
+BAD_WF = """name: Legacy
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "${{ github.head_ref }}"
+"""
+
+
+def wf(tool: str, new: str, existing: str | None = None, gates: str | None = GATES_ALL,
+       name: str = "ci.yml") -> str:
+    """A Write or Edit of .github/workflows/<name>. For Edit, `new` replaces all of `existing`."""
+    d = repo(gates)
+    path = os.path.join(d, ".github", "workflows", name)
+    os.makedirs(os.path.dirname(path))
+    if existing is not None:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(existing)
+    inp = ({"file_path": path, "content": new} if tool == "Write"
+           else {"file_path": path, "old_string": existing, "new_string": new})
+    return run("pre-tool", {"session_id": "t", "tool_name": tool, "cwd": d, "tool_input": inp})
+
+
 def stop(msg: str, gates: str | None = GATES_ALL, prompt: str = "p1") -> str:
     d = repo(gates)
     return run("stop", {"session_id": "t-stop", "prompt_id": prompt + d[-6:], "cwd": d,
@@ -410,6 +454,41 @@ CASES = [
                                                     env={"CLAUDE_CODE_REMOTE": "true"}), "allow"),
     ("B5 Windows settings path", lambda: edit("Write", {"file_path": "C:\\Users\\me\\.claude\\settings.json", "content": "{}"}), "ask"),
     ("B5 bash write to Windows settings path", lambda: bash("copy x C:\\Users\\me\\.claude\\settings.local.json > out"), "ask"),
+    # --- B8: workflow edits
+    ("B8 hardened workflow ok", lambda: wf("Write", GOOD_WF), "allow"),
+    ("B8 version-tag pin", lambda: wf("Write", GOOD_WF.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")), "deny"),
+    ("B8 branch pin", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      - uses: home-assistant/actions/hassfest@master\n      - name: Test\n")), "deny"),
+    ("B8 hacs/action@main is the documented exception", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      - uses: hacs/action@main\n        with:\n          category: integration\n      - name: Test\n")), "allow"),
+    ("B8 local action ok", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      - uses: ./.github/actions/setup\n      - name: Test\n")), "allow"),
+    ("B8 expression in run block", lambda: wf("Write", GOOD_WF.replace('echo "$REF"', 'echo "${{ github.head_ref }}"')), "deny"),
+    ("B8 expression in one-line run", lambda: wf("Write", GOOD_WF.replace('        run: |\n          set -euo pipefail\n          echo "$REF"\n',
+        '        run: echo "${{ inputs.tag }}"\n')), "deny"),
+    ("B8 expression in env ok", lambda: wf("Write", GOOD_WF), "allow"),
+    ("B8 expression in a YAML comment ok", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      # never put ${{ }} inside run:\n      - name: Test\n")), "allow"),
+    ("B8 checkout without persist-credentials", lambda: wf("Write", GOOD_WF.replace(
+        "        with:\n          persist-credentials: false\n", "")), "deny"),
+    ("B8 checkout with persist-credentials: true ok (job pushes)", lambda: wf("Write", GOOD_WF.replace(
+        "persist-credentials: false", "persist-credentials: true")), "allow"),
+    ("B8 checkout under - name: still read", lambda: wf("Write", GOOD_WF.replace(
+        "      - uses: actions/checkout@", "      - name: Checkout\n        uses: actions/checkout@")), "allow"),
+    ("B8 no permissions block asks", lambda: wf("Write", GOOD_WF.replace("permissions:\n  contents: read\n", "")), "ask"),
+    ("B8 job without timeout asks", lambda: wf("Write", GOOD_WF.replace("    timeout-minutes: 10\n", "")), "ask"),
+    ("B8 reusable-workflow job needs no timeout", lambda: wf("Write", GOOD_WF +
+        "  shared:\n    uses: ./.github/workflows/shared.yml\n"), "allow"),
+    ("B8 second job without timeout asks", lambda: wf("Write", GOOD_WF +
+        "  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n"), "ask"),
+    ("B8 .yaml extension checked too", lambda: wf("Write", BAD_WF, name="ci.yaml"), "deny"),
+    ("B8 non-workflow YAML ignored", lambda: edit("Write", {"file_path": "docker-compose.yml", "content": BAD_WF}), "allow"),
+    ("B8 editing a legacy workflow without adding problems ok", lambda: wf("Edit",
+        BAD_WF.replace("name: Legacy", "name: Legacy build"), existing=BAD_WF), "allow"),
+    ("B8 fixing a legacy workflow ok", lambda: wf("Edit", BAD_WF.replace("@v4", "@3d3c42e5aac5ba805825da76410c181273ba90b1"), existing=BAD_WF), "allow"),
+    ("B8 legacy workflow, new unpinned action", lambda: wf("Edit",
+        BAD_WF + "      - uses: softprops/action-gh-release@v2\n", existing=BAD_WF), "deny"),
+    ("B8 declined stands down", lambda: wf("Write", BAD_WF, gates=GATES_DECLINED), "allow"),
     # --- PowerShell tool (Windows)
     ("A4 PowerShell commit, gates pending", lambda: run("pre-tool", {"session_id": "t", "tool_name": "PowerShell", "cwd": repo(GATES_NONE),
                                                                      "tool_input": {"command": "git add -A; git commit -m x"}}), "deny"),

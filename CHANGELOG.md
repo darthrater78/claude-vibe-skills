@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.41.0] — 2026-09-27
+
+**The workflow templates are fixed and re-checked, the skill's own workflows
+now follow its rules, and a new check stops Claude writing a workflow that
+breaks the rules a line of YAML can prove.** Found by a workflow audit of 26
+repos built with the skill.
+
+### Added
+- **Workflow edits are checked as they're written** (`ENFORCEMENT.md` B8,
+  `checks/enforce.py`). A Write or Edit to `.github/workflows/*.yml` is denied
+  when it adds an action not pinned to a commit SHA (a version tag or a branch
+  like `@main`; `hacs/action` stays the documented exception), a `${{ }}`
+  inside a `run:` script, or a checkout without `persist-credentials`. It asks
+  you when it drops the `permissions:` block or adds a job with no
+  `timeout-minutes`. Only what an edit adds counts, so fixing one thing in an
+  old workflow isn't blocked by the rest. 22 new test cases.
+- **This repo lints its own workflows** (`.github/workflows/lint-workflows.yml`):
+  actionlint 1.7.12, checksum-verified, built from the skill's template.
+
+### Fixed
+- **The Android template's `setup-gradle` pin didn't exist.**
+  `ac638b010cf753c3…` matched the real v4.4.1 commit (`ac638b010cf58a27…`) in
+  its first nine characters only, so every workflow built from the template
+  failed to resolve the action. It now pins v6.3.0 by its verified SHA with
+  `cache-provider: basic` (the MIT-licensed provider; v6's default is a
+  proprietary one, free only on public repos). The step's comment notes that
+  it also validates the Gradle wrapper jar.
+- **Templates put `${{ }}` inside `run:` scripts**, which the checklist rates
+  Critical: the APK path in the Android release, and the repository name in
+  the Windows and Scripts releases. The APK path now goes through `env:`, and
+  the repository name comes from the runner's own `$GITHUB_REPOSITORY`.
+- **Every template's release `gate` job had no `timeout-minutes`** (Android,
+  Docker, Home Assistant, Linux, Node.js, Python, Scripts, Windows). Its CI
+  wait loop gives up after 30 minutes; the job now has a 35-minute backstop.
+- **The workflow-linting template** had no top-level `permissions:`,
+  concurrency group or timeout, and its checkout kept the credential.
+- **Template pins brought current**, each resolved against its tag with
+  `git ls-remote`: `setup-java` v4.7.1 → v6.0.1, `docker/build-push-action`
+  v7.3.0 → v7.4.0, `docker/setup-buildx-action` v4.3.0 → v4.4.1. The Android
+  release's asset check now runs with `set -euo pipefail`.
+- **This repo's workflows now follow the skill's rules.** `validate.yml` has
+  `permissions: contents: read`. Every multi-line `run:` block in
+  `release.yml` starts with `set -euo pipefail`, and a comment records why it
+  has no "CI passed" gate: CI here is `validate.sh`, which the release job
+  runs itself on the tagged commit.
+
 ## [2.40.0] — 2026-09-26
 
 **Updating the gate file no longer stops for a permission prompt, the
