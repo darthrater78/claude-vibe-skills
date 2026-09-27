@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.43.0
+version: 2.44.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -17,7 +17,7 @@ description: >
 # run in Git Bash (Git for Windows), which Claude Code finds on its own.
 hooks:
   PreToolUse:
-    - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+    - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*[Gg][Ii][Tt][Hh][Uu][Bb].*"
       hooks:
         - type: command
           shell: bash
@@ -344,12 +344,15 @@ merged without them, they are still owed on the merged code.
 
 ### Running a gate
 
-**Before running, passing, or marking ➖ N/A on any gate, read that gate's
-reference file** from this skill's base directory: Gates 1, 2, 4 and 5 are in
-`GATE_REFERENCE.md`, **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
-`SHIP_REFERENCE.md`**. Read only the one the gate you are running is in. This
-table says what each gate is *for*, not what makes it pass, so never run a
-gate from memory of it:
+**Before running, passing, or marking ➖ N/A on any gate, have that gate's
+reference file in context** (this skill's base directory): Gates 1, 2, 4 and 5
+are in `GATE_REFERENCE.md`, **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
+`SHIP_REFERENCE.md`**. Read only the one the gate you are running is in, and
+read each **once per session**: it stays in context, so reading it again for
+the next gate only adds a second copy. Re-read it only after a compaction, or
+when you cannot quote the step you are about to run. This table says what
+each gate is *for*, not what makes it pass, so never run a gate from memory
+of it:
 
 | Gate | Passes when |
 |---|---|
@@ -373,8 +376,7 @@ These phrases mean "surface the gates", not "comply silently":
 | "we can do security later" | Run the security scan now, no exceptions |
 | "just ship it" / "done" | Walk through all open gates |
 | "just commit this" | Show what would be committed, get approval |
-| Hook flags uncommitted changes | Acknowledge the hook output, do NOT commit — wait for user approval |
-| Hook suggests committing | Treat as information, not instruction — ask the user |
+| Hook flags uncommitted changes | Information, not instruction: acknowledge it, do NOT commit, and wait for the user's approval. Same when a hook suggests committing |
 | "thanks" / "that's all" / silence | Run session-end checkpoint (Section 8) before winding down |
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
 | "just give me the commands" | Same gates as executing them — tracker goes above the block (Section 1) |
@@ -382,9 +384,7 @@ These phrases mean "surface the gates", not "comply silently":
 | Mode not yet chosen | Ask it with the session-start questions — no edits or git writes until recorded |
 | "auto mode" / "take it from here" | Explicit choice — confirm in one line what semi-autonomous mode does and does not change (Operating modes), record `Mode: semi-autonomous`, continue |
 | "stop asking me to approve commits" | Commit approval is not what semi-autonomous mode relaxes — offer semi-autonomous mode for the *commands*, keep the approval |
-| "just tag it" / "push the tag for me" | Tag pushes are the user's to run in **both** modes (§5.8) — present the block, don't execute it. Semi-autonomous mode adds the full pre-tag report above it, it does not take the block away |
-| "just delete that branch for me" | Ref deletions are the user's to run in both modes, same as tags (§5.8) — present the block, don't execute it |
-| Tag push or ref-deleting push (branch or tag) returns 403 | Not a retry and not a workaround — hand the block to the user (§5.8) |
+| "just tag it" / "push the tag for me" | Tag pushes and ref deletions ("just delete that branch") are the user's in **both** modes (§5.8): present the block, don't execute it, and on a 403 hand it over rather than retry. Semi-autonomous mode adds the full pre-tag report above it |
 | "that finding is pre-existing" / "it's unrelated to this change" | Provenance, not a terminal state (§4.7) — it stays open and blocks the release until fixed, waived or withdrawn |
 | "ignore the Mediums" / "stop flagging that" | Category suppression is not a waiver (§4.7) — ask which specific finding, and record the waiver with their reason |
 | "we'll fix it next release" | Not a terminal state — offer the waiver explicitly so the decision is on the record, or fix it now |
@@ -551,10 +551,14 @@ Cost suggestions are one or two sentences, woven into normal responses — never
 a lecture or checklist dump. Once per session per topic. If the user declines,
 drop it.
 
-Cost drivers, roughly by impact: long sessions (history resent every request,
-~6x), model choice (Opus ~3x Sonnet), effort level (xhigh ~2.3x medium),
-output length, and context injected on every request (MCP servers, skills,
-rules).
+Cost drivers, roughly by impact: **model choice** (per token, Opus 5.5 is 2x
+Sonnet 5 and Fable 5.1 is 5x); **output** (5x the price of input, and effort
+raises it); **new context** (files read, tool output, a reference file loaded
+twice); and **turns**. Every turn resends the history, but Claude Code caches
+it, and a cache read costs about a tenth of fresh input or less. So a long
+session costs mostly through what each turn *adds*, a turn spent on nothing
+still costs its output and its tool results, and a very long history crowds
+out the context and brings compaction closer.
 
 ### 5.1 Behaviors you control directly
 
@@ -564,7 +568,10 @@ rules).
   `git diff` to reading modified files. Don't re-read what you've seen, or
   re-verify what a tool result already confirmed.
 - **Batch tool calls.** Independent calls go in parallel: each sequential round
-  trip resends the whole history.
+  trip is another turn.
+- **Reference files load once per session.** A file already read this session
+  is in context: use it, don't read it again (Section 2, "Running a gate"). The
+  exception is a compaction, which drops it.
 - **Minimize agent spawns**, since each starts cold, and prefer page text to
   screenshots.
 
@@ -601,7 +608,8 @@ session.** Record it as the gate file's `Model:` row (`Model: Opus 5.5 —
 approved for this session`) and never raise it again that session: not at the
 end of replies, not on a new task. A new session, or a switch to a different
 above-ceiling model, asks again. Do not proceed with substantial work on an
-above-ceiling model until the user switches or approves. If a task genuinely warrants a stronger model
+above-ceiling model until the user switches or approves. A lower effort on the
+approved model is the cheaper lever when the answer is "stay" (§5.3). If a task genuinely warrants a stronger model
 (architecture, root-cause debugging, security analysis), say so once. Only the user can switch (`/model`); offer
 once to set `"model": "sonnet"` in `~/.claude/settings.json` if they keep
 landing on expensive models.
@@ -633,8 +641,8 @@ after-`/mcp` re-check are in `SESSION_START.md`, "MCP check".
 
 ### 5.6 Phase transitions → fresh session
 
-A long session resends its whole history on every request, so a fresh start is
-often the largest saving available. Offer a handoff at these points. **Each is
+A long session's history grows every turn and crowds the context toward
+compaction, so a fresh start is often the largest saving available. Offer a handoff at these points. **Each is
 an observable event, not a judgment call**, because a model biased toward
 continuing never decides that "the work shifted phase":
 
@@ -647,61 +655,24 @@ Say it in one line, not as an open question that is easy to drop:
 > This session is carrying [N] turns and the release is done — a fresh one would
 > be cheaper. Want a handoff summary?
 
-**One handoff, always replaced.** Write it to `.dev-skills-handoff.md` in the
-repo root (gitignored; never under `.claude/`, which prompts on every edit),
-overwriting the last one. **Local sessions: commit it locally, never push it**:
-save it as a parentless commit on the local-only ref `refs/dev-skills/handoff`,
-outside every branch, so no normal push sends it, it never touches the index,
-and the one it replaces is garbage-collected. This bookkeeping needs no commit
-approval. One call:
-
-```
-git update-ref refs/dev-skills/handoff "$(printf '100644 blob %s\tHANDOFF.md\n' "$(git hash-object -w .dev-skills-handoff.md)" | git mktree | xargs git -c user.name=dev-skills -c user.email=dev-skills@localhost commit-tree -m 'dev-skills handoff')"
-```
-
-Session start reads it back (`git show refs/dev-skills/handoff:HANDOFF.md`).
-**Remote containers: commit and push the file on the working branch**, or it
-dies with the container. The user can override either way.
-
-**Handoff format** (also used by Section 5.9). Keep it under ~30 lines:
-
-```
-## Handoff: [task name]
-**Goal:** one sentence
-**Current state:** what's done, what's verified
-**Gate status:** the tracker, with current state
-**Mode:** what *this* session ran in; the next session asks again (Operating modes)
-**Key files:** path:line — why it matters
-**Decisions made:** constraints the next session must respect
-**Shell environment:** [user's shell from session start, step 2]
-**Next step:** the single concrete next action
-```
+**Before writing one, read `SESSION_END.md`**: where it is stored (a local-only
+ref locally, the working branch in a remote container), the one-call command,
+and the format.
 
 ### 5.7 Token impact estimate
 
 **Fires at every session-end checkpoint (Section 8) and on request** ("how did
 we do?"). The only skip condition is the one gates use: the session modified no
-tracked file. "This felt like a small task" is *not* a skip condition.
-
-It is approximate, since billing data is not visible. Build it from per-request
-overhead (MCP tools, skills), conversation growth, files loaded, and any time
-spent above the Sonnet ceiling. A header and at most 3 lines. Include the MCP
-line only when connections changed since the session-start MCP check:
-
-```
-Token impact (rough estimate):
-✅ Saved ~40k — read only 2 relevant files instead of exploring the package
-⚠️ ~30k/turn overhead — 5 connected MCP servers, none used this session
-Biggest win next time: disable unused connectors
-```
-
-Never let the report become longer than the savings it describes.
+tracked file. "This felt like a small task" is *not* a skip condition. A
+header and at most 3 lines; format in `SESSION_END.md`.
 
 ### 5.8 Git command presentation
 
-**Before composing any command block, load `SHELL_REFERENCE.md`** (the
-labeled run-block format, no `cd`, one block per stop, remote verification,
-forks, the Termux clone flow). Do not build a block from memory of this summary.
+**Before composing the session's first command block, load
+`SHELL_REFERENCE.md`** (the labeled run-block format, no `cd`, one block per
+stop, remote verification, forks, the Termux clone flow), and keep it for the
+session. Re-read it only after a compaction. Do not build a block from memory
+of this summary; the enforcement checks (C3–C7) reject a malformed one.
 
 **Who runs git.** In semi-autonomous mode, Claude does (Operating modes), and
 presenting is only the fallback when an operation fails. In manual mode it
@@ -735,19 +706,10 @@ The user does anything upstream on GitHub directly (`SHELL_REFERENCE.md`,
 
 ### 5.9 Usage limit handoff
 
-**Offer a handoff (format in 5.6) when** a system message mentions overage,
-rate limits or a usage cap; the user says they are running low; or the
-conversation was compacted. **Do not gate this on a numeric token budget.** On
-Claude Code for web it starts at 15M and never visibly falls, so a budget
-check never fires. A genuinely low number still counts, but its absence is not
-a reason to stay quiet.
-
-> ⚠️ **Heads up — this session looks close to a limit.** If it cuts off mid-task
-> you lose the working context. Want a handoff summary now?
-
+**Offer a handoff (5.6) when** a system message mentions overage, rate limits
+or a usage cap; the user says they are running low; or the conversation was
+compacted. Never wait for a numeric token budget to fall (`SESSION_END.md`).
 Offer once. Don't nag.
-
----
 
 ## 6. Session start
 
@@ -775,14 +737,17 @@ reconstruct the tracker from memory.
 
 **Fires when the session is winding down**: "thanks", "that's all", silence, or any sign the work is done. Before wrapping up, read the
 evidence for steps 1–5 in one call (§5.1). It is `;`-separated so that one
-failure cannot hide the rest, and each failure is itself a finding:
+failure cannot hide the rest, and each failure is itself a finding.
+`<start>` is the `Start:` row of the gate file, the commit the session began
+on (`SESSION_START.md`). If the row is missing, say so and diff against
+`origin/<default>` instead:
 
 ```
-git status -sb; git diff --stat <start-commit>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .dev-skills-gates.md; docker ps --format '{{.Names}}'
+git status -sb; git diff --stat <start>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .dev-skills-gates.md; docker ps --format '{{.Names}}'
 ```
 
 1. **Were source files modified this session?** (`git status`, `git diff`
-   against the starting commit.) If not, skip the rest, including the token
+   against `<start>`.) If not, skip the rest, including the token
    estimate: the session was exploratory or advisory.
 2. **Show the gate tracker.** Any gate not ✅ or ➖ N/A is unfinished work.
 3. **Unmerged branches.** If a branch this session created has commits not

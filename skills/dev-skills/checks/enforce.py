@@ -491,6 +491,13 @@ class Op:
         self.publishes = False  # a tag or a GitHub release: never on the work-commit track
 
 
+# Commands that write a commit without `git commit`. A flag in NO_COMMIT means this
+# invocation writes none (it stops, aborts, or fast-forwards). `git merge -n` is
+# --no-stat, not --no-commit, so it doesn't count there.
+COMMITTING = {"merge", "cherry-pick", "revert", "am"}
+NO_COMMIT = {"--no-commit", "-n", "--abort", "--quit", "--skip", "--ff-only", "--squash", "--show-current-patch"}
+
+
 def classify(argv: list[str], root: str | None) -> list["Op"]:
     ops = []
     g = git_argv(argv)
@@ -498,6 +505,9 @@ def classify(argv: list[str], root: str | None) -> list["Op"]:
         sub, args = g[0], g[1:]
         if sub == "commit":
             ops.append(Op("work", "git commit"))
+        elif sub in COMMITTING and not any(a in NO_COMMIT and not (sub == "merge" and a == "-n") for a in args):
+            # These write commits without `git commit`, so they carry its gate.
+            ops.append(Op("work", f"git {sub}"))
         elif sub == "tag":
             flags = [a for a in args if a.startswith("-")]
             names = [a for a in args if not a.startswith("-")]
@@ -559,6 +569,19 @@ def gh_repo_flags(args: list[str]) -> list[str]:
     return [re.sub(r"^https?://github\.com/|\.git$", "", r) for r in repos]
 
 
+def gh_positionals(args: list[str], valued: set[str]) -> list[str]:
+    """Arguments that aren't flags or the values of the flags in `valued`."""
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False
+        elif a in valued:
+            skip = True
+        elif not a.startswith("-"):
+            out.append(a)
+    return out
+
+
 def classify_gh(args: list[str]) -> list["Op"]:
     words = [a for a in args if not a.startswith("-")]
     head = words[:2]
@@ -576,6 +599,13 @@ def classify_gh(args: list[str]) -> list["Op"]:
         op.publishes = True
     elif head == ["release", "delete"]:
         op = Op("user_only", "deleting a release", "release deletion")
+    elif head in (["release", "edit"], ["release", "upload"]):
+        op = Op("release", f"gh release {head[1]}")
+        op.publishes = True
+    elif head == ["repo", "sync"] and gh_positionals(args, {"--source", "-s", "--branch", "-b"})[2:]:
+        # `gh repo sync <owner/repo>` updates that remote repo's default branch.
+        op = Op("release", "gh repo sync to a remote repo's default branch")
+        op.targets_default = True
     elif words[:1] == ["api"]:
         method = None
         for i, a in enumerate(args):
@@ -595,6 +625,18 @@ def classify_gh(args: list[str]) -> list["Op"]:
             elif re.search(r"/releases(/|$)", endpoint):
                 op = Op("user_only" if method == "DELETE" else "release", "a release through gh api")
                 op.publishes = method != "DELETE"
+            elif re.search(r"/merges$|/pulls/\d+/update-branch$", endpoint):
+                merges = endpoint.endswith("/merges")
+                op = Op("release" if merges else "work",
+                        "a branch merge through gh api" if merges else "updating a PR branch through gh api")
+                op.targets_default = merges
+            elif re.search(r"/pulls$", endpoint) and method == "POST":
+                op = Op("pr", "opening a pull request through gh api")
+            elif re.search(r"/contents/", endpoint) and method in ("PUT", "DELETE"):
+                # A contents write is a commit. With no branch field it lands on the default branch.
+                on_branch = any(re.match(r"branch=", a) for a in args)
+                op = Op("work" if on_branch else "release", "a file commit through gh api")
+                op.targets_default = not on_branch
     if op:
         op.is_gh = True
         op.gh_repos = gh_repo_flags(args)
@@ -1386,14 +1428,17 @@ def pre_tool(payload: dict) -> NoReturn:
         name = m.group(2)
         if name in ("create_tag", "delete_branch", "delete_tag", "delete_ref", "delete_release"):
             pre_decision("deny", f"{name} is the user's to run (SKILL.md §5.8). Present the git command instead.")
+        # enable_pr_auto_merge is a merge that happens later, with no check at that point,
+        # so it needs everything a merge needs now.
         kind = {"create_pull_request": "pr", "merge_pull_request": "release",
-                "create_release": "release", "push_files": "work",
-                "create_or_update_file": "work", "delete_file": "work"}.get(name)
+                "enable_pr_auto_merge": "release", "create_release": "release",
+                "push_files": "work", "create_or_update_file": "work", "delete_file": "work",
+                "update_pull_request_branch": "work"}.get(name)
         if kind:
             op = Op(kind, name)
             op.is_gh = True
             op.publishes = name == "create_release"
-            op.targets_default = name == "merge_pull_request"
+            op.targets_default = name in ("merge_pull_request", "enable_pr_auto_merge")
             owner, repo = inp.get("owner"), inp.get("repo")
             if owner and repo:
                 op.gh_repos = [f"{owner}/{repo}"]
@@ -1532,11 +1577,18 @@ def stop_check(payload: dict) -> NoReturn:
                     + "\n- ".join(problems) + shape})
 
 
+def stop_key(payload: dict) -> str:
+    return "stop-" + re.sub(r"[^A-Za-z0-9_-]", "", f"{payload.get('session_id', '')}-{payload.get('prompt_id', '')}")[:160]
+
+
 def stop_counter(payload: dict) -> int:
-    key = re.sub(r"[^A-Za-z0-9_-]", "", f"{payload.get('session_id', '')}-{payload.get('prompt_id', '')}")[:160]
+    """Blocks so far for this reply. `stop_hook_active` is false on a reply's first stop
+    and true only while Claude continues because a Stop hook blocked, so a false one
+    starts the count over. That keeps the limit per user message even on Claude Code
+    versions that send no `prompt_id`."""
     try:
-        path = os.path.join(state_dir(), "stop-" + key)
-        n = int(read(path) or "0") + 1
+        path = os.path.join(state_dir(), stop_key(payload))
+        n = (int(read(path) or "0") if payload.get("stop_hook_active") else 0) + 1
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(str(n))
         return n
@@ -1626,9 +1678,8 @@ def main() -> None:
 
 
 def stop_counter_peek(payload: dict) -> int:
-    key = re.sub(r"[^A-Za-z0-9_-]", "", f"{payload.get('session_id', '')}-{payload.get('prompt_id', '')}")[:160]
     try:
-        return int(read(os.path.join(state_dir(), "stop-" + key)) or "0")
+        return int(read(os.path.join(state_dir(), stop_key(payload))) or "0")
     except (OSError, ValueError):
         return 0
 

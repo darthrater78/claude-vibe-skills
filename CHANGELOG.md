@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.44.0] — 2026-09-27
+
+**The enforcement checks close five ways to merge, commit or publish without
+a gate, and the skill stops charging for work it already did.** A cost and
+logic review found GitHub writes the checks never saw, and instructions that
+had Claude reload the same reference file before every gate and every command
+block.
+
+### Added
+- **The checks now cover every git and GitHub write that bypassed them.**
+  - GitHub MCP `enable_pr_auto_merge` needs everything a merge needs. Before, it
+    scheduled a merge to the default branch with no gate checked, then or later.
+  - GitHub MCP `update_pull_request_branch` needs SECURITY, like any commit on a branch.
+  - `gh release edit` and `gh release upload` change a published release, so
+    they need gates 1–5 and are denied on the work-commit track.
+  - `gh repo sync <repo>` writes that repo's default branch.
+  - `gh api` writes to `/merges`, `/pulls`, `/pulls/N/update-branch` and
+    `/contents/` (a contents write with no `branch` lands on the default branch).
+  - `git merge`, `cherry-pick`, `revert` and `am` write commits without
+    `git commit`, so they carry its gate. `--ff-only`, `--no-commit`,
+    `--squash` and `--abort` pass.
+  26 new test cases, 274 in all.
+- **A `Start:` row in the gate file**, from a new `head` key in the session
+  probe. The session-end checkpoint diffed against a `<start-commit>` that
+  nothing recorded, so after a compaction "were files modified this session?"
+  had no reliable answer.
+
+### Fixed
+- **The reply-fix limit is per reply on every Claude Code version.** The count
+  was keyed on `prompt_id`, which Claude Code sends only from 2.1.196. On
+  older versions it counted for the whole session, so after two send-backs
+  every later violation went through with only a warning. The count now starts
+  over whenever a reply's first stop arrives (`stop_hook_active` false).
+- **The cost model matches current pricing and caching.** "Opus ~3x Sonnet" is
+  2x for Opus 5.5 against Sonnet 5, and Fable 5.1 is 5x. The resent history is
+  cached at about a tenth of the input price or less, so §5 now ranks model,
+  output, new context and turns, and the semi-autonomous mode's cost line no
+  longer says each command resends the whole conversation at full price.
+- Stale text: `ENFORCEMENT.md`'s size (19KB, not 12KB) and the status marker's path.
+
+### Changed
+- **Reference files load once per session.** "Before running any gate, read
+  its reference file" and "before composing any command block, load
+  `SHELL_REFERENCE.md`" meant a release read `GATE_REFERENCE.md` (26KB) up to
+  four times and `SHELL_REFERENCE.md` (17KB) once per block. Each read added
+  another full copy to the context. A file stays in context once read and is
+  re-read only after a compaction. The rule that no gate runs from memory is
+  unchanged.
+- **SKILL.md is smaller despite the new rules** (loaded body 42.5KB → 41.2KB,
+  ceiling 41 → 40). The handoff storage and command, the handoff and
+  token-estimate formats, and the usage-limit prompt moved to a new
+  `SESSION_END.md`, which loads only when one of them is due. Their triggers
+  stay in SKILL.md. Five shortcut rows that restated §1 and §5.8 are folded
+  into two. No rule was removed: `scripts/rule-phrases.txt` swaps the two
+  "read before every …" phrases for their read-once wording and adds
+  "Reference files load once per session".
+- **The PreToolUse check starts only for GitHub MCP tools**, not every MCP
+  call. It only ever checked GitHub tools, so nothing is lost.
+- **The probe reads the default branch locally** (`origin/HEAD`) and falls
+  back to `git remote show origin` only when that's missing, which saves a
+  network round trip at session start.
+
 ## [2.43.0] — 2026-09-27
 
 **The templates are linted and their pins checked in CI, and the workflow

@@ -22,7 +22,7 @@ SKILL|A gate can only be N/A for structural reasons
 SKILL|What it never satisfies: Gates 1–4
 SKILL|Close an absorbed section in the step that absorbs it
 SKILL|Never open a PR whose only content is tracker bookkeeping
-SKILL|Before running, passing, or marking ➖ N/A on any gate, read that gate's reference file
+SKILL|Before running, passing, or marking ➖ N/A on any gate, have that gate's reference file in context
 SKILL|The tag push and every ref deletion go to the user
 SKILL|means no mode, never manual
 SKILL|When something goes wrong, that operation falls back to manual
@@ -31,7 +31,8 @@ SKILL|Claude never waives its own finding
 SKILL|Surface a finding at the moment it is discovered
 SKILL|Never write a version number from memory
 SKILL|Do not chain across a stop
-SKILL|Before composing any command block, load `SHELL_REFERENCE.md`
+SKILL|Before composing the session's first command block, load `SHELL_REFERENCE.md`
+SKILL|Reference files load once per session
 SKILL|Forks: `origin` is the fork, and nothing targets upstream
 SKILL|Treat Sonnet as the maximum model
 SKILL|Never silently wind down
