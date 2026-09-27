@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.42.1] — 2026-09-27
+
+**Two gaps found by checking 2.42.0 against the 2026-09-26 portfolio audit.**
+
+### Fixed
+- **The Cosign signing snippet put `${{ github.repository }}` inside a `run:`
+  script** (`WORKFLOW_REFERENCE.md`), which the checklist rates Critical and
+  the workflow-edit check denies, so copying it into a workflow was blocked by
+  the skill's own hook. It now reads the runner's `$GITHUB_REPOSITORY`.
+- **A repo with no `dependabot.yml` passed the workflow audit.** Dependabot was
+  only recommended when Claude created a workflow, so the six audited repos
+  without one, and one covering only `github-actions`, passed Gate 3. The
+  audit's missing-workflows step now reports a missing file, or one missing an
+  ecosystem the repo uses, as a Medium finding rather than an offer.
+
+### Changed
+- **`scripts/audit-workflows.py` checks snippets too.** Every YAML fragment in
+  the `WORKFLOW_*.md` files, `WORKFLOW_REFERENCE.md` included, is checked for
+  `${{ }}` inside `run:`. A fragment that shows the wrong way on purpose opens
+  with `# bad` and is skipped. Proven to fail on the old Cosign snippet.
+
 ## [2.42.0] — 2026-09-27
 
 **Workflows that already exist get audited too.** 2.41.0 checked workflows as

@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.42.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.42.1`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.42.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.42.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.42.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.42.1)
 
 ---
 
@@ -129,7 +129,8 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   validation, and the audit offers dependency review, CodeQL, secret
   scanning and build provenance. Docker images are scanned with Trivy
   before a version tag points at them. New template for Capacitor/Ionic apps.
-  *(2.42.0)*
+  A missing or incomplete `dependabot.yml` is an audit finding. *(2.42.0,
+  2.42.1)*
 - **Workflows checked as they're written.** A workflow edit that adds an
   unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps
   its credential is blocked; one that drops `permissions:` or a job timeout
@@ -1007,7 +1008,7 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~16KB | Before writing any command block, and at session start when the repo is a fork or someone else's — fork targeting and the four fork cases, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~43KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
+| `WORKFLOW_REFERENCE.md` | ~44KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
 | `WORKFLOW_DOCKER.md` | ~17KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template, with the Trivy image scan |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
 | `WORKFLOW_LINUX.md` | ~7KB | Workflow help, only when environment detection matches a Linux application — the binary/.deb/.rpm/AppImage template |
@@ -1098,4 +1099,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.42.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.42.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
