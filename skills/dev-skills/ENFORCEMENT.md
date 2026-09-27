@@ -22,8 +22,10 @@ own** at fixed points:
 | After the user answers Claude's multiple-choice questions | the questions and the answers |
 
 They **only read**: the payload above, the project's gate file
-(`.dev-skills-gates.md`), and a compose file that a `docker compose`
-command is about to start. They answer **allow**, **deny** (the action doesn't
+(`.dev-skills-gates.md`), a compose file that a `docker compose`
+command is about to start, and the `[alias]` sections of your git config
+(`~/.gitconfig`, `~/.config/git/config` and the repo's `.git/config`), so an
+alias can't hide a git write. They answer **allow**, **deny** (the action doesn't
 happen, and Claude sees why), **ask** (Claude Code asks the user), or **fix the
 reply** (Claude has to correct the reply before it ends). **They never run a
 command.** The one thing they write is a status marker in the system temp
@@ -150,11 +152,14 @@ cleanup. The checks never remove anything themselves.
 
 **A4. Gates before git writes.** A Bash or PowerShell command containing `git commit`,
 anything else that writes a commit (`git merge`, `cherry-pick`, `revert`, `am`,
-except `--ff-only`, `--no-commit`, `--squash` and `--abort`), `git push`,
-`gh pr create|merge`, `gh release create|edit|upload`, `gh repo sync <repo>`,
+except `--ff-only`, `--no-commit`, `--squash` and `--abort`; a `git pull` of a
+branch other than the one checked out, except `--ff-only` and `--rebase`),
+`git push`, `gh pr create|merge|update-branch`, `gh release create|edit|upload`,
+`gh repo sync <repo>`,
 or a `gh api` merge, release, pull request, branch update or contents write, even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
 or `;`, is checked against the gate file. So is the PowerShell and Windows
-spelling of each: `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`,
+spelling of each: a git alias that expands to one (from `-c alias.…` or your
+git config, shell `!` aliases included), `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`,
 `pwsh`/`powershell -Command` or `-EncodedCommand`, `cmd /c`,
 `Start-Process` (with its `-WorkingDirectory`), and a `Set-Location` into
 another repo. A heredoc or here-string (`<<<`) fed to a shell is checked as
@@ -321,6 +326,8 @@ have already arrived.
 - **A gate file that is already tracked.** B6 stops it being staged by name,
   but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
   up its changes. Session start untracks it (`SESSION_START.md`).
+- **Aliases from config files the checks don't read**: the system config
+  (`/etc/gitconfig`) and anything pulled in through `include.path`.
 - **Most of the workflow checklist.** B8 reads workflow YAML line by line
   and covers only the rules a line can prove. Release gates, a secret written
   to disk before a dependency install, whether a pin resolves to its tag,

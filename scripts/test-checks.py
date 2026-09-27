@@ -176,6 +176,14 @@ def bash_docker(cmd: str, build_row: str) -> str:
     return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
 
 
+def bash_alias(cmd: str, config: str, gates: str | None = GATES_NONE) -> str:
+    """A git command in a repo whose .git/config defines aliases."""
+    d = repo(gates)
+    with open(os.path.join(d, ".git", "config"), "w", encoding="utf-8") as fh:
+        fh.write(config)
+    return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
+
+
 def edit(tool: str, inp: dict, gates: str | None = GATES_ALL) -> str:
     d = repo(gates)
     inp = dict(inp)
@@ -419,6 +427,26 @@ CASES = [
                                                                   "cwd": repo(GATES_ALL), "tool_input": {"owner": "owner", "repo": "repo"}}), "allow"),
     ("A4 MCP update branch", lambda: run("pre-tool", {"session_id": "t", "tool_name": "mcp__github__update_pull_request_branch",
                                                       "cwd": repo(GATES_NONE), "tool_input": {"owner": "owner", "repo": "repo"}}), "deny"),
+    # --- A4 (2.44.1): gh pr update-branch, git pull of another branch, git aliases
+    ("A4 gh pr update-branch", lambda: bash("gh pr update-branch 5", gates=GATES_NONE), "deny"),
+    ("A4 gh pr update-branch, SECURITY ok", lambda: bash("gh pr update-branch 5", gates=GATES_WORK), "allow"),
+    ("A4 pull of another branch merges", lambda: bash("git pull origin master", gates=GATES_NONE), "deny"),
+    ("A4 pull of another branch, SECURITY ok", lambda: bash("git pull origin master", gates=GATES_WORK), "allow"),
+    ("A4 pull of own branch ok", lambda: bash("git pull origin feat/x", gates=GATES_NONE), "allow"),
+    ("A4 bare pull ok", lambda: bash("git pull", gates=GATES_NONE), "allow"),
+    ("A4 pull --ff-only ok", lambda: bash("git pull --ff-only origin master", gates=GATES_NONE), "allow"),
+    ("A4 pull --rebase ok", lambda: bash("git pull --rebase origin master", gates=GATES_NONE), "allow"),
+    ("A4 inline alias to commit", lambda: bash("git -c alias.ci=commit ci -m x", gates=GATES_NONE), "deny"),
+    ("A4 inline alias to merge", lambda: bash("git -c alias.m=merge m origin/master", gates=GATES_NONE), "deny"),
+    ("A4 inline shell alias to push", lambda: bash("git -c 'alias.p=!git push origin master' p", gates=GATES_WORK), "deny"),
+    ("A4 config alias to commit", lambda: bash_alias("git ci -m x", "[alias]\n\tci = commit\n"), "deny"),
+    ("A4 config shell alias", lambda: bash_alias("git save", '[alias]\n  save = "!git add -A && git commit -m wip"\n'), "deny"),
+    ("A4 alias of an alias", lambda: bash_alias("git c2 -m x", "[alias]\n\tc1 = commit\n\tc2 = c1\n"), "deny"),
+    ("A4 config alias to a read ok", lambda: bash_alias("git st", "[alias]\n\tst = status -sb\n"), "allow"),
+    ("A4 alias shadowing a builtin is ignored ok", lambda: bash_alias("git status", "[alias]\n\tstatus = commit -m x\n"), "allow"),
+    ("A4 config alias, SECURITY ok", lambda: bash_alias("git ci -m x", "[alias]\n\tci = commit\n", gates=GATES_WORK), "allow"),
+    ("A4 unparseable alias fails closed", lambda: bash_alias("git q", '[alias]\n\tq = commit -m "open\n', gates=GATES_WORK), "deny"),
+    ("A4 other section not read as alias ok", lambda: bash_alias("git ci -m x", "[core]\n\tci = commit\n"), "allow"),
     ("C2 presented git merge", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x', "git merge origin/master"),
                                             gates=GATES_NONE), "block"),
     # --- declined

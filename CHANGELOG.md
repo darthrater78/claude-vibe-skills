@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.44.1] — 2026-09-27
+
+**The security gate on 2.44.0 found three more ways around the git checks, and
+this closes them.** None was Critical or High. Each was a git write that
+skipped its gate.
+
+### Fixed
+- **Git aliases no longer hide a git write.** `git -c alias.ci=commit ci` and
+  an alias defined in git config were never expanded, so every git check could
+  be bypassed with a new name. The checks now expand aliases from `-c`,
+  `~/.gitconfig`, `~/.config/git/config` and the repo's `.git/config`,
+  including shell (`!`) aliases and aliases of aliases. An alias that shadows
+  a git command is ignored, as git itself ignores it. This widens what the
+  checks read, and `ENFORCEMENT.md` now says so. The system config and
+  `include.path` files are listed under what the checks can't catch.
+- **`git pull` of another branch needs the gate `git merge` needs.** Pulling
+  `origin master` into a feature branch writes a merge commit. Pulling your own
+  branch, `--ff-only` and `--rebase` still pass.
+- **`gh pr update-branch` is gated like its API and MCP forms**, which 2.44.0
+  covered and this missed.
+- An alias whose text can't be parsed needs every gate a merge needs, rather
+  than passing.
+- 19 new test cases, 293 in all. Each of the 8 deny cases for the three
+  findings fails against the 2.44.0 checks.
+
+### Changed
+- The `gh api` classifier is its own function (`classify_gh`: 62 → 35 lines).
+
 ## [2.44.0] — 2026-09-27
 
 **The enforcement checks close five ways to merge, commit or publish without
