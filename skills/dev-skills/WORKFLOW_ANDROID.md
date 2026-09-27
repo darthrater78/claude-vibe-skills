@@ -54,6 +54,12 @@ jobs:
       # tampered gradle-wrapper.jar fails here instead of running.
       # cache-provider: basic is the MIT-licensed actions/cache provider; the
       # default "enhanced" one is proprietary and free only on public repos.
+      # ADAPT: a job that caches with setup-java (`cache: gradle`) instead of
+      # setup-gradle still validates the wrapper, with the validation-only
+      # action, before its first ./gradlew. Every job that runs ./gradlew needs
+      # one or the other:
+      # - name: Validate Gradle wrapper
+      #   uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:

@@ -173,6 +173,16 @@ not read, and an unquoted one is read only for `$( )`. The gates it needs:
   `gh api` contents write with no `branch`):
   those plus **RELEASE**, and the SECURITY row must say `0 open`
 
+**No dev version reaches the default branch.** Any write that lands on it (a
+push, a merge, a `gh api` merge) is denied while the working tree declares a
+pre-release version: `1.2.0-dev.1`, `-alpha`, `-beta`, `-rc`, `-pre`,
+`-preview`, `-SNAPSHOT`, or PEP 440's `1.2.0.dev1`, `a1`, `b1`, `rc1`. It reads
+`VERSION`, `package.json`, `pyproject.toml`, `Cargo.toml`,
+`app/build.gradle(.kts)` `versionName`, `custom_components/*/manifest.json`, and
+the newest version heading in `CHANGELOG.md`. Dev builds stay on their feature
+branch (`WORKFLOW_DEVRELEASE.md`); set the final version, then merge. Gates
+passing don't lift it.
+
 **A merge with no publishing intent** (`SKILL.md` §2) passes with VERSION,
 RELEASE and SHIP marked `➖ no publishing intent`, but only while the file reads
 `Track: work commit`, and only on those three rows. While either holds, a tag,
@@ -205,13 +215,19 @@ to `.dev-skills-gates.md` that **adds** any of these lines asks the
 user, showing the lines:
 - `Hook enforcement: declined`
 - `Host network: … approved`
-- anything mentioning a waiver
+- a new or changed waiver clause: the text from "waive" to the next `;`,
+  `·`, `|`, `)` or line end, so `🔕 waived 2026-09-26 by user: …` and
+  `(…; waived M1)` both count. The clause is compared, not the whole line:
+  editing other evidence on a line that already carries an approved waiver
+  passes, while widening it (`waived M1` → `waived M1 M2`) or adding another
+  asks. 2.44.1 and earlier compared whole lines, so every update to a
+  SECURITY or Standards row that mentioned a waiver asked again.
 
 **Gate rows and the `Mode:` line pass without asking, in both modes.** The
 mode is the user's answer to the session-start question, and a gate passing
 is shown on the tracker and backed by the commit approval (and, in
 semi-autonomous mode, the pre-tag report). A prompt for each would ask the
-user to approve bookkeeping they already approved. A gate row that mentions a
+user to approve bookkeeping they already approved. A gate row that adds a
 waiver still asks, because of the waiver.
 
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
@@ -254,8 +270,12 @@ adds what `WORKFLOW_REFERENCE.md` rates Critical:
   said so.
 
 It **asks** when an edit adds what the checklist rates High: no
-`permissions:` block anywhere in the file, or a job without `timeout-minutes`
-(a job that calls a reusable workflow can't set one, so it passes).
+`permissions:` block anywhere in the file, a job without `timeout-minutes`
+(a job that calls a reusable workflow can't set one, so it passes), or a job
+whose `run:` calls `./gradlew` before any step in **that job** validates the
+wrapper jar (`gradle/actions/wrapper-validation`, or `setup-gradle` without
+`validate-wrappers: false`). Each job is its own runner, so validation in
+another job doesn't count.
 
 Only problems the edit *adds* count, compared with the file on disk, so
 fixing one thing in an old, unhardened workflow isn't blocked by everything
@@ -333,6 +353,10 @@ have already arrived.
   to disk before a dependency install, whether a pin resolves to its tag,
   and anything in a composite action are the workflow audit's job, and a
   workflow written from the shell isn't seen at all.
+- **A merge of a PR that isn't checked out.** The dev-version check (A4)
+  reads the working tree, so `gh pr merge 12` from a different branch checks
+  that branch's version, not the PR's. Merge from the PR's branch, or let
+  the release workflow's tag/version check catch it.
 - **Whether a gate row is honest.** Gate rows and the `Mode:` line pass
   without a prompt (B5), so the git-write checks trust what the file says.
 

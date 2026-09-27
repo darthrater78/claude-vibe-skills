@@ -1,0 +1,39 @@
+name: Audit workflows across repos
+
+# Gate 3 audits a repo's workflows only when a Claude session opens it, so a
+# repo nobody is working in never meets a rule added since its last session.
+# This reads every repo's workflows weekly and keeps one "Weekly workflow
+# audit" issue here current (scripts/audit-repos.py). It writes nothing to the
+# audited repos: GITHUB_TOKEN writes this repo's issue and reads public repos;
+# the optional AUDIT_TOKEN secret (fine-grained, read-only Contents and
+# Metadata) adds private ones. Findings don't fail the run, the issue is the
+# signal; a run that can't list repos or write the issue does fail.
+on:
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-repos
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit every repo's workflows
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AUDIT_TOKEN: ${{ secrets.AUDIT_TOKEN }}
+        run: python3 scripts/audit-repos.py

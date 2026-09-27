@@ -184,6 +184,16 @@ def bash_alias(cmd: str, config: str, gates: str | None = GATES_NONE) -> str:
     return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
 
 
+def bash_files(cmd: str, files: dict[str, str], gates: str | None = GATES_ALL, branch: str = "feat/x") -> str:
+    """A command in a repo whose working tree holds these files."""
+    d = repo(gates, branch=branch)
+    for rel, body in files.items():
+        os.makedirs(os.path.dirname(os.path.join(d, rel)) or d, exist_ok=True)
+        with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+            fh.write(body)
+    return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
+
+
 def edit(tool: str, inp: dict, gates: str | None = GATES_ALL) -> str:
     d = repo(gates)
     inp = dict(inp)
@@ -220,6 +230,22 @@ jobs:
       - run: echo "${{ github.head_ref }}"
 """
 
+GRADLE_WF = GOOD_WF.replace("      - name: Test\n", """      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Build with gradlew
+        run: ./gradlew assembleDebug
+      - name: Test
+""")
+GATES_APK = GATES_ALL.replace("🔨 BUILD      ➖ N/A — no build system",
+    "🔨 BUILD      ✅ assembleDebug\n    handoff: APK offered\n    test artifact: app-debug.apk @ abc1234")
+WAIVED_GATES = GATES_ALL.replace("🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High",
+    "🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High (fixed H1; waived M1)\n"
+    "    🔕 waived 2026-09-26 by user: M1 feature work, scheduled for 1.3.0\n"
+    "    open notes (fix or waive): none")
 
 def wf(tool: str, new: str, existing: str | None = None, gates: str | None = GATES_ALL,
        name: str = "ci.yml") -> str:
@@ -238,6 +264,16 @@ def wf(tool: str, new: str, existing: str | None = None, gates: str | None = GAT
 def stop(msg: str, gates: str | None = GATES_ALL, prompt: str = "p1") -> str:
     d = repo(gates)
     return run("stop", {"session_id": "t-stop", "prompt_id": prompt + d[-6:], "cwd": d,
+                        "last_assistant_message": msg, "stop_hook_active": False})
+
+
+def stop_files(msg: str, files: dict[str, str], gates: str | None = GATES_ALL) -> str:
+    """The Stop check on a reply, in a repo whose working tree holds these files."""
+    d = repo(gates)
+    for rel, body in files.items():
+        with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+            fh.write(body)
+    return run("stop", {"session_id": "t-stop", "prompt_id": "pf" + d[-6:], "cwd": d,
                         "last_assistant_message": msg, "stop_hook_active": False})
 
 
@@ -447,6 +483,34 @@ CASES = [
     ("A4 config alias, SECURITY ok", lambda: bash_alias("git ci -m x", "[alias]\n\tci = commit\n", gates=GATES_WORK), "allow"),
     ("A4 unparseable alias fails closed", lambda: bash_alias("git q", '[alias]\n\tq = commit -m "open\n', gates=GATES_WORK), "deny"),
     ("A4 other section not read as alias ok", lambda: bash_alias("git ci -m x", "[core]\n\tci = commit\n"), "allow"),
+    # --- A4: no dev version reaches the default branch
+    ("A4 push to master with a final version ok", lambda: bash_files("git push origin master",
+        {"VERSION": "1.2.0\n"}), "allow"),
+    ("A4 push to master with VERSION -dev", lambda: bash_files("git push origin master",
+        {"VERSION": "1.2.0-dev.1\n"}), "deny"),
+    ("A4 gh pr merge with package.json -rc", lambda: bash_files("gh pr merge 5 --merge",
+        {"package.json": '{\n  "name": "x",\n  "version": "2.0.0-rc.1"\n}\n'}), "deny"),
+    ("A4 merge with pyproject .dev", lambda: bash_files("gh pr merge 5 --squash",
+        {"pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0.dev3"\n'}), "deny"),
+    ("A4 merge with gradle versionName -beta", lambda: bash_files("gh pr merge 5 --merge",
+        {"app/build.gradle.kts": 'android {\n  defaultConfig {\n    versionName = "1.4.0-beta.2"\n  }\n}\n'},
+        gates=GATES_APK), "deny"),
+    ("A4 merge with gradle versionName final ok", lambda: bash_files("gh pr merge 5 --merge",
+        {"app/build.gradle.kts": 'android {\n  defaultConfig {\n    versionName = "1.4.0"\n  }\n}\n'},
+        gates=GATES_APK), "allow"),
+    ("A4 merge with HA manifest b1", lambda: bash_files("gh pr merge 5 --merge",
+        {"custom_components/blind/manifest.json": '{"domain": "blind", "version": "0.3.0b1"}\n'}), "deny"),
+    ("A4 merge with CHANGELOG top entry -dev", lambda: bash_files("gh pr merge 5 --merge",
+        {"CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n## [1.3.0-dev.2] - 2026-09-27\n\n## [1.2.0]\n"}), "deny"),
+    ("A4 older dev entry under a final one ok", lambda: bash_files("gh pr merge 5 --merge",
+        {"CHANGELOG.md": "# Changelog\n\n## [1.3.0] - 2026-09-27\n\n## [1.3.0-dev.2]\n", "VERSION": "1.3.0\n"}), "allow"),
+    ("A4 dev version pushed to its feature branch ok", lambda: bash_files("git push -u origin feat/x",
+        {"VERSION": "1.2.0-dev.1\n"}), "allow"),
+    ("A4 gh api merge with dev version", lambda: bash_files("gh api -X PUT repos/owner/repo/pulls/5/merge",
+        {"VERSION": "1.2.0-alpha.1\n"}), "deny"),
+    ("A4 presented merge with dev version", lambda: stop_files(
+        RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x', "gh pr merge 5 --merge"),
+        {"VERSION": "1.2.0-dev.1\n"}), "block"),
     ("C2 presented git merge", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x', "git merge origin/master"),
                                             gates=GATES_NONE), "block"),
     # --- declined
@@ -469,6 +533,17 @@ CASES = [
     ("B5 declined can't skip B5", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                         "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
                                                gates=GATES_DECLINED), "ask"),
+    ("B5 edit beside an approved waiver ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "(fixed H1; waived M1)", "new_string": "(fixed H1 L2; waived M1)"}, gates=WAIVED_GATES), "allow"),
+    ("B5 whole-file rewrite keeping waivers ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
+        "content": WAIVED_GATES.replace("📄 DOCS       ✅", "📄 DOCS       ✅ changelog 1.2.0")}, gates=WAIVED_GATES), "allow"),
+    ("B5 new waiver record asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "    open notes", "new_string": "    🔕 waived 2026-09-27 by user: M2 accepted\n    open notes"},
+        gates=WAIVED_GATES), "ask"),
+    ("B5 widening a waiver asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "waived M1)", "new_string": "waived M1 M2)"}, gates=WAIVED_GATES), "ask"),
+    ("B5 a second identical waiver clause asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "📄 DOCS       ✅", "new_string": "📄 DOCS       ✅ (waived M1)"}, gates=WAIVED_GATES), "ask"),
     ("B5 settings file", lambda: edit("Write", {"file_path": ".claude/settings.json", "content": "{}"}), "ask"),
     ("B5 bash write to gate file", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "ask"),
     ("B5 bash write into checks via ~", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
@@ -539,6 +614,25 @@ CASES = [
         "  shared:\n    uses: ./.github/workflows/shared.yml\n"), "allow"),
     ("B8 second job without timeout asks", lambda: wf("Write", GOOD_WF +
         "  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n"), "ask"),
+    ("B8 gradlew after wrapper-validation ok", lambda: wf("Write", GRADLE_WF), "allow"),
+    ("B8 gradlew after setup-gradle ok", lambda: wf("Write", GRADLE_WF.replace(
+        "gradle/actions/wrapper-validation@", "gradle/actions/setup-gradle@")), "allow"),
+    ("B8 gradlew with setup-java cache only asks", lambda: wf("Write", GRADLE_WF.replace(
+        "      - uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0\n", "")), "ask"),
+    ("B8 setup-gradle with validate-wrappers: false asks", lambda: wf("Write", GRADLE_WF.replace(
+        "      - uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0\n",
+        "      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0\n"
+        "        with:\n          validate-wrappers: false\n")), "ask"),
+    ("B8 gradlew in a block before validation asks", lambda: wf("Write", GOOD_WF.replace("          echo \"$REF\"\n",
+        "          echo \"$REF\"\n          ./gradlew test\n")), "ask"),
+    ("B8 validated in one job only asks for the other", lambda: wf("Write", GRADLE_WF +
+        "  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: ./gradlew lint\n"), "ask"),
+    ("B8 gradlew under a subfolder asks", lambda: wf("Write", GOOD_WF.replace("          echo \"$REF\"\n",
+        "          echo \"$REF\"\n          cd app && android/gradlew assembleDebug; echo done\n")), "ask"),
+    ("B8 gradlew named, not run, ok", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      - name: Skip gradlew here\n        run: echo no\n      - name: Test\n")), "allow"),
+    ("B8 commented-out gradlew ok", lambda: wf("Write", GOOD_WF.replace("      - name: Test\n",
+        "      # - run: ./gradlew lint\n      - name: Test\n")), "allow"),
     ("B8 .yaml extension checked too", lambda: wf("Write", BAD_WF, name="ci.yaml"), "deny"),
     ("B8 non-workflow YAML ignored", lambda: edit("Write", {"file_path": "docker-compose.yml", "content": BAD_WF}), "allow"),
     ("B8 editing a legacy workflow without adding problems ok", lambda: wf("Edit",

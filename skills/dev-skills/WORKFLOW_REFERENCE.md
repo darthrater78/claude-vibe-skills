@@ -349,6 +349,9 @@ and match the patterns already used in this repo's own workflows.
   pinned snapshot would silently validate against stale ones and pass
   integrations that no longer meet the real requirements. This is the one
   template action left unpinned, and it is intentional, not an oversight.
+  **It does not cover hassfest.** `home-assistant/actions/hassfest` has no
+  release tags, so it is SHA-pinned to master's head with a `# master <date>`
+  comment (`WORKFLOW_HOMEASSISTANT.md`), and `@master` is a finding.
 - **`persist-credentials: false`** on checkout unless the job needs to push.
   Credentials sitting in `.git/config` are attack surface while scripts run.
 - **Least-privilege `permissions:`** — declare only what the job needs. Never
@@ -634,14 +637,19 @@ every item:
 - [ ] Least-privilege `permissions:` block — present at all: without one,
       every job runs with the repo's default token scope
 - [ ] No action on a branch ref (`@main`, `@master`) unless it is a
-      documented exemption (`hacs/action` is the only one)
+      documented exemption (`hacs/action` is the only one; hassfest is not
+      exempt: pin it to master's head SHA, `WORKFLOW_HOMEASSISTANT.md`)
 - [ ] No secret written to disk before a dependency install: decode it after
       `npm ci`/`pip install`/`gradle` resolution, immediately before the step
       that uses it, and delete it in an `if: always()` step
 - [ ] Docker releases scan the pushed digest (Trivy, action SHA and binary
       `version:` both pinned) and tag it only after the scan passes
-- [ ] Gradle builds validate the wrapper jar before running `./gradlew`
-      (`setup-gradle` v4+ does by default; don't set `validate-wrappers: false`)
+- [ ] **Every job** that runs `./gradlew` validates the wrapper jar first, in
+      that job: jobs run on separate runners, often in parallel, so a check in
+      one job protects no other. `setup-gradle` v4+ does it by default (don't
+      set `validate-wrappers: false`); a job that uses `setup-java`'s
+      `cache: gradle` instead adds `gradle/actions/wrapper-validation`
+      (`WORKFLOW_ANDROID.md`)
 - [ ] Concurrency groups (cancel-in-progress for CI, never for release)
 - [ ] Timeouts on all jobs
 - [ ] Tag-on-default-branch verification in release workflows
