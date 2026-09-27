@@ -6,9 +6,10 @@ procedure", Step 1). It is checked before Android, because a Capacitor
 project carries an `android/` Gradle project too, and the Android template
 alone would build a shell with no web app inside it.
 
-The selection procedure, the audit checklist, workflow linting, template best
-practices, dev releases, and the Dependabot configuration stay in
-`WORKFLOW_REFERENCE.md`. This file is the template itself.
+The selection procedure, the audit checklist, workflow linting and template
+best practices stay in `WORKFLOW_REFERENCE.md`; dev releases are in
+`WORKFLOW_DEVRELEASE.md` and the Dependabot configuration in
+`WORKFLOW_DEPENDABOT.md`. This file is the template itself.
 
 ---
 

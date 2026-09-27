@@ -78,7 +78,8 @@ session start detects workflows that exist but may have issues — read every
    missing per the environment detection table and report the gaps. No
    `.github/dependabot.yml`, or one missing an ecosystem the repo uses
    (`github-actions` plus each package manager), is a 📝 Medium finding,
-   not an offer: without it SHA pins and packages drift silently. Then
+   not an offer: without it SHA pins and packages drift silently
+   (`WORKFLOW_DEPENDABOT.md` has the config). Then
    check the four supply-chain guards below. Each one is an **offer, not a
    finding**: ask once, and record the answer on the audit's evidence line
    (`SECURITY_GATE.md`, "Workflow audit"), so a declined guard is a decision
@@ -209,7 +210,8 @@ relevant questions batched together.
 5. **Branch protection**: Which branch is the default? (main / master / other)
 6. **Dev releases**: Do you want to be able to push pre-release tags from
    feature branches for testing? (e.g., `v1.0.0-dev.1` builds from your
-   working branch, marked as pre-release on GitHub)
+   working branch, marked as pre-release on GitHub). On yes, load
+   `WORKFLOW_DEVRELEASE.md`
 7. **Workflow linting**: Add `lint-workflows.yml` (runs `actionlint` on
    `.github/workflows/**` changes)? Recommended whenever any workflow is being
    added — see [Workflow linting](#workflow-linting).
@@ -246,7 +248,7 @@ After the user answers the Step 3 questions:
    (Section 1 of SKILL.md) applies — never auto-commit workflow files
 5. **Recommend Dependabot** if `.github/dependabot.yml` doesn't exist yet —
    suggest it alongside the new workflows, with an entry for **every ecosystem
-   in the repo**, not just `github-actions`
+   in the repo**, not just `github-actions` (`WORKFLOW_DEPENDABOT.md`)
 6. **Recommend `lint-workflows.yml`** if it doesn't exist yet — suggest it
    alongside the new workflows, the same way Dependabot is suggested. See
    [Workflow linting](#workflow-linting).
@@ -580,257 +582,15 @@ the Android template, and each of these is read in full.
 A project can span more than one environment — a Python package with a Docker
 image, for example. Load each template that matches, and no others.
 
-Everything that applies to *every* template — the best practices above, the
-linting rules, dev releases, Cosign signing, and the Dependabot configuration
-below — stays in this file and applies to whichever template you load.
+Everything that applies to *every* template — the best practices and linting
+rules above — stays in this file and applies to whichever template you load.
+Two topics have their own file, loaded only when they come up:
 
+| Topic | File |
+|---|---|
+| Dependabot config, refreshing a SHA pin by hand | `WORKFLOW_DEPENDABOT.md` |
+| Dev (pre-)releases from a branch, Cosign image signing | `WORKFLOW_DEVRELEASE.md` |
 
-## Dev releases
-
-A dev release (pre-release) lets you build and test from a feature branch
-without going through the full release process. The user pushes a tag like
-`v1.0.0-dev.1` from their working branch, CI builds the artifact, and GitHub
-marks the release as a pre-release so it won't be mistaken for a production
-release.
-
-This applies to **any** environment template above — not just Android.
-
-**When to use dev releases:**
-- Testing a build artifact (APK, binary, Docker image) before merging
-- Sharing a work-in-progress build with testers
-- Running the full release pipeline as a dry run on a feature branch
-
-**Who pushes the tag.** Same rule as any other tag (`SKILL.md` Section 5.8):
-the user pushes it, in both modes, because Claude's credentials are denied on
-tag refs. And either way it is a release sequence — a pre-release still builds
-and publishes an artifact, so all six gates apply before the tag goes anywhere.
-
-**How it works:**
-1. The user pushes a pre-release tag from their feature branch:
-   ```bash
-   git tag v1.0.0-dev.1
-   git push origin v1.0.0-dev.1
-   ```
-2. The release workflow triggers (it matches `v*`)
-3. The tag-on-default-branch check **skips** for pre-release tags
-4. The build runs and creates a GitHub release marked as **pre-release**
-5. When the feature branch merges and is ready for production, the user
-   tags the merge commit with the final version (`v1.0.0`) — that tag
-   IS on the default branch and creates a full release
-
-**Tag naming convention:**
-
-| Tag | Meaning | Branch check |
-|---|---|---|
-| `v1.0.0` | Production release | Must be on default branch |
-| `v1.0.0-dev.1` | Development build | Any branch |
-| `v1.0.0-alpha.1` | Early testing | Any branch |
-| `v1.0.0-beta.1` | Feature-complete testing | Any branch |
-| `v1.0.0-rc.1` | Release candidate | Any branch |
-
-**To add dev release support to any template,** modify two places in the
-release workflow:
-
-1. **Tag-on-default-branch check** — skip for pre-release tags:
-   ```yaml
-   - name: Verify tag is on default branch
-     env:
-       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-     run: |
-       set -euo pipefail
-       case "$GITHUB_REF_NAME" in
-         *-dev.*|*-alpha.*|*-beta.*|*-rc.*) echo "Pre-release tag — skipping branch check."; exit 0 ;;
-       esac
-       if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
-         echo "Tag $GITHUB_REF_NAME is not on $DEFAULT_BRANCH."
-         echo "Releases come from the default branch only."
-         echo "Use a pre-release tag (e.g., v1.0.0-dev.1) for feature branch builds."
-         exit 1
-       fi
-   ```
-
-2. **Release creation** — mark pre-releases:
-   ```yaml
-   - name: Create GitHub release
-     env:
-       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-     run: |
-       set -euo pipefail
-       prerelease_flag=""
-       case "$GITHUB_REF_NAME" in
-         *-dev.*|*-alpha.*|*-beta.*|*-rc.*) prerelease_flag="--prerelease" ;;
-       esac
-       gh release create "$GITHUB_REF_NAME" \
-         --title "$GITHUB_REF_NAME" \
-         --notes-file release-notes.md \
-         $prerelease_flag
-   ```
-
-**When suggesting workflows to the user,** ask whether they want dev release
-support as part of the [Step 3 questions](#step-3--ask-all-questions-in-one-turn).
-If yes, include the pre-release modifications in the generated workflow.
-
----
-
-## Advanced: container image signing with Cosign
-
-**What this does:** Cosign signs your Docker image with a cryptographic
-signature that proves it came from your CI pipeline. Anyone pulling the image
-can verify it was built by GitHub Actions, not tampered with, and came from
-your repository. Think of it like a wax seal on a letter — it doesn't change
-the contents, but it proves who sent it.
-
-**When to use it:**
-- You publish Docker images that others depend on
-- Your organization requires supply-chain provenance
-- You want to follow SLSA (Supply-chain Levels for Software Artifacts) best
-  practices
-
-**Not needed when:**
-- The image is only used internally by your own team
-- You're just getting started and want to keep things simple (you can always
-  add signing later)
-
-To add signing to a Docker release workflow, add these steps after the
-`Build and push` step:
-
-```yaml
-      # --- Optional: sign the container image with Cosign ---
-      # This uses keyless signing via GitHub's OIDC identity — no keys to
-      # manage. The signature is recorded in a public transparency log
-      # (Rekor) that anyone can verify.
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      - name: Sign the container image
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          set -euo pipefail
-          cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${DIGEST}"
-```
-
-**Required changes when adding signing:**
-1. Add `id: build` to the `Build and push` step so the digest is accessible
-2. Add `id-token: write` to the `permissions:` block (needed for OIDC)
-3. Add `attestations: write` and `packages: write` if using attestation
-
-**How users verify the signature:**
-```bash
-cosign verify \
-  --certificate-identity-regexp "https://github.com/OWNER/REPO" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/OWNER/REPO:TAG
-```
-
----
-
-## Keeping action SHAs current with Dependabot
-
-Action SHAs should be updated when new versions are released. Dependabot
-automates this — it opens small PRs that bump one action at a time, with the
-changelog linked. You review and merge; nothing else changes.
-
-**What it does:** Dependabot watches the versions your repo depends on — both
-GitHub Action SHAs and application packages. When a new version is released it
-opens a PR with the changelog linked. You review the PR, confirm CI passes, and
-merge.
-
-**Recommend adding this file to every project**, and **cover every ecosystem the
-repo actually uses, not just `github-actions`.** An actions-only config is the
-common mistake: the workflow pins stay current while the application's own
-packages drift for months, which is exactly the backlog SKILL.md Section 4.1
-exists to prevent. Each ecosystem needs its own `updates:` entry — Dependabot
-does not infer them.
-
-### `.github/dependabot.yml`
-
-```yaml
-version: 2
-updates:
-  # 1. GitHub Actions — keeps SHA pins and their version comments current
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    # Group all action updates into a single PR to reduce noise
-    groups:
-      actions:
-        patterns:
-          - "*"
-
-  # 2. Application packages — one entry per ecosystem in the repo.
-  #    Replace "npm" with the real one: pip, cargo, gomod, nuget, maven,
-  #    gradle, bundler, composer, docker, terraform, ...
-  #    `directory` points at the folder holding the manifest/lockfile.
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    groups:
-      # Patch and minor bumps ride together: one review, not one risk class.
-      # A minor bump can still demand a major toolchain change — only a build
-      # settles it. Group for review convenience, never as a risk judgement.
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-    # Majors stay ungrouped: each is a breaking change with its own gates.
-```
-
-**Security updates are a separate feature — this file does NOT configure
-them.** `dependabot.yml` controls *version updates*: the scheduled "Bump X
-from A to B" PRs above. Advisory-driven *security updates* are repository
-settings, not a file — **Settings → Code security → Dependabot alerts** and
-**Dependabot security updates**. Both must be turned on, and once they are,
-they work from the dependency graph for every ecosystem in the repo, whether
-or not that ecosystem has an `updates:` entry here.
-
-A repo with a perfect `dependabot.yml` and alerts left off is current but
-unwatched: it gets version churn and zero CVE coverage, which reads as
-security maintenance and is not — the "Bump X" PRs above never name a CVE or
-GHSA identifier, because they can't; nothing was ever watching for one.
-Claude cannot flip a repository setting, so when alerts are disabled
-(`GET /repos/{owner}/{repo}/dependabot/alerts` returning `403`) this is a
-Gate 3 finding to surface, not something to assume is handled because the
-file looks right.
-
-**Adaptation notes:**
-- Change `interval` to `"monthly"` for less-active projects
-- Remove the `groups` section if you prefer one PR per update (easier to review
-  individually but more PRs)
-- Add `reviewers:` to assign specific people to review these PRs
-- For monorepos, add one entry per manifest location with different `directory:`
-  values — a nested `package.json` or `requirements.txt` is invisible to a
-  root-only entry
-- `ignore:` a specific package only with a stated reason; it silences security
-  PRs for it too
-
-**What the PRs look like:**
-
-Dependabot will open PRs like:
-> Bump actions/checkout from v7.0.0 to v7.0.1
->
-> Updates actions/checkout from 3d3c42e... (v7.0.0) to abc1234... (v7.0.1)
-> - [Release notes](link)
-> - [Changelog](link)
-> - [Commits](link)
-
-The PR updates both the SHA and the version comment automatically.
-
-**Driving a Dependabot PR from an agent: comments don't work.** Posting
-`@dependabot rebase` (or `merge`, `squash`) through the GitHub API or an MCP
-tool does not trigger Dependabot — the `@` mention arrives with invisible
-separators inserted (`·@·d·ependabot`) and Dependabot's own listener never
-matches it. The comment posts successfully and nothing happens, which is the
-dangerous part: it looks like it worked. Use `update_pull_request_branch`
-(GitHub's own "Update branch" action) instead — it merges the base branch in
-and fires the push event CI responds to, the same mechanical effect a
-`@dependabot rebase` comment was trying to produce.
-
----
 
 ## Integration with the gate reference files
 
@@ -905,29 +665,6 @@ every item:
 - [ ] Dependabot configured (`.github/dependabot.yml`) — with an entry for
       GitHub Actions **and** for every package ecosystem the repo uses
 - [ ] OIDC trusted publishing used where supported (PyPI, cosign)
-
----
-
-## Updating action SHA pins
-
-Action SHAs should be updated when new versions are released. The best
-approach is [Dependabot](#keeping-action-shas-current-with-dependabot) — it
-opens PRs automatically when new action versions are available.
-
-To find the current SHA for a version manually:
-
-```bash
-# Get the commit SHA for a specific version tag
-git ls-remote https://github.com/actions/checkout.git refs/tags/v7.0.1
-```
-
-When updating, always include the version comment:
-```yaml
-# Before:
-- uses: actions/checkout@old-sha  # v7.0.0
-# After:
-- uses: actions/checkout@new-sha  # v7.0.1
-```
 
 ---
 

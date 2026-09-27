@@ -4,9 +4,10 @@ Loaded on demand by the dev-skills skill, **only when project environment
 detection matches Android app** (`WORKFLOW_REFERENCE.md`, "Workflow selection
 procedure", Step 1). A project that is not Android app never needs this file.
 
-The selection procedure, the audit checklist, workflow linting, template best
-practices, dev releases, and the Dependabot configuration stay in
-`WORKFLOW_REFERENCE.md`. This file is the template itself.
+The selection procedure, the audit checklist, workflow linting and template
+best practices stay in `WORKFLOW_REFERENCE.md`; dev releases are in
+`WORKFLOW_DEVRELEASE.md` and the Dependabot configuration in
+`WORKFLOW_DEPENDABOT.md`. This file is the template itself.
 
 ---
 
@@ -72,7 +73,7 @@ jobs:
 ### Release workflow — `.github/workflows/release.yml`
 
 The APK MUST be attached to every release — users download it directly to
-install on their device. See also [dev releases](#dev-releases) for
+install on their device. See also dev releases (`WORKFLOW_DEVRELEASE.md`) for
 pre-release builds from feature branches.
 
 ```yaml

@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.42.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.43.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.42.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.42.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.43.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.43.0)
 
 ---
 
@@ -108,7 +108,8 @@ Every check, with exactly what it blocks and lets through, is in
 [`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md). Each one has test cases
 in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
 quietly weaken again. `scripts/audit-workflows.py` applies the workflow
-rules to this repo's own workflows and every template on each run too. **What they can't catch:** judgment (the track, N/A
+rules to this repo's own workflows and every template on each run too, and
+`scripts/check-pins.py` checks weekly that every action pin still matches its tag. **What they can't catch:** judgment (the track, N/A
 reasons, severity, docs accuracy), whether your "yes" meant commit approval,
 and what you actually paste. Those stay instructions. To run the checks in
 every session, including ones that don't load the skill, see
@@ -120,6 +121,11 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Templates are linted and their pins checked.** CI runs actionlint on every
+  template workflow, and a weekly job confirms each action pin still matches
+  its tag and flags newer releases, since Dependabot can't see pins inside
+  Markdown. Dependabot and dev-release guidance moved to their own files, so a
+  workflow audit loads 10KB less. *(2.43.0)*
 - **Existing workflows get re-audited, not just new ones.** Every Gate 3 now
   runs the workflow checklist against every file in `.github/workflows/`
   and records which skill version it audited against, so a checklist that
@@ -1008,7 +1014,9 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~16KB | Before writing any command block, and at session start when the repo is a fork or someone else's — fork targeting and the four fork cases, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~44KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
+| `WORKFLOW_REFERENCE.md` | ~34KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, CI-status release gates, and the review checklist |
+| `WORKFLOW_DEPENDABOT.md` | ~6KB | When a repo needs a `dependabot.yml` or one is missing an ecosystem, or a SHA pin is refreshed by hand — the config for every ecosystem, and the `ls-remote` pin lookup |
+| `WORKFLOW_DEVRELEASE.md` | ~6KB | Only when the user wants a dev (pre-)release from a branch or Cosign image signing |
 | `WORKFLOW_DOCKER.md` | ~17KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template, with the Trivy image scan |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
 | `WORKFLOW_LINUX.md` | ~7KB | Workflow help, only when environment detection matches a Linux application — the binary/.deb/.rpm/AppImage template |
@@ -1076,7 +1084,9 @@ from unreviewed code. Every workflow pins `actions/checkout` to a commit SHA
 rather than a mutable version tag, checks out with `persist-credentials: false`,
 declares least-privilege `permissions:`, and carries a concurrency group and
 timeouts. `lint-workflows.yml` runs actionlint (checksum-verified) on any change
-to the workflow files.
+to the workflow files or the templates. `check-pins.yml` resolves every action
+pin, templates included, against the tag its comment names, weekly and on any
+pull request that touches one.
 
 ---
 
@@ -1099,4 +1109,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.42.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.43.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

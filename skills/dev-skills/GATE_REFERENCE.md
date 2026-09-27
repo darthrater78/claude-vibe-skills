@@ -22,6 +22,8 @@ the pre-flight says one is owed.
 | `SHELL_REFERENCE.md` | before composing any command block |
 | `DOCKER_TEST.md` | Gate 2, before a Docker test container starts or a run command is handed over |
 | `WORKFLOW_REFERENCE.md` | a CI workflow is missing, or the user asks for workflow help |
+| `WORKFLOW_DEPENDABOT.md` | a repo needs a `dependabot.yml`, one is missing an ecosystem, or a SHA pin is refreshed by hand |
+| `WORKFLOW_DEVRELEASE.md` | the user wants a dev (pre-)release from a branch, or Cosign image signing |
 
 Do not load a file this session has no use for. Each of these is read in full;
 loading the ship path during Gate 1, or semi-autonomous execution in a manual

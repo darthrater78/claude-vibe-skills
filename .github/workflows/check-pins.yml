@@ -1,0 +1,36 @@
+name: Check action pins
+
+# Every SHA-pinned action in this repo, templates included, must resolve to
+# the tag its comment names (scripts/check-pins.py). Dependabot can't see the
+# templates in skills/dev-skills/*.md, so this is what catches a template pin
+# that never existed or has fallen releases behind. Weekly, because upstream
+# tags move and get deleted without anything here changing; also on any pull
+# request that touches a pin. A scheduled failure emails the repo owner.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'skills/dev-skills/*.md'
+      - 'scripts/check-pins.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-pins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve every pin against its tag
+        run: python3 scripts/check-pins.py

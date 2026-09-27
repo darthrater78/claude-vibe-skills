@@ -5,6 +5,10 @@ workflows and every template workflow in skills/dev-skills/WORKFLOW_*.md.
 validate.sh calls this, so CI re-checks the reference repo and its templates on
 every push instead of only when Claude edits a workflow. Any deny or ask
 finding fails the run.
+
+`--extract DIR` writes each full template workflow to DIR as a .yml file
+instead, for lint-workflows.yml to run actionlint over: the templates live in
+Markdown because that's what Claude loads, but actionlint only reads YAML.
 """
 from __future__ import annotations
 
@@ -49,7 +53,20 @@ def snippets() -> list[tuple[str, str]]:
     return found
 
 
+def extract(out: Path) -> int:
+    """Write every full template workflow to out/<doc>-<n>.yml."""
+    out.mkdir(parents=True, exist_ok=True)
+    templates = [(label, text) for label, text in targets() if " block " in label]
+    for label, text in templates:
+        doc, _, n = label.partition(" block ")
+        (out / f"{doc.removesuffix('.md').lower()}-{n}.yml").write_text(text, encoding="utf-8")
+    print(f"extracted {len(templates)} template workflows to {out}")
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--extract":
+        return extract(Path(sys.argv[2]))
     failures = 0
     checked = targets()
     for label, text in checked:

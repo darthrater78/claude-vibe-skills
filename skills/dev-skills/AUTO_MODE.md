@@ -233,7 +233,7 @@ performs before `git tag`: read the version out of the merged commit, compare it
 to the tag being created, and stop if they differ.
 
 **Pre-release tags are handed over the same way.** A dev, alpha, beta, or rc
-tag (`v1.2.3-dev.1` — `WORKFLOW_REFERENCE.md`, "Dev releases") is a tag push, so
+tag (`v1.2.3-dev.1` — `WORKFLOW_DEVRELEASE.md`) is a tag push, so
 both modes hand it to the user, with the pre-tag report above it in this one.
 What it is *not* is a shortcut around the track rules: a pre-release tag still publishes an artifact,
 so it is a release sequence with all six gates, not a work commit. The one thing
