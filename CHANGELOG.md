@@ -4,6 +4,72 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.42.0] — 2026-09-27
+
+**Workflows that already exist get audited too.** 2.41.0 checked workflows as
+Claude writes them. A workflow written before the skill, inherited from a fork
+or audited under an older checklist was never looked at again.
+
+### Added
+- **Gate 3 audits every workflow** (`SECURITY_GATE.md`, "Workflow audit"). Any
+  repo with `.github/workflows/` gets the full `WORKFLOW_REFERENCE.md`
+  checklist on every file, not only the ones the diff touched, and the gate
+  file records the skill version it audited against
+  (`workflows: audited 3 against skill 2.42.0 — 0 open`). The next Gate 3
+  re-audits everything when that line is missing, names an older skill or a
+  workflow changed since. Findings in old workflows are ordinary Gate 3
+  findings: "it predates this change" is not a terminal state.
+- **Forks start with their workflows unaudited** (`SESSION_START.md`, step
+  1a). Upstream wrote them, and enabling Actions runs them with the fork's
+  secrets, so the banner says so and the first Gate 3 audits them all.
+- **Four checklist rules** (`WORKFLOW_REFERENCE.md`): a secret written to disk
+  before a dependency install is Critical, since every package's install
+  scripts can read it. A missing `permissions:` block and a first-party
+  action on a branch ref are High. A Gradle build with no wrapper validation
+  is Medium. A release workflow that runs the project's full validation
+  itself, with a comment saying so, is exempt from the CI-passed gate (this
+  repo's `release.yml` is the example).
+- **Supply-chain guards in the missing-workflows report**: dependency review,
+  CodeQL, secret scanning (push protection or gitleaks), and build provenance
+  (attestation, SHA-256 and an SBOM). They are offers, not findings. The
+  user's answer goes on the evidence line, so a declined guard is a decision
+  on the record instead of a finding that blocks every release. Each guard
+  comes with a plain-language line to say to the user and a recommendation
+  based on the repo's code, and a guard that doesn't apply is said in one
+  line instead of offered.
+- **This repo audits its own workflows on every push** (`scripts/audit-workflows.py`,
+  run by `validate.sh`). It applies the workflow-edit check's rules to the three
+  repo workflows and all 19 template workflows, so CI fails if the reference
+  repo or a template drifts from the checklist.
+- **`WORKFLOW_HYBRID.md`**: a CI and release template for Capacitor/Ionic apps.
+  It runs `npm ci`, the web build and `cap sync android`, then decodes the
+  keystore to `$RUNNER_TEMP`, builds the signed APK and deletes the keystore
+  in an `if: always()` step. Detection checks for it before Android, because a
+  Capacitor project also has an `android/` Gradle project.
+
+- **Trivy image scanning for Docker projects** (`WORKFLOW_DOCKER.md`), and
+  only there: projects that don't ship an image are already covered by their
+  ecosystem audit, Dependabot and dependency review. CI scans the built image
+  and reports without failing, since a base-image CVE isn't the PR's doing.
+  A weekly scheduled workflow rescans the newest published release and uploads
+  SARIF, catching CVEs published after release. The release pushes by digest, scans that exact
+  digest twice (a SARIF report for the Security tab, then a table run that
+  gates), and only then tags it, so an image that fails is never published
+  under a version. `trivy-action` is pinned by SHA (v0.36.0) and the Trivy
+  binary by version (v0.74.0), since the action's tags were hijacked in an
+  early-2026 supply-chain attack. `trivy.yaml` fails on fixable HIGH and
+  CRITICAL findings in the image's OS packages, and `.trivyignore.yaml`
+  accepts one finding at a time with a reason and an `expired_at` date. Both
+  were verified against the real v0.74.0 binary. Gate 3 runs the same scan
+  locally on the test image, and the checklist rates a version tag on an
+  unscanned image High.
+
+### Changed
+- **The Home Assistant template's commented-out hassfest step is pinned**,
+  not `@master`. hassfest has no release tags, so it pins master's head with
+  the `ls-remote` command to refresh it. `hacs/action` is still the one
+  documented unpinned exception.
+
 ## [2.41.0] — 2026-09-27
 
 **The workflow templates are fixed and re-checked, the skill's own workflows

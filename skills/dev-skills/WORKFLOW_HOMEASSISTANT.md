@@ -50,7 +50,9 @@ jobs:
 
       # ADAPT: add hassfest validation if needed
       # - name: Hassfest validation
-      #   uses: home-assistant/actions/hassfest@master
+      #   # hassfest has no release tags; pinned to master's head. Refresh with
+      #   # git ls-remote https://github.com/home-assistant/actions.git refs/heads/master
+      #   uses: home-assistant/actions/hassfest@58bff37c8947f690ace498be413a9b78d6f30f93 # master 2026-09-27
 
       - name: Check shell scripts
         run: |

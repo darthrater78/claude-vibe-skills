@@ -58,6 +58,7 @@ current lockfile:
 | .NET | `dotnet list package --vulnerable --include-transitive` |
 | Java | `mvn org.owasp:dependency-check-maven:check` / `gradle dependencyCheckAnalyse` |
 | Any | `osv-scanner scan source .` |
+| Docker image | `trivy image --config trivy.yaml --ignorefile .trivyignore.yaml <image>` on the Gate 2 test image (the same config the workflows use, `WORKFLOW_DOCKER.md`) |
 
 If no audit tool is available for the ecosystem, say so explicitly rather than
 passing the step in silence — an unaudited dependency tree is an unknown, and
@@ -111,6 +112,35 @@ move on":**
   project moved to a non-LTS line without the user's recorded yes
 - 💡 Low: missing `encoding=` on `open()`, string paths, missing static analysis in CI,
   an LTS line still in support but superseded by a newer settled LTS
+
+#### Workflow audit — every workflow, not only the ones this change touched
+
+Part of every scan in a repo with `.github/workflows/`. The enforcement check
+(`ENFORCEMENT.md`, B8) only sees workflow files as they are edited, so a
+workflow written before the skill, inherited from a template or a fork, or
+last audited under an older checklist is never looked at again unless this
+step does it. Load `WORKFLOW_REFERENCE.md` and run its audit procedure
+against **every** workflow file, including steps 4 and 5 (missing workflows
+and drift). Its findings are Gate 3 findings with the same severities and
+the same lifecycle (below): "that workflow predates this change" is
+provenance, not a terminal state.
+
+**Record what the audit ran against** as an evidence line under the
+`🔒 SECURITY` row:
+
+```
+  workflows: audited 3 against skill 2.42.0 — 0 open (lint-workflows, release, validate)
+```
+
+The skill version is the running skill's `version:`, not the project's. The
+next Gate 3 re-audits every workflow when that line is missing, names an
+older skill version (the checklist has grown since), or any file under
+`.github/workflows/` changed after it was written. Otherwise it re-reads only
+the workflows the current diff touches and carries the line forward.
+**No `.github/workflows/`**: write `workflows: none` and report the gaps
+from the audit procedure's step 4. Either way, that step's supply-chain
+guards are offers, not findings: add the user's answers to the evidence line
+(`offered: CodeQL declined 2026-09-27`).
 
 #### Project standards check (`SKILL.md` §10)
 

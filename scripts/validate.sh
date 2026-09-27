@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md checks/enforce.py)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_HYBRID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -193,6 +193,18 @@ if python3 scripts/test-checks.py; then
   echo "  OK: enforcement check tests"
 else
   echo "  FAIL: enforcement check tests (run python3 scripts/test-checks.py -v)"
+  errors=$((errors + 1))
+fi
+
+# The same workflow rules, applied to this repo's workflows and every template:
+# the reference repo has to pass its own checklist on every push, not only when
+# Claude happens to edit a workflow.
+echo ""
+echo "=== Workflow audit ==="
+if python3 scripts/audit-workflows.py; then
+  echo "  OK: repo workflows and templates"
+else
+  echo "  FAIL: workflow audit (run python3 scripts/audit-workflows.py)"
   errors=$((errors + 1))
 fi
 

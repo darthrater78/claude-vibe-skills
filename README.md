@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.41.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.42.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.41.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.41.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.42.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.42.0)
 
 ---
 
@@ -107,7 +107,8 @@ to install.
 Every check, with exactly what it blocks and lets through, is in
 [`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md). Each one has test cases
 in `scripts/test-checks.py`, run by `validate.sh` and CI, so a check can't
-quietly weaken again. **What they can't catch:** judgment (the track, N/A
+quietly weaken again. `scripts/audit-workflows.py` applies the workflow
+rules to this repo's own workflows and every template on each run too. **What they can't catch:** judgment (the track, N/A
 reasons, severity, docs accuracy), whether your "yes" meant commit approval,
 and what you actually paste. Those stay instructions. To run the checks in
 every session, including ones that don't load the skill, see
@@ -119,6 +120,16 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Existing workflows get re-audited, not just new ones.** Every Gate 3 now
+  runs the workflow checklist against every file in `.github/workflows/`
+  and records which skill version it audited against, so a checklist that
+  grows re-checks everything. A fork's inherited workflows start unaudited.
+  The checklist adds secrets decoded before a dependency install, a missing
+  `permissions:` block, branch-pinned actions and Gradle wrapper
+  validation, and the audit offers dependency review, CodeQL, secret
+  scanning and build provenance. Docker images are scanned with Trivy
+  before a version tag points at them. New template for Capacitor/Ionic apps.
+  *(2.42.0)*
 - **Workflows checked as they're written.** A workflow edit that adds an
   unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps
   its credential is blocked; one that drops `permissions:` or a job timeout
@@ -996,13 +1007,14 @@ The skill uses tiered loading to keep token costs down:
 | `SECURITY_ANDROID.md` | ~9KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only security rules and examples |
 | `QUALITY_ANDROID.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Android — Android-only quality rules and examples |
 | `SHELL_REFERENCE.md` | ~16KB | Before writing any command block, and at session start when the repo is a fork or someone else's — fork targeting and the four fork cases, the labeled run-block format, manual mode's few-stops rules, tag/ref-deletion rationale, the semi-autonomous-mode fallback, Git Bash split invocations, Termux clone flow |
-| `WORKFLOW_REFERENCE.md` | ~40KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
-| `WORKFLOW_DOCKER.md` | ~9KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template |
+| `WORKFLOW_REFERENCE.md` | ~43KB | When a CI workflow is missing or the user asks for workflow help — the selection and audit procedures, workflow linting, template best practices, dev/pre-release builds, Cosign signing, Dependabot config, CI-status release gates, and the review checklist |
+| `WORKFLOW_DOCKER.md` | ~17KB | Workflow help, only when environment detection matches Docker — the Docker/container-image template, with the Trivy image scan |
 | `WORKFLOW_WINDOWS.md` | ~8KB | Workflow help, only when environment detection matches a Windows app — the .NET/packaged-.exe template |
 | `WORKFLOW_LINUX.md` | ~7KB | Workflow help, only when environment detection matches a Linux application — the binary/.deb/.rpm/AppImage template |
 | `WORKFLOW_HOMEASSISTANT.md` | ~6KB | Workflow help, only when environment detection matches Home Assistant/HACS — the integration template |
 | `WORKFLOW_SCRIPTS.md` | ~7KB | Workflow help, only when environment detection matches a script collection — the shell/PowerShell/Python-scripts template |
 | `WORKFLOW_ANDROID.md` | ~9KB | Workflow help, only when environment detection matches Android — the Gradle/APK/AAB template |
+| `WORKFLOW_HYBRID.md` | ~13KB | Workflow help, only when environment detection matches a Capacitor/Ionic hybrid app — npm build, `cap sync`, then the signed APK |
 | `WORKFLOW_PYTHON.md` | ~8KB | Workflow help, only when environment detection matches a Python package — the PyPI template |
 | `WORKFLOW_NODEJS.md` | ~8KB | Workflow help, only when environment detection matches Node.js — the npm template |
 
@@ -1015,7 +1027,7 @@ The second rule is **one file, one moment.** A reference file is read in full,
 so a file that covers several unrelated moments charges every one of them for
 all of it. Session start happens once and never again; Gate 6 is the largest of
 the six and fires last; semi-autonomous execution is dead weight in a manual
-session; seven of the eight workflow templates are wrong for any given project.
+session; eight of the nine workflow templates are wrong for any given project.
 Each of those is its own file, so loading one does not drag the others along.
 `scripts/validate.sh` enforces a per-file size ceiling to keep it that way.
 
@@ -1086,4 +1098,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.41.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.42.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

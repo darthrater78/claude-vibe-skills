@@ -12,12 +12,24 @@ practices, dev releases, and the Dependabot configuration stay in
 
 ## Docker workflow
 
-Two files: a build check and a release workflow.
+Three workflows (a build check, a release and a weekly image scan) plus two
+Trivy files, `trivy.yaml` and `.trivyignore.yaml` (below). The release scans
+the exact pushed digest **before** any version tag points at it, so an image
+that fails the scan is never published under a version. The weekly scan
+catches CVEs published after release against an image that hasn't changed.
+Trivy is for projects that **ship a container image**. Elsewhere, the
+ecosystem audit, Dependabot and dependency review already cover what it
+would find, and it only adds duplicate alerts.
+
+**Pin `trivy-action` by SHA, never by tag.** Its tags were hijacked in a
+supply-chain attack in early 2026, which is the exact case SHA pinning
+protects against. Pin the Trivy binary too (`version:`), so the action's
+default can't change what runs.
 
 ### CI build check — `.github/workflows/ci.yml`
 
-Triggers on every push to a branch and on pull requests. Builds the image to
-verify it compiles. Does NOT push to any registry.
+Triggers on every push to a branch and on pull requests. Builds the image,
+scans it, and does NOT push to any registry.
 
 ```yaml
 name: CI
@@ -52,9 +64,22 @@ jobs:
         with:
           context: .
           push: false
-          tags: ${{ github.repository }}:test
+          load: true
+          tags: ci-image:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Reports only: a CVE in the base image isn't this PR's doing, so it
+      # doesn't fail the check. The release gate is what blocks.
+      - name: Scan image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ci-image:test
+          version: v0.74.0
+          trivy-config: trivy.yaml
+          trivyignores: .trivyignore.yaml
+          format: table
+          exit-code: '0'
 ```
 
 ### Release workflow — `.github/workflows/release.yml`
@@ -73,6 +98,7 @@ on:
 permissions:
   contents: write
   packages: write
+  security-events: write  # the SARIF upload; drop it with those steps
 
 concurrency:
   group: release-${{ github.ref }}
@@ -193,27 +219,81 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Registries need a lowercase name; the owner may not be.
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
-      - name: Build and push
+      # Pushed by digest only: no version tag points at it until it passes
+      # the scan below.
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
           # ADAPT: add platforms for multi-arch
           # platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Two runs over the same digest. This one never fails: it writes SARIF
+      # for the repo's Security tab. ADAPT: a private repo without GitHub
+      # Advanced Security can't take SARIF; drop this step and the upload.
+      - name: Scan image (SARIF report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          version: v0.74.0
+          trivy-config: trivy.yaml
+          trivyignores: .trivyignore.yaml
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
+      - name: Upload scan to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      # This run is the gate: a fixable HIGH or CRITICAL stops the release
+      # here, before any version tag exists.
+      - name: Scan image (gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          version: v0.74.0
+          skip-setup-trivy: true
+          trivy-config: trivy.yaml
+          trivyignores: .trivyignore.yaml
+          format: table
+          exit-code: '1'
+
+      - name: Tag the scanned image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(-t "$tag")
+          done <<< "$TAGS"
+          docker buildx imagetools create "${args[@]}" "${IMAGE}@${DIGEST}"
 
       - name: Extract release notes
         run: |
@@ -239,9 +319,124 @@ jobs:
             --notes-file release-notes.md
 ```
 
+### Weekly image scan — `.github/workflows/image-scan.yml`
+
+Rescans the newest published release every week and uploads the result to the
+Security tab. It never fails: its job is to surface new CVEs, and fixing one
+is a new release with a bumped base image.
+
+```yaml
+name: Image scan
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'  # Mondays; ADAPT the time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+concurrency:
+  group: image-scan
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The newest stable version tag, never a floating :latest.
+      - name: Find the newest release
+        id: image
+        run: |
+          set -euo pipefail
+          tag="$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | head -n1 || true)"
+          if [ -z "$tag" ]; then
+            echo "::error::No release tag yet, so there is no published image to scan."
+            exit 1
+          fi
+          echo "ref=ghcr.io/${GITHUB_REPOSITORY,,}:${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan the published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          version: v0.74.0
+          trivy-config: trivy.yaml
+          trivyignores: .trivyignore.yaml
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
+      - name: Upload scan to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-weekly
+```
+
+### Trivy configuration — `trivy.yaml` and `.trivyignore.yaml`
+
+Both files sit in the repo root. `trivy.yaml` decides what fails:
+
+```
+severity:
+  - HIGH
+  - CRITICAL
+scan:
+  scanners:
+    - vuln
+pkg:
+  types:
+    - os          # the base image's packages; app dependencies are Gate 3's audit
+vulnerability:
+  ignore-unfixed: true   # nothing to bump to yet; Gate 3 still reports it
+```
+
+`.trivyignore.yaml` accepts one finding at a time, and every entry carries a
+reason and an expiry, so an accepted risk comes back for review instead of
+staying hidden:
+
+```
+vulnerabilities:
+  - id: CVE-2026-12345
+    statement: "libfoo is in the base image but never loaded; waived by <user> 2026-09-27"
+    expired_at: 2026-12-31
+```
+
+An entry is a Gate 3 waiver (`SECURITY_GATE.md`, "Finding lifecycle"): the
+user decides it, and it re-opens when `expired_at` passes. Start with an
+empty `vulnerabilities: []`.
+
 **Adaptation notes:**
+- **A scan failure is the base image's**, nearly always: bump the `FROM` tag
+  (or its digest) to the newest patch, rebuild, and re-tag
+- **Optional, off by default to keep the noise down:** `scanners: [vuln,
+  misconfig]` in `trivy.yaml` also checks the Dockerfile and compose files
+  (running as root, no `HEALTHCHECK`), and a
+  `format: cyclonedx` run on the gated digest writes an SBOM to attach to
+  the release (the provenance offer, `WORKFLOW_REFERENCE.md`, step 4)
+- **A failed gate leaves an untagged digest** in the registry. It can't be
+  pulled by version, and the registry's untagged-image cleanup removes it
 - For Docker Hub: swap login action, set `images:` to `docker.io/<user>/<repo>`
-- For multi-arch: uncomment `platforms:` line, increase timeout to 30 min
+- For multi-arch: uncomment `platforms:` line, increase timeout to 30 min.
+  Trivy scans the runner's platform from the manifest list; add
+  `TRIVY_PLATFORM: linux/arm64` in a second gate step's `env:` to scan another
 - For private registries: add registry URL to login and metadata actions
 - **For a floating `:dev`/`:latest`-style tag** (this template's
   `docker/metadata-action` block already handles the standard `:latest`
