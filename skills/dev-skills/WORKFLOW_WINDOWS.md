@@ -83,6 +83,8 @@ jobs:
   # runner minute on a check that doesn't touch Windows.
   gate:
     runs-on: ubuntu-latest
+    # The CI wait loop below gives up after 30 minutes; this is the backstop.
+    timeout-minutes: 35
     permissions:
       actions: read
       contents: read
@@ -185,7 +187,7 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           cd publish
-          7z a -tzip "../${{ github.event.repository.name }}-v${version}-win-x64.zip" .
+          7z a -tzip "../${GITHUB_REPOSITORY#*/}-v${version}-win-x64.zip" .
 
       - name: Extract release notes
         shell: bash
@@ -210,7 +212,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          artifact="${{ github.event.repository.name }}-v${version}-win-x64.zip"
+          artifact="${GITHUB_REPOSITORY#*/}-v${version}-win-x64.zip"
           gh release create "$GITHUB_REF_NAME" \
             "$artifact" \
             --title "$GITHUB_REF_NAME" \

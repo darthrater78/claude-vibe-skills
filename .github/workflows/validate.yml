@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master, main]
 
+# This job only reads the tree.
+permissions:
+  contents: read
+
 # Supersede in-flight runs for the same branch or PR — the newest push is the
 # only one whose result matters.
 concurrency:

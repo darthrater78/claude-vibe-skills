@@ -14,7 +14,7 @@ updates:
     schedule:
       interval: "weekly"
     # One PR for all action bumps rather than one per action — this repo uses
-    # a single action (actions/checkout, pinned by SHA in both workflows), so
+    # a single action (actions/checkout, pinned by SHA in every workflow), so
     # grouping keeps a quiet repo quiet.
     groups:
       actions:

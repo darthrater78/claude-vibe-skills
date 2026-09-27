@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.40.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.41.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.40.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.40.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.41.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.41.0)
 
 ---
 
@@ -100,7 +100,7 @@ to install.
 | Group | What's checked |
 |---|---|
 | **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c` and any push that lands on the default branch · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked |
+| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
@@ -119,6 +119,12 @@ every session, including ones that don't load the skill, see
 
 Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Workflows checked as they're written.** A workflow edit that adds an
+  unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps
+  its credential is blocked; one that drops `permissions:` or a job timeout
+  asks you. The templates themselves were fixed: a nonexistent
+  `setup-gradle` pin, `${{ }}` in three release scripts, and release gate
+  jobs with no timeout. *(2.41.0)*
 - **Enforcement on Windows.** The checks now cover Claude Code's PowerShell
   tool, find Python through the `py -3` launcher, and protect Windows-style
   settings paths. A gate passing or the mode being recorded no longer stops
@@ -1053,9 +1059,11 @@ attached.
 
 The default-branch check matters because a tag trigger fires for a tag on *any*
 commit — without it, tagging an unreviewed branch would publish a real release
-from unreviewed code. Both workflows pin `actions/checkout` to a commit SHA
-rather than a mutable version tag, check out with `persist-credentials: false`,
-and carry concurrency groups and timeouts.
+from unreviewed code. Every workflow pins `actions/checkout` to a commit SHA
+rather than a mutable version tag, checks out with `persist-credentials: false`,
+declares least-privilege `permissions:`, and carries a concurrency group and
+timeouts. `lint-workflows.yml` runs actionlint (checksum-verified) on any change
+to the workflow files.
 
 ---
 
@@ -1078,4 +1086,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.40.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.41.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -98,6 +98,8 @@ jobs:
   # place that checks both before anything gets built or published.
   gate:
     runs-on: ubuntu-latest
+    # The CI wait loop below gives up after 30 minutes; this is the backstop.
+    timeout-minutes: 35
     permissions:
       actions: read
       contents: read

@@ -9,7 +9,7 @@ it writes is a small status marker in the temp directory, so the session
 banner can say whether enforcement is active.
 
 Modes (argv[1]):
-  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5 B6)
+  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5 B6 B7 B8)
   stop       Stop: the reply Claude is about to end with            (C1 C2 C3 C4 C5 C7)
   post-ask   PostToolUse on AskUserQuestion: unanswered questions   (D1)
 
@@ -1129,6 +1129,136 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
     return ("ask", "the gate file change needs the user's OK:\n" + "\n".join(f"  + {line}" for line in sorted(added)))
 
 
+# --- B8: workflow files -------------------------------------------------------
+
+# The mechanical half of the workflow review checklist (WORKFLOW_REFERENCE.md):
+# what a line-level read of the YAML can prove. Only problems an edit *adds* are
+# raised, so fixing one thing in an old, unhardened workflow isn't held hostage
+# to everything else wrong with it.
+WORKFLOW_PATH = re.compile(r"(^|[/\\])\.github[/\\]workflows[/\\][^/\\]+\.ya?ml$")
+SHA_PIN = re.compile(r"^[0-9a-f]{40}$")
+# HACS's own guidance is to run hacs/action at @main (WORKFLOW_REFERENCE.md,
+# Security) — the one documented exception to SHA pinning.
+UNPINNED_OK = {"hacs/action"}
+USES_LINE = re.compile(r"^(\s*)(-\s+)?uses:\s*['\"]?([^\s'\"#]+)")
+RUN_LINE = re.compile(r"^(\s*)(-\s+)?run:\s*(.*)$")
+
+
+def indent_of(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def step_has(lines: list[str], at: int, key: str) -> bool:
+    """Whether the list item (step) holding line `at` sets `key`."""
+    start = at
+    while start > 0 and not lines[start].lstrip().startswith("- "):
+        start -= 1
+    dash = indent_of(lines[start])
+    for n in range(start, len(lines)):
+        s = lines[n].strip()
+        if n > start and s and not s.startswith("#") and indent_of(lines[n]) <= dash:
+            break
+        if s.lstrip("- ").startswith(key + ":"):
+            return True
+    return False
+
+
+def workflow_problems(text: str) -> tuple[list[str], list[str]]:
+    """(deny, ask) problems in one workflow file."""
+    deny: list[str] = []
+    ask: list[str] = []
+    lines = text.splitlines()
+    run_col: int | None = None  # column of `run:` while inside its block scalar
+    for n, line in enumerate(lines):
+        s = line.strip()
+        if run_col is not None:
+            if not s or indent_of(line) > run_col:
+                if "${{" in line:
+                    deny.append(f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}")
+                continue
+            run_col = None
+        if s.startswith("#"):
+            continue
+        m = RUN_LINE.match(line)
+        if m:
+            body = m.group(3)
+            if body[:1] in ("|", ">"):
+                run_col = len(m.group(1)) + len(m.group(2) or "")
+            elif "${{" in body:
+                deny.append(f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}")
+            continue
+        m = USES_LINE.match(line)
+        if not m:
+            continue
+        ref = m.group(3)
+        if ref.startswith(("./", "docker://")):
+            continue
+        action, _, version = ref.partition("@")
+        if not SHA_PIN.match(version) and "/".join(action.split("/")[:2]) not in UNPINNED_OK:
+            deny.append(f"`{ref}` is not pinned to a 40-character commit SHA")
+        if action == "actions/checkout" and not step_has(lines, n, "persist-credentials"):
+            # Keyed without the ref, so re-pinning a legacy checkout isn't "new".
+            deny.append("a checkout without `persist-credentials: false`")
+    if not re.search(r"^\s*permissions:", text, re.M):
+        ask.append("no `permissions:` block, so every job gets the repo's default token scope")
+    ask.extend(f"job `{name}` has no `timeout-minutes`" for name in jobs_without_timeout(text))
+    return deny, ask
+
+
+def jobs_without_timeout(text: str) -> list[str]:
+    """Jobs under `jobs:` with no timeout-minutes. A job that calls a reusable
+    workflow (`uses:` at job level) can't set one, so it isn't listed."""
+    jobs = re.search(r"^jobs:[ \t]*\n", text, re.M)
+    if not jobs:
+        return []
+    body = [x for x in text[jobs.end():].splitlines() if x.strip() and not x.strip().startswith("#")]
+    if not body:
+        return []
+    col = indent_of(body[0])
+    found: dict[str, bool] = {}  # job name -> has a timeout or is exempt
+    name = None
+    for line in body:
+        depth = indent_of(line)
+        if depth < col:
+            break
+        s = line.strip()
+        if depth == col:
+            name = s.rstrip(":")
+            found[name] = False
+        elif name and depth == col + 2 and s.startswith(("timeout-minutes:", "uses:")):
+            found[name] = True
+    return [n for n, ok in found.items() if not ok]
+
+
+def workflow_edit_check(tool: str, inp: dict) -> tuple[str, str] | None:
+    path = inp.get("file_path")
+    if not path or not WORKFLOW_PATH.search(path):
+        return None
+    current = read(path)
+    # A new file starts from nothing wrong, not from an empty file's problems.
+    old_deny, old_ask = workflow_problems(current) if current is not None else ([], [])
+    new_deny, new_ask = workflow_problems(new_content(tool, inp, current))
+
+    def added(new: list[str], old: list[str]) -> list[str]:
+        left = list(old)
+        out = []
+        for p in new:
+            if p in left:
+                left.remove(p)
+            else:
+                out.append(p)
+        return out
+
+    deny, ask = added(new_deny, old_deny), added(new_ask, old_ask)
+    where = os.path.basename(path)
+    if deny:
+        return ("deny", f"this edit to {where} adds what the workflow checklist rates Critical "
+                        "(WORKFLOW_REFERENCE.md, Template best practices):\n- " + "\n- ".join(deny + ask))
+    if ask:
+        return ("ask", f"this edit to {where} adds what the workflow checklist rates High:\n- " + "\n- ".join(ask))
+    return None
+
+
 WRITE_HINT = re.compile(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-[a-z]*i|\bcp\b|\bmv\b|\brm\b|\bpython3?\b|\bnode\b|"
                         r"\btruncate\b|\bdd\b|\binstall\b|\bln\b|\bchmod\b|"
                         # PowerShell and cmd: cmdlets, their aliases, and .NET file writes.
@@ -1209,6 +1339,10 @@ def pre_tool(payload: dict) -> NoReturn:
         res = file_edit_check(tool, inp, root)
         if res:
             pre_decision(*res)
+        if not gates.declined:
+            res = workflow_edit_check(tool, inp)
+            if res:
+                pre_decision(*res)
         allow()
 
     if gates.declined:

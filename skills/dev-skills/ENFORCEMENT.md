@@ -74,7 +74,8 @@ first message that asks anything:
 > files I edit, my replies and the gate file, and it only allows, denies or
 > asks you. It never runs anything. It blocks git writes whose gates haven't
 > passed, test containers not on your LAN IP, host networking you haven't
-> approved, unlabeled or ungated command blocks, and loopback test URLs, and
+> approved, unlabeled or ungated command blocks, loopback test URLs, and
+> workflow edits that add an unpinned action or a `${{ }}` in a script, and
 > it flags questions you didn't answer. Full list: `ENFORCEMENT.md`.
 
 Then ask, in the same `AskUserQuestion` call as the mode question: **"Keep the
@@ -226,6 +227,29 @@ onto a branch, or a push of `refs/dev-skills/…`, asks the user on a local
 session, so it only leaves the machine when they approve. A remote container
 does both freely, because its copy dies with the container.
 
+**B8. Workflow edits meet the workflow checklist's mechanical rules.** A
+Write or Edit to `.github/workflows/*.yml` (or `.yaml`) is **denied** when it
+adds what `WORKFLOW_REFERENCE.md` rates Critical:
+- a `uses:` not pinned to a 40-character commit SHA (a version tag or a
+  branch like `@main`). Local actions (`./…`) and `docker://` refs pass, and
+  so does `hacs/action`, the one documented exception (Template best
+  practices, Security);
+- `${{ }}` inside a `run:` script, one-line or block, comment lines included,
+  since Actions substitutes it before the shell reads the line. Pass the
+  value through `env:`. A `${{ }}` in a YAML comment outside the script
+  passes;
+- an `actions/checkout` step without `persist-credentials:`. An explicit
+  `persist-credentials: true` passes, because a job that pushes needs it and
+  said so.
+
+It **asks** when an edit adds what the checklist rates High: no
+`permissions:` block anywhere in the file, or a job without `timeout-minutes`
+(a job that calls a reusable workflow can't set one, so it passes).
+
+Only problems the edit *adds* count, compared with the file on disk, so
+fixing one thing in an old, unhardened workflow isn't blocked by everything
+else wrong with it. A new file is checked in full.
+
 ### C. Claude's replies
 
 **C1. No loopback or bridge test URLs.** An `http(s)://` URL to `localhost`,
@@ -288,6 +312,11 @@ have already arrived.
 - **A gate file that is already tracked.** B6 stops it being staged by name,
   but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
   up its changes. Session start untracks it (`SESSION_START.md`).
+- **Most of the workflow checklist.** B8 reads workflow YAML line by line
+  and covers only the rules a line can prove. Release gates, a secret written
+  to disk before a dependency install, whether a pin resolves to its tag,
+  and anything in a composite action are the workflow audit's job, and a
+  workflow written from the shell isn't seen at all.
 - **Whether a gate row is honest.** Gate rows and the `Mode:` line pass
   without a prompt (B5), so the git-write checks trust what the file says.
 
