@@ -46,6 +46,10 @@ Standards: BUILD docs ✅
 🚀 SHIP       ⬜
 """
 GATES_WORK = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅ 0 open")
+GATES_OPEN_LOW = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 4 Medium, 5 Low")
+GATES_OPEN_HIGH = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 0 Critical, 1 High, 2 Medium")
+GATES_OPEN_10C = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 10 Critical, 0 High")
+GATES_OPEN_ALL = GATES_ALL.replace("🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High", "🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 1 Medium")
 GATES_SEMI = GATES_NONE.replace("Mode: manual", "Mode: semi-autonomous (approved 2026-09-24)")
 GATES_UNCHOSEN = GATES_ALL.replace("Mode: manual", "Mode: unchosen")
 GATES_DECLINED = GATES_NONE.replace("Mode: manual", "Mode: manual\nHook enforcement: declined (2026-09-24)")
@@ -369,6 +373,13 @@ CASES = [
     # --- A4: gates, strict rows, wrappers
     ("A4 commit, gates pending (decoy lines)", lambda: bash("git commit -m 'feat: x'", gates=GATES_NONE), "deny"),
     ("A4 commit, SECURITY ok", lambda: bash("git commit -m 'feat: x'", gates=GATES_WORK), "allow"),
+    ("A4 commit, only Medium/Low open ok", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_LOW), "allow"),
+    ("A4 push feature branch, only Medium/Low open ok", lambda: bash("git push origin feat/x", gates=GATES_OPEN_LOW), "allow"),
+    ("A4 commit, a High open", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_HIGH), "deny"),
+    ("A4 commit, 10 Critical is not 0 Critical", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_10C), "deny"),
+    ("A4 PR, only Medium/Low open", lambda: bash("gh pr create --fill", gates=GATES_OPEN_ALL), "deny"),
+    ("A4 merge, only Medium/Low open", lambda: bash("gh pr merge 5 --merge", gates=GATES_OPEN_ALL), "deny"),
+    ("A4 push master, only Medium/Low open", lambda: bash("git push origin master", gates=GATES_OPEN_ALL), "deny"),
     ("A4 bash -c wrapper", lambda: bash("bash -c 'git commit -m x'", gates=GATES_NONE), "deny"),
     ("A4 env prefix", lambda: bash("env A=1 git commit -m x", gates=GATES_NONE), "deny"),
     ("A4 sudo", lambda: bash("sudo git push origin feat/x", gates=GATES_NONE), "deny"),

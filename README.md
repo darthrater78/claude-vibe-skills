@@ -125,6 +125,9 @@ The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
   no longer asks just for naming it, which prompted on nearly every session.
   It asks only when it deletes the file or writes a waiver, an enforcement
   decline or a host-network approval, the same rule as an edit. *(2.45.2)*
+- **Open Medium and Low findings don't block work commits.** A SECURITY row
+  of `⏳ open — 0 Critical, 0 High, …` lets you commit and push a feature
+  branch; PRs, merges and releases still need every finding closed. *(2.45.2)*
 - **Install instructions for every surface, and synced installs checked.** The
   install section covers the hand install on Windows, Python 3 for the checks,
   installing one way only, and a tested answer on whether a copy synced from

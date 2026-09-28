@@ -12,8 +12,9 @@ Edit/Write. The shell check still asked whenever a command contained
 `dev-skills-gates.md` and anything write-like (`>`, `python3`, `cp`, `rm`,
 `install`), which caught the session-start probe, `git add`, ignore entries
 and routine row updates. Replayed through the checks, 188 commands from past
-sessions asked; 13 do now, most of them real waiver or settings writes. Also in this release: the
-README's install section, rewritten (docs only).
+sessions asked; 13 do now, most of them real waiver or settings writes.
+Also in this release: open Medium and Low findings stop blocking work
+commits, and the README's install section is rewritten.
 
 ### Changed
 - **B5, shell commands on the gate file** (`checks/enforce.py`,
@@ -41,8 +42,17 @@ README's install section, rewritten (docs only).
 - 10 new B5 cases and 4 changed: routine `sed`, heredoc and PowerShell writes
   pass; the probe and ignore entries pass; waivers, declines, host-network
   approvals and deletes written from the shell still ask.
+- 7 new A4 cases: a commit or feature-branch push passes with only Medium/Low
+  open; a High, `10 Critical`, a PR, a merge or a push to master does not.
 
 ### Fixed
+- **Open Medium and Low findings no longer block a work commit** (A4,
+  `ENFORCEMENT.md`, `SECURITY_GATE.md`, `SKILL.md` §2). The docs always said
+  they don't, but the check needed SECURITY ✅ or ➖ for every commit, and ✅
+  needs `0 open`, so one open Low blocked saving unrelated work. A commit, PR
+  branch update or push to a non-default branch now also passes with
+  `🔒 SECURITY   ⏳ open — 0 Critical, 0 High, …`. PRs, merges and releases
+  still need `✅ 0 open`.
 - Stale README text: command blocks no longer "start with the right `cd`",
   the build handoff and the two tracks referred to a hook you had to
   install (the checks turn on by themselves since 2.37.0), and the

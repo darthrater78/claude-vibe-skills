@@ -263,7 +263,9 @@ gets dropped, and a dropped checklist is a leak.
 
 **Work commit** — saving progress mid-session, on a branch, no version bump, no
 artifact, no publish.
-Required: 🔒 SECURITY (on the changed code) and commit approval (Section 1).
+Required: 🔒 SECURITY (on the changed code; `⏳ open — 0 Critical, 0 High` is
+enough, since open Medium and Low findings stop only the release track) and
+commit approval (Section 1).
 VERSION / BUILD / DOCS / RELEASE / SHIP stay ⬜ pending — not owed yet, not
 skipped.
 

@@ -45,6 +45,8 @@ PR = ["VERSION", "BUILD", "SECURITY", "DOCS"]
 RELEASE = ["VERSION", "BUILD", "SECURITY", "DOCS", "RELEASE"]
 NO_INTENT = re.compile(r"no publishing intent", re.I)
 NO_INTENT_GATES = {"VERSION", "RELEASE", "SHIP"}
+# `⏳ open — 0 Critical, 0 High, 2 Medium`: enough for a work commit, not a release.
+OPEN_BELOW_HIGH = re.compile(r"(^|[^0-9])0\s+Critical\b.*(^|[^0-9])0\s+High\b", re.I)
 MAX_STOP_BLOCKS = 2  # per user prompt, then the reply goes through with a visible warning
 
 
@@ -173,12 +175,16 @@ class Gates:
         return [line.strip() for gate in GATE_EMOJI if (line := self.row(gate))
                 and "➖" in line and NO_INTENT.search(line)]
 
-    def missing(self, required: list[str]) -> list[str]:
+    def missing(self, required: list[str], work: bool = False) -> list[str]:
         out = []
         for gate in required:
             line = self.row(gate)
             if line is None:
                 out.append(f"{gate} — no '{GATE_EMOJI[gate]} {gate}' row")
+            elif work and gate == "SECURITY" and "⏳" in line and OPEN_BELOW_HIGH.search(line):
+                # Medium and Low don't stop a work commit (SECURITY_GATE.md, "Finding
+                # lifecycle"); they stop the release track, which still needs ✅ 0 open.
+                continue
             elif "✅" not in line and "➖" not in line:
                 out.append(line.strip())
             elif "✅" not in line and NO_INTENT.search(line):
@@ -826,9 +832,10 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
                     problems.append(f"{op.label} before the merge is confirmed. Not ✅: " + "; ".join(miss))
             continue
         required = REQUIRED[op.kind]
-        miss = gates.missing(required)
+        miss = gates.missing(required, work=op.kind == "work")
         if miss:
-            problems.append(f"{op.label} needs {', '.join(required)}. Not ✅ or ➖: " + "; ".join(miss))
+            extra = " (a work commit also passes with SECURITY ⏳ at 0 Critical, 0 High)" if op.kind == "work" else ""
+            problems.append(f"{op.label} needs {', '.join(required)}. Not ✅ or ➖{extra}: " + "; ".join(miss))
         build = gates.row("BUILD") or ""
         notes = gates.row_notes("BUILD").lower()
         if "BUILD" in required and "✅" in build and "handoff" not in notes and artifact_repo(gates.root):

@@ -171,6 +171,14 @@ commit — you must be able to save progress — but **no finding of any severit
 may be open when the release track runs.** Gate 5 (PR), Gate 6 (merge, tag,
 publish) are all blocked while anything is open.
 
+The SECURITY row says which case you're in, and the checks read it:
+
+```
+🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 2 Medium, 1 Low    commits and branch pushes pass
+🔒 SECURITY   ⏳ open — 0 Critical, 1 High                     nothing passes
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High                   PRs, merges and releases pass
+```
+
 A finding leaves the open state in exactly three ways:
 
 | Terminal state | What it means | Who can do it |

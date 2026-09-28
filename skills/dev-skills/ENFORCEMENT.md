@@ -167,7 +167,9 @@ git config, shell `!` aliases included), `git.exe` or a full path to it, `&`, `i
 another repo. A heredoc or here-string (`<<<`) fed to a shell is checked as
 commands. Any other heredoc is data: a quoted one (`python3 - <<'EOF'`) is
 not read, and an unquoted one is read only for `$( )`. The gates it needs:
-- commit, a PR branch update, or a push to a non-default branch: **SECURITY**
+- commit, a PR branch update, or a push to a non-default branch: **SECURITY**,
+  which also passes as `⏳ open — 0 Critical, 0 High, …` (Medium and Low don't
+  stop a work commit; the `0 Critical, 0 High` is read from the row's first line)
 - opening a PR: **VERSION, BUILD, SECURITY, DOCS**
 - a merge, **turning on auto-merge** (a merge that later runs unchecked), a
   release or an edit to one, or **any write that lands on the default branch**
