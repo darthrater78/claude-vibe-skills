@@ -245,9 +245,13 @@ like it writes a settings file or the checks asks, including PowerShell's
 `[IO.File]::` writes.
 
 **A shell command on the gate file follows the Edit rule.** It asks only when
-it deletes the file (`rm`, `git rm` without `--cached`, `Remove-Item`) or
-writes it with one of the lines above in the command (a waiver clause,
-`Hook enforcement: declined`, `Host network: … approved`). Routine row and
+it deletes or empties the file (`rm`, `git rm` without `--cached`,
+`Remove-Item`, `find -delete`, `: >`, `truncate`), writes it with one of the
+lines above in the command (a waiver clause, `Hook enforcement: declined`,
+`Host network: … approved`, `test artifact: n/a`), or writes it from text the
+command doesn't show (`cp`/`mv` onto it, `git checkout`/`restore` of it, a
+redirect from `cat <file>`, `base64 -d`, `git show` or escape codes), since
+those can't be checked for waivers. Routine row and
 evidence updates, reads, and commands that only name the file (the
 session-start probe, `git add`, an ignore entry, `git rm --cached`) pass.
 Through 2.45.0 any command naming the file with a write-like token asked,
@@ -358,6 +362,10 @@ have already arrived.
 - **Commands the user runs.** C2–C7 check what Claude hands over. What the
   user actually pastes is theirs.
 - **Anything while declined**, apart from B5.
+- **A script that copies text into the gate file from elsewhere**, such as a
+  Python heredoc that reads another file and writes it there. B5 reads the
+  command, not the result, so a waiver that never appears in the command gets
+  through. Edit/Write stays the rule for the gate file.
 - **A gate file that is already tracked.** B6 stops it being staged by name,
   but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
   up its changes. Session start untracks it (`SESSION_START.md`).

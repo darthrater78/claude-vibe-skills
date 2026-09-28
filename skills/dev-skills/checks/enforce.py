@@ -841,7 +841,7 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
         # A work-commit merge that changes no app code needs no test artifact
         # (GATE_REFERENCE.md Gate 2). The line asks the user when it's added (B5).
         no_app = bool(NO_APP_CHANGE.search(notes))
-        if no_app and not gates.work_track:
+        if no_app and not gates.work_track and op.targets_default:
             problems.append("'test artifact: n/a — no app code changed' is only for a merge on the work-commit "
                             "track (Track: work commit). A release needs a real test artifact.")
         exempt = no_app and gates.work_track
@@ -1525,18 +1525,26 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     plugin = os.environ.get("CLAUDE_PLUGIN_ROOT")
     enforcement = bool(re.search(r"\.claude[^/\\\s]*[/\\]settings(\.local)?\.json", cmd)) or bool(plugin and plugin in cmd)
     gate = "dev-skills-gates.md" in cmd
-    if not (enforcement or gate) or not WRITE_HINT.search(
-            cmd.replace("2>&1", "").replace(">/dev/null", "").replace("2>/dev/null", "")):
-        return None
-    if enforcement:
+    hint = WRITE_HINT.search(cmd.replace("2>&1", "").replace(">/dev/null", "").replace("2>/dev/null", ""))
+    if enforcement and hint:
         return ("ask", "this shell command may write a settings file or the enforcement checks. The user decides.")
+    if not gate:
+        return None
     # The gate file follows the same rule as an Edit to it: routine row and
     # evidence updates pass, and only what B5 shows the user asks. A command
     # that merely named the file (the session-start probe, `git add`, an ignore
     # entry) used to ask too, on nearly every session.
     segments = [s for s in re.split(r"&&|\|\||[;\n|]", cmd) if "dev-skills-gates.md" in s]
-    if any(GATE_DELETE.match(s) and "--cached" not in s for s in segments):
-        return ("ask", "this shell command deletes the gate file, and every gate's record with it. The user decides.")
+    if any((GATE_DELETE.match(s) or GATE_FIND_DELETE.search(s)) and "--cached" not in s for s in segments) \
+            or GATE_EMPTY.search(cmd):
+        return ("ask", "this shell command deletes or empties the gate file, and every gate's record with it. "
+                       "The user decides.")
+    # Content the command doesn't show (copied, restored or decoded from
+    # elsewhere) can't be checked for waivers here, so it asks.
+    if any(GATE_COPY_CMD.match(s) for s in segments) or GATE_RESTORE.search(cmd) \
+            or (GATE_WRITE_TARGET.search(cmd) and OPAQUE_SOURCE.search(cmd)):
+        return ("ask", "this shell command writes the gate file from content it doesn't show (a copy, a restore "
+                       "or decoded text), so its waiver lines can't be checked. Use Edit/Write.")
     writes = GATE_WRITE_TARGET.search(cmd) or any(GATE_WRITE_CMD.search(s) for s in segments) \
         or (INTERPRETER.search(cmd) and SCRIPT_WRITE.search(cmd))
     if not writes:
@@ -1557,6 +1565,18 @@ GATE_WRITE_TARGET = re.compile(r"(>>?|\btee(\s+-a)?|\b(set|add)-content(\s+-path
                                r"\b(write|append)all(text|lines|bytes)\(|\btee-object(\s+-filepath)?)\s*" + GATE_PATH, re.I)
 GATE_WRITE_CMD = re.compile(r"^\s*(sudo\s+)?(sed\s+-i|perl\s+-[a-z]*i|cp|mv|install|ln|truncate|dd|copy|move|"
                             r"copy-item|move-item|cpi|mi)\b", re.I)
+GATE_FIND_DELETE = re.compile(r"\bfind\b.*(-delete\b|-exec\s+rm\b)", re.I)
+GATE_EMPTY = re.compile(r"(^|[;&|\n(]\s*)(:|true)?\s*>\s*" + GATE_PATH + r"['\"]?\s*($|[;&|)\n])|"
+                        r"\b(truncate|clear-content|clc)\b[^;&|\n]*dev-skills-gates\.md", re.I)
+# The gate file as the destination (last argument) of a copy, move or link.
+GATE_COPY_CMD = re.compile(r"\s*(sudo\s+)?(cp|mv|ln|install|dd|rsync|copy|move|xcopy|robocopy|copy-item|move-item|"
+                           r"cpi|mi)\b.*(dev-skills-gates\.md['\"]?\s*$|of=" + GATE_PATH + ")", re.I)
+GATE_RESTORE = re.compile(r"\bgit\s+(-C\s+\S+\s+)?(checkout|restore)\b[^;&|\n]*dev-skills-gates\.md", re.I)
+# A redirect into the gate file whose text comes from a file, a download or an
+# encoding. A heredoc (`cat > f <<'EOF'`) shows its text, so `cat` there is fine.
+OPAQUE_SOURCE = re.compile(r"\bcat\b(?![^\n]*<<)|\b(base64|xxd|openssl|gzip|gunzip|zcat|curl|wget|iconv|rev|"
+                           r"get-content|gc|type)\b|\bgit\s+show\b|\\[0-7]{3}|\\x[0-9a-f]{2}|\$'|(?<!<)<(?!<)\s*[^\s<(]",
+                           re.I)
 INTERPRETER = re.compile(r"\b(python3?|py|node|perl|ruby)\b", re.I)
 SCRIPT_WRITE = re.compile(r"dev-skills-gates\.md[\s\S]*(open\([^)]*['\"][wa]|write_text|writeFile|appendFile|"
                           r"\.write\()|(open\([^)]*['\"][wa]|write_text|writeFile|appendFile)[\s\S]*dev-skills-gates\.md")

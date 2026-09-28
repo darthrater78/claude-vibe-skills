@@ -846,7 +846,7 @@ The skill uses tiered loading to keep token costs down:
 | `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
-| `SESSION_END.md` | ~3KB | Only when a handoff is written or the token impact estimate is due — where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
+| `SESSION_END.md` | ~6KB | When the session winds down, a handoff is written or the token impact estimate is due — the session-end checkpoint, where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |

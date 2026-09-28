@@ -23,8 +23,16 @@ README's install section is rewritten.
   `ENFORCEMENT.md`): they follow the same rule as an Edit. A command asks only
   when it deletes the file (`rm`, `git rm` without `--cached`,
   `Remove-Item`), or when it writes the file and carries a waiver clause,
-  `Hook enforcement: declined` or `Host network: … approved`. Settings files
-  and the installed checks folder still ask on any shell write.
+  `Hook enforcement: declined` or `Host network: … approved`. It also asks
+  when the command writes the file from text it doesn't show (`cp`/`mv` onto
+  it, `git checkout` of it, a redirect from `cat <file>`, `base64 -d`,
+  `git show` or escape codes) or empties it, since those can't be checked for
+  waivers. Settings files and the installed checks folder still ask on any
+  shell write. Scripts that copy another file's text into it remain a known
+  gap (`ENFORCEMENT.md`, "What they can't catch").
+- **The session-end checkpoint procedure moved to `SESSION_END.md`**, which
+  already loads at that moment. `SKILL.md` keeps the trigger and the
+  never-wind-down-silently rule, and is about 1.7KB smaller on every turn.
 - **A docs-only merge can skip the test artifact** (A4, B5,
   `GATE_REFERENCE.md` Gate 2, `ENFORCEMENT.md`). In a repo that builds a
   Docker image, `.exe` or `.apk`, every merge needed a handoff and a
@@ -53,9 +61,12 @@ README's install section is rewritten.
   approvals and deletes written from the shell still ask.
 - 7 new A4 cases: a commit or feature-branch push passes with only Medium/Low
   open; a High, `10 Critical`, a PR, a merge or a push to master does not.
-- 4 new cases for `test artifact: n/a — no app code changed`: a work-commit
-  merge passes with it and not without it, a release is refused, and adding
-  the line asks.
+- 5 new cases for `test artifact: n/a — no app code changed`: a work-commit
+  merge passes with it and not without it, a release merge is refused, a
+  release-track commit isn't, and adding the line asks.
+- 12 new B5 cases for text the command doesn't show: copies, restores,
+  decoded or escaped text and emptying ask; heredoc rows, backups, piped
+  reads and commit messages naming the file pass.
 
 ### Fixed
 - **Gate 2 covers artifacts `gh run download` refuses** (`GATE_REFERENCE.md`).

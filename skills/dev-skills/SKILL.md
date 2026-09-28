@@ -737,46 +737,19 @@ reconstruct the tracker from memory.
 
 ## 8. Session-end checkpoint
 
-**Fires when the session is winding down**: "thanks", "that's all", silence, or any sign the work is done. Before wrapping up, read the
-evidence for steps 1–5 in one call (§5.1). It is `;`-separated so that one
-failure cannot hide the rest, and each failure is itself a finding.
-`<start>` is the `Start:` row of the gate file, the commit the session began
-on (`SESSION_START.md`). If the row is missing, say so and diff against
-`origin/<default>` instead:
-
-```
-git status -sb; git diff --stat <start>; git log --oneline origin/<default>..HEAD; git ls-remote --tags origin "v<version>"; cat .dev-skills-gates.md; docker ps --format '{{.Names}}'
-```
-
-1. **Were source files modified this session?** (`git status`, `git diff`
-   against `<start>`.) If not, skip the rest, including the token
-   estimate: the session was exploratory or advisory.
-2. **Show the gate tracker.** Any gate not ✅ or ➖ N/A is unfinished work.
-3. **Unmerged branches.** If a branch this session created has commits not
-   merged via PR, flag it and offer to finish Gates 5–6.
-4. **Untagged versions.** Compare `git ls-remote --tags origin` to the version
-   file, and flag an untagged current version the same way. This is a
-   backstop: a reclaimed container, a usage limit or a crash never reaches it,
-   which is why `SESSION_START.md` step 7 is the primary check.
-5. **Orphaned test containers.** Anything this session started for Gate 2
-   testing must be gone from `docker ps`. Remove it now if not.
-6. **Token impact estimate** (Section 5.7). This checkpoint is its firm
-   trigger.
-7. **Lessons for the skill itself.** If this session showed a rule, check or
-   gap in *this skill* that should change, list them and ask once whether to
-   record them (`LESSONS_REFERENCE.md`). A no drops them.
-
-**Remote containers: uncommitted work is destroyed, not pending.** Escalate:
-
-> 🚨 **Remote session ending with uncommitted changes.** These edits exist only
-> in this container and will be lost when it is reclaimed. Should I commit and
-> push to `<branch>` now?
+**Fires when the session is winding down**: "thanks", "that's all", silence, or
+any sign the work is done. **Read `SESSION_END.md`, "Session-end checkpoint",
+and run it before wrapping up**: one evidence read, then unfinished gates,
+unmerged branches, untagged versions, orphaned test containers, the token
+estimate (§5.7) and lessons for the skill. Skip it all when no source file
+changed this session.
 
 **Never silently wind down** with uncommitted changes, untagged versions, or
 incomplete gates. Surface the gap with the tracker and let the user decide.
-Semi-autonomous mode does not skip this checkpoint. Uncommitted changes still
-need the user's yes, and Claude then finishes the open gates itself instead of
-handing back a block.
+Semi-autonomous mode does not skip this checkpoint. In a remote container,
+uncommitted work is destroyed, not pending: escalate before anything else.
+
+---
 
 ## 9. Audit mode and workflows
 
