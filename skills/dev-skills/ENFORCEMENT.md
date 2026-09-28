@@ -57,8 +57,10 @@ guardrails".
   the PowerShell tool as well as Bash.
 - **They find their own folder through `CLAUDE_PLUGIN_ROOT`**, which Claude Code
   sets to the skill's folder when it runs a skill's checks. This was verified
-  on Claude Code 2.1.281. It is **not documented** for skills, only for
-  plugins, so a future Claude Code version could change it. If that happens,
+  on Claude Code 2.1.281, and on 2.1.284 for both a hand-installed copy and
+  one synced from claude.ai. Claude Code's own hook error says it "is available
+  for skill hooks", but the docs still describe it only for plugins, so a
+  future Claude Code version could change it. If that happens,
   the checks fail closed as above and the banner says so. They never fail
   silently.
 - **Claude can't edit its way out.** Changes to the gate file that decline

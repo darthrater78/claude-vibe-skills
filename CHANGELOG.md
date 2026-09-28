@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.45.1] — 2026-09-28
+
+**The README's install section answers the questions readers were asking,
+and the rest of it matches the skill again.** Docs only. The skill's behavior
+is unchanged.
+
+### Changed
+- **Install covers every surface.** It explains how to install one way only
+  (a hand-installed copy and a synced one can both load), when to install by
+  hand (CLI sessions that don't sync, such as ones using an API key, Bedrock
+  or Vertex), the Python 3 and Git Bash requirement for the checks, a
+  PowerShell hand install, and `CLAUDE_CONFIG_DIR`.
+- **Synced copies enforce like hand-installed ones, tested.** On Claude Code
+  2.1.284 a copy synced from claude.ai registered its 3 hooks and ran the
+  checks, the same as a hand-installed copy. The limits Claude Code puts on
+  synced skills (no `!` commands, `@` attachments or placeholder substitution
+  in the skill's text) don't touch anything this skill uses. The README says
+  so, and `ENFORCEMENT.md` records the test and that Claude Code's own hook
+  error calls `CLAUDE_PLUGIN_ROOT` available for skill hooks.
+- **"What's new" lists the last few releases only**, not every release back
+  to 2.12. The CHANGELOG has the rest.
+
+### Fixed
+- Stale README text: command blocks no longer "start with the right `cd`",
+  the build handoff and the two tracks referred to a hook you had to
+  install (the checks turn on by themselves since 2.37.0), and the
+  semi-autonomous merge row had CI on the merge commit checked before the
+  merge.
+- The README's "What's inside" table lists `checks/enforce.py`, and "For
+  maintainers" covers `validate.yml` and `audit-repos.yml`.
+
 ## [2.45.0] — 2026-09-27
 
 **Repos nobody is working in get audited too, and a dev version can't reach
