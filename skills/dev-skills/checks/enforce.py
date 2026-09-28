@@ -1506,14 +1506,44 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     # `git rm --cached` only untracks the file (SESSION_START.md); it never writes it.
     cmd = re.sub(r"\bgit\s+(-C\s+\S+\s+)?rm\s+(-r\s+)?--cached\s+(-r\s+)?(--\s+)?[^\s;&|<>`$()]*dev-skills-gates\.md(?=\s|$|[;&|])",
                  "", cmd)
-    touches = "dev-skills-gates.md" in cmd or re.search(r"\.claude[^/\\\s]*[/\\]settings(\.local)?\.json", cmd)
     plugin = os.environ.get("CLAUDE_PLUGIN_ROOT")
-    if plugin and plugin in cmd:
-        touches = True
-    if touches and WRITE_HINT.search(cmd.replace("2>&1", "").replace(">/dev/null", "").replace("2>/dev/null", "")):
-        return ("ask", "this shell command may write the gate file, a settings file, or the enforcement checks. "
-                       "Edit the gate file with the Edit/Write tools so the change can be shown line by line.")
+    enforcement = bool(re.search(r"\.claude[^/\\\s]*[/\\]settings(\.local)?\.json", cmd)) or bool(plugin and plugin in cmd)
+    gate = "dev-skills-gates.md" in cmd
+    if not (enforcement or gate) or not WRITE_HINT.search(
+            cmd.replace("2>&1", "").replace(">/dev/null", "").replace("2>/dev/null", "")):
+        return None
+    if enforcement:
+        return ("ask", "this shell command may write a settings file or the enforcement checks. The user decides.")
+    # The gate file follows the same rule as an Edit to it: routine row and
+    # evidence updates pass, and only what B5 shows the user asks. A command
+    # that merely named the file (the session-start probe, `git add`, an ignore
+    # entry) used to ask too, on nearly every session.
+    segments = [s for s in re.split(r"&&|\|\||[;\n|]", cmd) if "dev-skills-gates.md" in s]
+    if any(GATE_DELETE.match(s) and "--cached" not in s for s in segments):
+        return ("ask", "this shell command deletes the gate file, and every gate's record with it. The user decides.")
+    writes = GATE_WRITE_TARGET.search(cmd) or any(GATE_WRITE_CMD.search(s) for s in segments) \
+        or (INTERPRETER.search(cmd) and SCRIPT_WRITE.search(cmd))
+    if not writes:
+        return None
+    # Unanchored: in a command the line sits inside a sed, printf or heredoc.
+    added = [ln.strip() for ln in cmd.splitlines() if any(re.search(p.pattern.lstrip("^"), ln) for p, _ in SENSITIVE)]
+    added += [m.group(0).strip() for m in WAIVER.finditer(cmd)]
+    if added:
+        return ("ask", "this shell command may write a waiver, an enforcement decline or a host-network approval "
+                       "into the gate file. Make that change with Edit/Write so the user sees it:\n"
+                       + "\n".join(f"  + {a}" for a in added[:5]))
     return None
+
+
+GATE_PATH = r"['\"]?[^\s'\";&|()]*dev-skills-gates\.md"
+GATE_DELETE = re.compile(r"\s*(sudo\s+)?(git\s+(-C\s+\S+\s+)?)?(rm|del|erase|remove-item|ri)\b", re.I)
+GATE_WRITE_TARGET = re.compile(r"(>>?|\btee(\s+-a)?|\b(set|add)-content(\s+-path)?|\bout-file(\s+-filepath)?|"
+                               r"\b(write|append)all(text|lines|bytes)\(|\btee-object(\s+-filepath)?)\s*" + GATE_PATH, re.I)
+GATE_WRITE_CMD = re.compile(r"^\s*(sudo\s+)?(sed\s+-i|perl\s+-[a-z]*i|cp|mv|install|ln|truncate|dd|copy|move|"
+                            r"copy-item|move-item|cpi|mi)\b", re.I)
+INTERPRETER = re.compile(r"\b(python3?|py|node|perl|ruby)\b", re.I)
+SCRIPT_WRITE = re.compile(r"dev-skills-gates\.md[\s\S]*(open\([^)]*['\"][wa]|write_text|writeFile|appendFile|"
+                          r"\.write\()|(open\([^)]*['\"][wa]|write_text|writeFile|appendFile)[\s\S]*dev-skills-gates\.md")
 
 
 GATE_FILE_SPEC = re.compile(r"(^|[/\\])\.?dev-skills-gates\.md$")

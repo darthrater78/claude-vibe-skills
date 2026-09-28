@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.2`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.2](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.2)
 
 ---
 
@@ -121,10 +121,14 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Far fewer gate-file prompts.** A shell command that names the gate file
+  no longer asks just for naming it, which prompted on nearly every session.
+  It asks only when it deletes the file or writes a waiver, an enforcement
+  decline or a host-network approval, the same rule as an edit. *(2.45.2)*
 - **Install instructions for every surface, and synced installs checked.** The
   install section covers the hand install on Windows, Python 3 for the checks,
   installing one way only, and a tested answer on whether a copy synced from
-  claude.ai enforces like a hand-installed one (it does). *(2.45.1)*
+  claude.ai enforces like a hand-installed one (it does). *(2.45.2)*
 - **Idle repos get audited, and dev versions stay off the default branch.**
   A weekly job checks every repo's workflows and keeps one issue up to date.
   Pushing or merging a pre-release version (`-dev`, `-rc`, …) onto the default
@@ -167,7 +171,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.45.1 — all refs agree
+     🔢 VERSION    ✅ v2.45.2 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -184,9 +188,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.45.1
+Version: 2.45.2
 
-🔢 VERSION    ✅ all refs at 2.45.1; prev v2.45.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.45.2; prev v2.45.1 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -832,7 +836,7 @@ The skill uses tiered loading to keep token costs down:
 |---|---|---|
 | `SKILL.md` | ~40KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `ENFORCEMENT.md` | ~21KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `ENFORCEMENT.md` | ~22KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
@@ -950,4 +954,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.45.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.45.2` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

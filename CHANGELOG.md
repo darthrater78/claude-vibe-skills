@@ -4,13 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [2.45.1] — 2026-09-28
+## [2.45.2] — 2026-09-28
 
-**The README's install section answers the questions readers were asking,
-and the rest of it matches the skill again.** Docs only. The skill's behavior
-is unchanged.
+**Shell commands that name the gate file stop asking for permission.** Four
+earlier fixes (2.39.0, 2.39.1, 2.40.0, 2.45.0) relaxed edits made with
+Edit/Write. The shell check still asked whenever a command contained
+`dev-skills-gates.md` and anything write-like (`>`, `python3`, `cp`, `rm`,
+`install`), which caught the session-start probe, `git add`, ignore entries
+and routine row updates. Replayed through the checks, 188 commands from past
+sessions asked; 13 do now, most of them real waiver or settings writes. Also in this release: the
+README's install section, rewritten (docs only).
 
 ### Changed
+- **B5, shell commands on the gate file** (`checks/enforce.py`,
+  `ENFORCEMENT.md`): they follow the same rule as an Edit. A command asks only
+  when it deletes the file (`rm`, `git rm` without `--cached`,
+  `Remove-Item`), or when it writes the file and carries a waiver clause,
+  `Hook enforcement: declined` or `Host network: … approved`. Settings files
+  and the installed checks folder still ask on any shell write.
 - **Install covers every surface.** It explains how to install one way only
   (a hand-installed copy and a synced one can both load), when to install by
   hand (CLI sessions that don't sync, such as ones using an API key, Bedrock
@@ -25,6 +36,11 @@ is unchanged.
   error calls `CLAUDE_PLUGIN_ROOT` available for skill hooks.
 - **"What's new" lists the last few releases only**, not every release back
   to 2.12. The CHANGELOG has the rest.
+
+### Tests
+- 10 new B5 cases and 4 changed: routine `sed`, heredoc and PowerShell writes
+  pass; the probe and ignore entries pass; waivers, declines, host-network
+  approvals and deletes written from the shell still ask.
 
 ### Fixed
 - Stale README text: command blocks no longer "start with the right `cd`",

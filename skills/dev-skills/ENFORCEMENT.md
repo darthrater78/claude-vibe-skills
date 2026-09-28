@@ -235,11 +235,19 @@ waiver still asks, because of the waiver.
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
 a Claude Code `settings.json`/`settings.local.json` (`/` or Windows `\`
 paths) or to the installed checks folder asks. A shell command that looks
-like it writes any of those files asks, including PowerShell's
+like it writes a settings file or the checks asks, including PowerShell's
 `Set-Content`/`Out-File`/`Copy-Item` family, their aliases and
-`[IO.File]::` writes, so the gate file is edited with the Edit/Write tools, where the change
-can be shown line by line. `git rm --cached` on the gate file passes: it only
-untracks it.
+`[IO.File]::` writes.
+
+**A shell command on the gate file follows the Edit rule.** It asks only when
+it deletes the file (`rm`, `git rm` without `--cached`, `Remove-Item`) or
+writes it with one of the lines above in the command (a waiver clause,
+`Hook enforcement: declined`, `Host network: … approved`). Routine row and
+evidence updates, reads, and commands that only name the file (the
+session-start probe, `git add`, an ignore entry, `git rm --cached`) pass.
+Through 2.45.0 any command naming the file with a write-like token asked,
+which prompted on nearly every session. Waivers still belong in an Edit, where
+the change is shown line by line.
 
 **B6. The gate file stays out of local commits.** A `git add` that names
 `.dev-skills-gates.md`, or force-adds `.`, `-A` or `.claude/` (where a

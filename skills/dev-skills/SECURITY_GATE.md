@@ -129,7 +129,7 @@ provenance, not a terminal state.
 `🔒 SECURITY` row:
 
 ```
-  workflows: audited 3 against skill 2.45.1 — 0 open (lint-workflows, release, validate)
+  workflows: audited 3 against skill 2.45.2 — 0 open (lint-workflows, release, validate)
 ```
 
 The skill version is the running skill's `version:`, not the project's. The
