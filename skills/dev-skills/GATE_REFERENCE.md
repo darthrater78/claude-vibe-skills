@@ -323,9 +323,15 @@ Dockerfile or compose file, no `test creds` annotation. Write the BUILD row as:
 ```
 
 "Declined" describes the user's choice not to try it, never Claude skipping
-the handover. There is no valid annotation for "no test artifact": in a
-remote container or Termux the artifact comes from CI, so `handoff n/a` is no
-longer an answer.
+the handover. In a remote container or Termux the artifact comes from CI, so
+`handoff n/a` is no answer.
+
+**One exception: a work-commit merge that changes no app code** (docs,
+screenshots, tooling the app build excludes, and the build-file lines that
+exclude it). On `Track: work commit`, write `test artifact: n/a — no app code
+changed` on its own line under BUILD. It stands in for the handoff and the
+artifact, and adding it asks the user (B5), so they confirm the diff really
+is app-free. A release never takes it: it needs a real artifact.
 
 **Projects with CI release workflows.** If the project has a GitHub Actions
 workflow that builds release artifacts on tag push (check

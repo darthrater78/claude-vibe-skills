@@ -14,7 +14,9 @@ Edit/Write. The shell check still asked whenever a command contained
 and routine row updates. Replayed through the checks, 188 commands from past
 sessions asked; 13 do now, most of them real waiver or settings writes.
 Also in this release: open Medium and Low findings stop blocking work
-commits, and the README's install section is rewritten.
+commits, docs-only merges can skip the test artifact with your OK, the
+session-start probe stops reporting `ERROR` on repos with no tags, and the
+README's install section is rewritten.
 
 ### Changed
 - **B5, shell commands on the gate file** (`checks/enforce.py`,
@@ -23,6 +25,13 @@ commits, and the README's install section is rewritten.
   `Remove-Item`), or when it writes the file and carries a waiver clause,
   `Hook enforcement: declined` or `Host network: … approved`. Settings files
   and the installed checks folder still ask on any shell write.
+- **A docs-only merge can skip the test artifact** (A4, B5,
+  `GATE_REFERENCE.md` Gate 2, `ENFORCEMENT.md`). In a repo that builds a
+  Docker image, `.exe` or `.apk`, every merge needed a handoff and a
+  `test artifact:` line, even one that only changed README screenshots. On
+  `Track: work commit`, `test artifact: n/a — no app code changed` under
+  BUILD now stands in for both. Adding that line asks you, like a waiver, and
+  the release track refuses it.
 - **Install covers every surface.** It explains how to install one way only
   (a hand-installed copy and a synced one can both load), when to install by
   hand (CLI sessions that don't sync, such as ones using an API key, Bedrock
@@ -44,8 +53,16 @@ commits, and the README's install section is rewritten.
   approvals and deletes written from the shell still ask.
 - 7 new A4 cases: a commit or feature-branch push passes with only Medium/Low
   open; a High, `10 Critical`, a PR, a merge or a push to master does not.
+- 4 new cases for `test artifact: n/a — no app code changed`: a work-commit
+  merge passes with it and not without it, a release is refused, and adding
+  the line asks.
 
 ### Fixed
+- **The session-start probe no longer reports `ERROR` for a repo with no
+  tags** (`SESSION_START.md`). With `pipefail`, a `grep` with nothing to read
+  failed the whole line, so a new repo looked like a failed remote query.
+  `latest_tag` now prints `none`, `untagged` handles a changelog with no
+  version headings, and `ERROR` means only that the remote query failed.
 - **Open Medium and Low findings no longer block a work commit** (A4,
   `ENFORCEMENT.md`, `SECURITY_GATE.md`, `SKILL.md` §2). The docs always said
   they don't, but the check needed SECURITY ✅ or ➖ for every commit, and ✅

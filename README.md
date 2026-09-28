@@ -128,6 +128,9 @@ The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 - **Open Medium and Low findings don't block work commits.** A SECURITY row
   of `⏳ open — 0 Critical, 0 High, …` lets you commit and push a feature
   branch; PRs, merges and releases still need every finding closed. *(2.45.2)*
+- **Docs-only merges skip the test artifact, with your OK.** On a work-commit
+  merge, `test artifact: n/a — no app code changed` replaces the artifact
+  and handoff; you confirm it once when it's added. *(2.45.2)*
 - **Install instructions for every surface, and synced installs checked.** The
   install section covers the hand install on Windows, Python 3 for the checks,
   installing one way only, and a tested answer on whether a copy synced from

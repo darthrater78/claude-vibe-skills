@@ -838,10 +838,17 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
             problems.append(f"{op.label} needs {', '.join(required)}. Not ✅ or ➖{extra}: " + "; ".join(miss))
         build = gates.row("BUILD") or ""
         notes = gates.row_notes("BUILD").lower()
-        if "BUILD" in required and "✅" in build and "handoff" not in notes and artifact_repo(gates.root):
+        # A work-commit merge that changes no app code needs no test artifact
+        # (GATE_REFERENCE.md Gate 2). The line asks the user when it's added (B5).
+        no_app = bool(NO_APP_CHANGE.search(notes))
+        if no_app and not gates.work_track:
+            problems.append("'test artifact: n/a — no app code changed' is only for a merge on the work-commit "
+                            "track (Track: work commit). A release needs a real test artifact.")
+        exempt = no_app and gates.work_track
+        if "BUILD" in required and "✅" in build and "handoff" not in notes and artifact_repo(gates.root) and not exempt:
             problems.append("BUILD is ✅ with no 'handoff' note, but this repo builds a Docker image, .exe or .apk. "
                             "Offer the user the test artifact (GATE_REFERENCE.md Gate 2) and note it on the BUILD row.")
-        if op.targets_default and artifact_repo(gates.root):
+        if op.targets_default and artifact_repo(gates.root) and not exempt:
             if "test artifact:" not in notes:
                 problems.append("no 'test artifact: <path or link> @ <sha>' on the BUILD row. Nothing merges "
                                 "without a test artifact built from the merged commit (Gate 2).")
@@ -1257,7 +1264,9 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
 SENSITIVE = [
     (re.compile(r"^(Hook )?[Ee]nforcement:\s*declined"), "declining hook enforcement"),
     (re.compile(r"^Host network:.*approved"), "a host-network approval"),
+    (re.compile(r"test artifact:\s*n/a", re.I), "skipping the test artifact"),
 ]
+NO_APP_CHANGE = re.compile(r"test artifact:\s*n/a\s*[—–-]+\s*no app code changed", re.I)
 # A waiver is keyed by the clause that carries it (from "waive" to the next `;`,
 # `·`, `|`, `)` or line end), not by the whole line: a SECURITY row or Standards
 # row that mentions a waiver changes every time its other evidence does, and

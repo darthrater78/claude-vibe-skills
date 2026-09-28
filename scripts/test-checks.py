@@ -173,8 +173,8 @@ def bash_cd_other(cmd: str, other_gates: str | None = None) -> str:
                             "tool_input": {"command": cmd.format(other=other)}})
 
 
-def bash_docker(cmd: str, build_row: str) -> str:
-    d = repo(GATES_ALL.replace("🔨 BUILD      ➖ N/A — no build system", build_row))
+def bash_docker(cmd: str, build_row: str, gates: str = GATES_ALL) -> str:
+    d = repo(gates.replace("🔨 BUILD      ➖ N/A — no build system", build_row))
     with open(os.path.join(d, "Dockerfile"), "w", encoding="utf-8") as fh:
         fh.write("FROM alpine:3.20\n")
     return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
@@ -417,6 +417,12 @@ CASES = [
                                                               "🔨 BUILD      ✅ handoff offered · test artifact: img:pr-5 @ abc"), "deny"),
     ("A4 Dockerfile repo: all notes ok", lambda: bash_docker("gh pr merge 5 --merge",
                                                              "🔨 BUILD      ✅ handoff offered · test artifact: img:pr-5 @ abc · test creds: per run"), "allow"),
+    ("A4 Dockerfile repo: work merge, no app code changed ok", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed", gates=GATES_WORK_MERGE), "allow"),
+    ("A4 Dockerfile repo: work merge still needs the n/a line", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only", gates=GATES_WORK_MERGE), "deny"),
+    ("A4 Dockerfile repo: release can't use no app code changed", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only\n  handoff offered\n  test artifact: n/a — no app code changed\n  test creds: per run"), "deny"),
     ("A4 Dockerfile repo: notes on evidence lines ok", lambda: bash_docker("gh pr merge 5 --merge",
                                                                          "🔨 BUILD      ✅ built; handoff offered, user tried it\n  test artifact: img:pr-5 @ abc\n  test creds: generated per run"), "allow"),
     ("A4 ✅ on an evidence line doesn't pass", lambda: bash("git commit -m x",
@@ -555,6 +561,8 @@ CASES = [
         "old_string": "waived M1)", "new_string": "waived M1 M2)"}, gates=WAIVED_GATES), "ask"),
     ("B5 a second identical waiver clause asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
         "old_string": "📄 DOCS       ✅", "new_string": "📄 DOCS       ✅ (waived M1)"}, gates=WAIVED_GATES), "ask"),
+    ("B5 adding test artifact n/a asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "🔨 BUILD      ➖ N/A — no build system", "new_string": "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed"}), "ask"),
     ("B5 settings file", lambda: edit("Write", {"file_path": ".claude/settings.json", "content": "{}"}), "ask"),
     ("B5 bash routine write to gate file ok", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "allow"),
     ("B5 bash sed of a gate row ok", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open/' .dev-skills-gates.md"), "allow"),

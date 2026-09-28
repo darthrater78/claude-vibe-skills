@@ -196,7 +196,9 @@ A gate passes only when **its own row**, the line that starts with its emoji
 and name (`🔒 SECURITY`), has ✅ or ➖ **on that line**. `Previous:`,
 `Standards:` and evidence lines never count. In a repo that builds a Docker
 image, `.exe` or `.apk`, a ✅ BUILD needs a `handoff` note, and a merge needs
-`test artifact:` (plus `test creds` for Docker) on the BUILD row. In a fork,
+`test artifact:` (plus `test creds` for Docker) on the BUILD row. A
+work-commit merge can carry `test artifact: n/a — no app code changed`
+instead; the release track can't. In a fork,
 every `gh` write must name the fork with `--repo` and every push must go to
 `origin`. GitHub MCP tools are checked the same way, whatever the server is
 named: `create_pull_request`, `merge_pull_request`, `enable_pr_auto_merge`,
@@ -219,6 +221,7 @@ to `.dev-skills-gates.md` that **adds** any of these lines asks the
 user, showing the lines:
 - `Hook enforcement: declined`
 - `Host network: … approved`
+- `test artifact: n/a` (a merge that skips the test artifact, Gate 2)
 - a new or changed waiver clause: the text from "waive" to the next `;`,
   `·`, `|`, `)` or line end, so `🔕 waived 2026-09-26 by user: …` and
   `(…; waived M1)` both count. The clause is compared, not the whole line:
