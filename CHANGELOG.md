@@ -58,6 +58,13 @@ README's install section is rewritten.
   the line asks.
 
 ### Fixed
+- **Gate 2 covers artifacts `gh run download` refuses** (`GATE_REFERENCE.md`).
+  An artifact uploaded with `archive: false` can fail with "path traversal";
+  the handover gives the `gh api …/artifacts/<id>/zip` download and a digest
+  check instead.
+- **A ship check that didn't run is not ✅** (`SHIP_REFERENCE.md` step 6). A
+  missing tool, or one that printed help instead of a result (older `gh` has
+  no `attestation`), is reported as what was and wasn't checked.
 - **The session-start probe no longer reports `ERROR` for a repo with no
   tags** (`SESSION_START.md`). With `pipefail`, a `grep` with nothing to read
   failed the whole line, so a new repo looked like a failed remote query.

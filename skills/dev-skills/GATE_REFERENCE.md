@@ -291,7 +291,10 @@ Hand it over after the smoke test passes, before this gate is marked passed:
 
 - **`.exe`, `.apk`, binaries:** copy the artifact into a local folder (e.g.
   `dist/`, `build/output/`) and give the exact path, or give the CI artifact
-  link.
+  link. An artifact uploaded with `archive: false` can make `gh run download`
+  refuse with "path traversal"; hand over `gh api
+  repos/<owner>/<repo>/actions/artifacts/<id>/zip > <file>` instead, plus a
+  hash to compare with the artifact's `digest`, in the user's recorded shell.
 - **Docker images:** give the exact commands to get and run it: `docker load
   -i <file>` (tarball), `docker pull <image>:pr-<n>`, or `docker build -t
   <tag> .`, then `docker run ...` with the ports and volumes the project needs,
