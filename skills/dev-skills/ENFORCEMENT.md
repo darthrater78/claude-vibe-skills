@@ -57,8 +57,10 @@ guardrails".
   the PowerShell tool as well as Bash.
 - **They find their own folder through `CLAUDE_PLUGIN_ROOT`**, which Claude Code
   sets to the skill's folder when it runs a skill's checks. This was verified
-  on Claude Code 2.1.281. It is **not documented** for skills, only for
-  plugins, so a future Claude Code version could change it. If that happens,
+  on Claude Code 2.1.281, and on 2.1.284 for both a hand-installed copy and
+  one synced from claude.ai. Claude Code's own hook error says it "is available
+  for skill hooks", but the docs still describe it only for plugins, so a
+  future Claude Code version could change it. If that happens,
   the checks fail closed as above and the banner says so. They never fail
   silently.
 - **Claude can't edit its way out.** Changes to the gate file that decline
@@ -165,7 +167,9 @@ git config, shell `!` aliases included), `git.exe` or a full path to it, `&`, `i
 another repo. A heredoc or here-string (`<<<`) fed to a shell is checked as
 commands. Any other heredoc is data: a quoted one (`python3 - <<'EOF'`) is
 not read, and an unquoted one is read only for `$( )`. The gates it needs:
-- commit, a PR branch update, or a push to a non-default branch: **SECURITY**
+- commit, a PR branch update, or a push to a non-default branch: **SECURITY**,
+  which also passes as `⏳ open — 0 Critical, 0 High, …` (Medium and Low don't
+  stop a work commit; the `0 Critical, 0 High` is read from the row's first line)
 - opening a PR: **VERSION, BUILD, SECURITY, DOCS**
 - a merge, **turning on auto-merge** (a merge that later runs unchecked), a
   release or an edit to one, or **any write that lands on the default branch**
@@ -192,7 +196,9 @@ A gate passes only when **its own row**, the line that starts with its emoji
 and name (`🔒 SECURITY`), has ✅ or ➖ **on that line**. `Previous:`,
 `Standards:` and evidence lines never count. In a repo that builds a Docker
 image, `.exe` or `.apk`, a ✅ BUILD needs a `handoff` note, and a merge needs
-`test artifact:` (plus `test creds` for Docker) on the BUILD row. In a fork,
+`test artifact:` (plus `test creds` for Docker) on the BUILD row. A
+work-commit merge can carry `test artifact: n/a — no app code changed`
+instead; the release track can't. In a fork,
 every `gh` write must name the fork with `--repo` and every push must go to
 `origin`. GitHub MCP tools are checked the same way, whatever the server is
 named: `create_pull_request`, `merge_pull_request`, `enable_pr_auto_merge`,
@@ -215,6 +221,7 @@ to `.dev-skills-gates.md` that **adds** any of these lines asks the
 user, showing the lines:
 - `Hook enforcement: declined`
 - `Host network: … approved`
+- `test artifact: n/a` (a merge that skips the test artifact, Gate 2)
 - a new or changed waiver clause: the text from "waive" to the next `;`,
   `·`, `|`, `)` or line end, so `🔕 waived 2026-09-26 by user: …` and
   `(…; waived M1)` both count. The clause is compared, not the whole line:
@@ -233,11 +240,23 @@ waiver still asks, because of the waiver.
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
 a Claude Code `settings.json`/`settings.local.json` (`/` or Windows `\`
 paths) or to the installed checks folder asks. A shell command that looks
-like it writes any of those files asks, including PowerShell's
+like it writes a settings file or the checks asks, including PowerShell's
 `Set-Content`/`Out-File`/`Copy-Item` family, their aliases and
-`[IO.File]::` writes, so the gate file is edited with the Edit/Write tools, where the change
-can be shown line by line. `git rm --cached` on the gate file passes: it only
-untracks it.
+`[IO.File]::` writes.
+
+**A shell command on the gate file follows the Edit rule.** It asks only when
+it deletes or empties the file (`rm`, `git rm` without `--cached`,
+`Remove-Item`, `find -delete`, `: >`, `truncate`), writes it with one of the
+lines above in the command (a waiver clause, `Hook enforcement: declined`,
+`Host network: … approved`, `test artifact: n/a`), or writes it from text the
+command doesn't show (`cp`/`mv` onto it, `git checkout`/`restore` of it, a
+redirect from `cat <file>`, `base64 -d`, `git show` or escape codes), since
+those can't be checked for waivers. Routine row and
+evidence updates, reads, and commands that only name the file (the
+session-start probe, `git add`, an ignore entry, `git rm --cached`) pass.
+Through 2.45.0 any command naming the file with a write-like token asked,
+which prompted on nearly every session. Waivers still belong in an Edit, where
+the change is shown line by line.
 
 **B6. The gate file stays out of local commits.** A `git add` that names
 `.dev-skills-gates.md`, or force-adds `.`, `-A` or `.claude/` (where a
@@ -343,6 +362,10 @@ have already arrived.
 - **Commands the user runs.** C2–C7 check what Claude hands over. What the
   user actually pastes is theirs.
 - **Anything while declined**, apart from B5.
+- **A script that copies text into the gate file from elsewhere**, such as a
+  Python heredoc that reads another file and writes it there. B5 reads the
+  command, not the result, so a waiver that never appears in the command gets
+  through. Edit/Write stays the rule for the gate file.
 - **A gate file that is already tracked.** B6 stops it being staged by name,
   but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
   up its changes. Session start untracks it (`SESSION_START.md`).

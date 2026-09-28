@@ -277,6 +277,11 @@ looks fine and is not:
      real certificate, not unsigned or self-signed. **Android:** the filename
      contains the version and does NOT contain `debug`.
 
+   **A check that didn't run is not ✅.** If a tool is missing or printed
+   help instead of a result (an older `gh` has no `attestation` subcommand),
+   say what was checked instead and what wasn't, e.g. "attestation present and
+   matches; signature not verified".
+
    If CI failed:
    > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
    > Check logs: `gh run view <run-id> --log-failed`

@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.2`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.2](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.2)
 
 ---
 
@@ -17,7 +17,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 
 - [What it does](#what-it-does) — the four rules
 - [Enforcement checks](#enforcement-checks) — what's actually checked, full disclosure, and how to decline
-- [What's new](#whats-new) — highlights since v2.12
+- [What's new](#whats-new) — the last few releases
 - [What it looks like](#what-it-looks-like) — a session, abridged
 - [Install](#install) — claude.ai, Desktop, CLI, web
 - [The six gates](#the-six-gates) — what each one checks
@@ -119,8 +119,22 @@ every session, including ones that don't load the skill, see
 
 ## What's new
 
-Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
+The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Far fewer gate-file prompts.** A shell command that names the gate file
+  no longer asks just for naming it, which prompted on nearly every session.
+  It asks only when it deletes the file or writes a waiver, an enforcement
+  decline or a host-network approval, the same rule as an edit. *(2.45.2)*
+- **Open Medium and Low findings don't block work commits.** A SECURITY row
+  of `⏳ open — 0 Critical, 0 High, …` lets you commit and push a feature
+  branch; PRs, merges and releases still need every finding closed. *(2.45.2)*
+- **Docs-only merges skip the test artifact, with your OK.** On a work-commit
+  merge, `test artifact: n/a — no app code changed` replaces the artifact
+  and handoff; you confirm it once when it's added. *(2.45.2)*
+- **Install instructions for every surface, and synced installs checked.** The
+  install section covers the hand install on Windows, Python 3 for the checks,
+  installing one way only, and a tested answer on whether a copy synced from
+  claude.ai enforces like a hand-installed one (it does). *(2.45.2)*
 - **Idle repos get audited, and dev versions stay off the default branch.**
   A weekly job checks every repo's workflows and keeps one issue up to date.
   Pushing or merging a pre-release version (`-dev`, `-rc`, …) onto the default
@@ -151,212 +165,8 @@ Highlights since v2.12. Full detail in [CHANGELOG.md](CHANGELOG.md).
   before a version tag points at them. New template for Capacitor/Ionic apps.
   A missing or incomplete `dependabot.yml` is an audit finding. *(2.42.0,
   2.42.1)*
-- **Workflows checked as they're written.** A workflow edit that adds an
-  unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps
-  its credential is blocked; one that drops `permissions:` or a job timeout
-  asks you. The templates themselves were fixed: a nonexistent
-  `setup-gradle` pin, `${{ }}` in three release scripts, and release gate
-  jobs with no timeout. *(2.41.0)*
-- **Enforcement on Windows.** The checks now cover Claude Code's PowerShell
-  tool, find Python through the `py -3` launcher, and protect Windows-style
-  settings paths. A gate passing or the mode being recorded no longer stops
-  for a prompt in either mode; declines, host-network approvals and waivers
-  still ask. On local sessions the gate file is no longer committed, so it
-  can't block `git checkout`, and it now lives in the repo root
-  (`.dev-skills-gates.md`), outside the `.claude/` folder Claude Code prompts
-  for on every edit. *(2.39.0, 2.39.1, 2.40.0)*
-- **See CI before you tag, in either mode.** The tag block handed over in
-  semi-autonomous mode now shows the PR checks and the merge commit's CI run
-  in your terminal and stops before tagging unless it passed, as the manual
-  block does. *(2.40.0)*
-- **LTS stays LTS.** A package or runtime on a long-term-support line
-  (Node.js, .NET, Java, Ubuntu, Debian, …) upgrades to the newest patch of the
-  newest *settled* LTS line, never to the newest release overall. A brand-new
-  LTS waits for its first patch, moving off LTS is your call, and an LTS past
-  end of support is a High finding. *(2.38.0)*
-- **Cheaper session start.** Parts only some sessions need (remote containers,
-  the out-of-date callout, fork cases, the full enforcement reference, the
-  compose example) load only when they apply. Session start reads 78KB instead
-  of 96KB, about 4k tokens less every session. *(2.38.0)*
-- **[Enforcement that actually runs.](#enforcement-checks)** Checks now ship
-  inside the skill and turn on when it loads, with full disclosure and a
-  keep-or-decline question every session. They cover gates on executed and
-  presented git, LAN-only test ports, host networking, gate-file edits,
-  labeled run blocks and unanswered questions. The old hand-installed hook
-  is replaced. *(2.37.0)*
-- **Gate enforcement stopped being bypassable.** Presenting a git command for
-  you to paste now counts as running it — same pre-flight, same tracker. An
-  optional [hook](#enforcement-checks) blocks git at the tool call
-  itself, and gate state moved into a
-  [file](#how-gates-are-enforced) so a compacted session can't "remember" a
-  scan that never ran. *(2.12, 2.13)*
-- **Ref operations come back to you.** Tag pushes *and* ref deletions are
-  handed over in every environment, containers included — Claude's credentials
-  are routinely denied on exactly those two. [Semi-autonomous
-  mode](#manual-and-semi-autonomous-mode) does not change this — no mode can
-  grant what the remote withholds — it only puts a full report above the block.
-  [Why](#tag-pushes-and-ref-deletions-come-back-to-you) *(2.15.0, 2.15.2)*
-- **Ref checks read the remote.** `git tag -l` and `git branch -r` both report
-  absence that means nothing in a fresh clone; every check is now
-  `git ls-remote`. *(2.15.0, 2.15.2)*
-- **Unfinished releases get caught.** A missing tag for the *previous* version
-  hard-blocks Gate 1, and session start compares released versions against
-  remote tags — so a release that died between merge and tag surfaces before
-  new work buries it. *(2.15.0)*
-- **[Local dev and CI are detected separately](#workflow-detection-local-dev-vs-ci).**
-  Gate 2 runs *your* build, not CI's — "CI will catch it" is explicitly
-  rejected, because CI runs after the commit Gate 2 protects. *(2.15.0)*
-- **[Windows security reached parity](#gate-3--security--quality-)** with Linux
-  and Android: UAC elevation, DLL search-order hijacking, registry ACLs,
-  unquoted service paths, code signing, reserved names. *(2.16.0)*
-- **Lower per-turn cost.** Gate execution detail and shell mechanics moved out
-  of the every-turn file into [references](#whats-inside) loaded on demand.
-  *(2.14.0, 2.16.0)*
-- **[Three cost behaviors that never fired now do](#cost-discipline).** The
-  token estimate, the phase-transition handoff, and the usage-limit handoff were
-  gated on judgment calls and on a token threshold that Claude Code for web
-  never crosses. All three now trigger on observable events. *(2.16.1)*
-- **[Subagent model delegation](#cost-discipline).** When spawning subagents,
-  the cheapest model tier that fits the task is used — Haiku for lookups, Sonnet
-  for code work, expensive models only when the session is already approved
-  above the Sonnet ceiling. *(2.17.0)*
-- **[Guided GitHub Actions workflows](#audit-mode).** New reference file with
-  audit and creation procedures: point it at an existing `.github/workflows/`
-  for a severity-graded review, or ask it to set one up and it detects your
-  project's environment, asks every config question in one turn, and
-  generates a template — Docker, Windows, Android, Linux, Home Assistant,
-  Python, Node.js, or scripts — with SHA-pinned actions, least-privilege
-  permissions, and dev/pre-release build support out of the box. *(2.18.0)*
-- **[Dependencies must be current and CVE-free](#gate-3--security--quality-).** Every
-  package is pinned to a release that is looked up, never recalled from
-  training data, and the whole dependency tree — transitive included — is
-  re-audited on every security gate, not just when the manifest changes. A
-  Critical or High advisory now hard-stops Gate 3 the same way a hardcoded
-  secret does, and Dependabot config covers every ecosystem in the repo rather
-  than GitHub Actions alone. *(2.19.0)*
-- **The skill checks its own currency, every session.** Session start now
-  compares this copy's version against the latest tag on
-  `darthrater78/claude-vibe-skills` directly — no cached clone, no number from
-  memory. Behind means a loud warning above the banner and an explicit
-  "continue or update first?" before any work starts; unreachable network
-  means one skip notice, not a silent guess. *(2.20.0)*
-- **[Release workflows verify the tag matches the tagged commit's own
-  version](#gate-6--ship-)**, not just that the commit is merged and CI-green.
-  A tag pushed before its release PR merges lands on the previous version's
-  commit — already merged, already green — and passed both older checks
-  while publishing the old code under the new tag. Gate 6 no longer hands
-  over the tag-push block until the merge and its CI are confirmed, the
-  block itself carries a version guard, and a recovery runbook covers a tag
-  that got published on the wrong commit anyway. *(2.24.0)*
-- **[Docker-in-a-web-container gets its own decision point](#gate-2--build-).**
-  A container with the `docker` CLI but no reachable daemon used to look
-  identical to "Docker available." Session start now measures with `docker
-  info`, not `which docker`, and when a Docker-build project hits this in a
-  remote/web session, offers a real choice — commit as work-in-progress to
-  finish on a machine with a working daemon, or fall back to the existing
-  CI-only BUILD path. Any container started for Gate 2 testing must be torn
-  down once it's served its purpose. *(2.25.0)*
-- **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).**
-  `SKILL.md` §1.1 has the type list; Gate 1 now reads the commit types since
-  the last tag as a signal for the version bump (`feat`→MINOR, `fix`→PATCH,
-  `!`/`BREAKING CHANGE:`→MAJOR) instead of asking cold. *(2.25.0)*
-- **The out-of-date warning got a lot louder.** A behind skill copy now gets
-  a bracketed, impossible-to-skim-past warning as the literal first line of
-  the first message — not folded into the banner — and if you continue
-  anyway, a compact `⚠️ outdated` tag stays on every later tracker display
-  for the rest of the session instead of vanishing after one message.
-  *(2.25.0)*
-- **Gate-file discipline, from a real postmortem.** The pre-flight hook now
-  reads a gate row's full text instead of just its first line — a status or
-  `handoff` annotation wrapped onto a continuation line used to read as
-  absent and block real work over formatting. Plus: rows stay short (link to
-  the commit/changelog instead of duplicating detail), a section closes when
-  the release step that absorbs it runs rather than in a separate cleanup
-  pass. *(2.25.0)* The SHIP ✅ record now rides in the next release's PR
-  rather than a PR of its own. *(2.28.0)*
-- **Three release-workflow templates stopped re-proving what CI already
-  proved.** The Linux and script-collection release jobs were re-running
-  shellcheck even though their own gate job already required it to have
-  passed for that commit — removed, with a new checklist item so an audit
-  catches this pattern automatically. The Node.js template moved to npm's
-  OIDC trusted publishing (GA since July 2025) instead of a long-lived
-  `NPM_TOKEN`. *(2.25.0)*
-- **[Semi-autonomous mode](#manual-and-semi-autonomous-mode).** Say "auto mode"
-  and Claude runs the git commands itself instead of handing you blocks —
-  commits, pushes, the PR, the merge, watching CI, verification. Two checkpoints
-  survive: **every commit still needs your explicit yes**, and the tag still
-  comes back to you as a block — with a full report of every action Claude took
-  since that approval above it. The version bump and release notes fold into the
-  commit approval. The mode is written to the gate state file so a compacted
-  session can't lose it, and it never carries into a new session. *(2.26.0)*
-- **You choose the mode at the start of every session.** Manual versus
-  semi-autonomous is now one of the session-start questions, asked neutrally
-  with no default. Until you answer, Claude makes no edits and runs or presents
-  no git writes, and the enforcement hook denies git writes while the gate file
-  reads `Mode: unchosen`. Before this, the mode was only ever mentioned as a
-  hint, so it was never actually chosen. *(2.29.0)*
-- **[Forks: `origin` is the fork, never upstream.](#forks)** Session start
-  checks whether `origin` is a fork, or is the upstream parent of a fork you
-  own, and repoints it to the fork before any work begins. Every push, PR,
-  merge and release targets the fork, with an explicit `--repo`, because a bare
-  `gh pr create` in a fork opens the PR upstream. Anything upstream, you do on
-  GitHub yourself. The hook blocks `gh` writes in a fork that lack `--repo` or
-  point anywhere else. *(2.29.0)*
-- **[Fewer round trips, shorter output.](#cost-discipline)** Session start
-  runs one read-only probe instead of about ten separate calls, and the
-  session-end checkpoint reads its evidence in one call. Chaining a step's
-  commands is now the rule in every mode, not just semi-autonomous, and never
-  crosses an approval or a failed gate. The tracker is one line unless a gate
-  changed, and the banner folds its all-clear checks into one row. *(2.30.0)*
-- **[The every-turn file is a quarter smaller, with its rules
-  guarded.](#for-maintainers)** `SKILL.md` went from ~54KB to ~40KB, about 3.5k
-  fewer tokens on every request. Rules and triggers stayed; formats, tables and
-  procedures moved to the file already loaded when they are needed. A
-  53-phrase manifest checked by `validate.sh` fails the build if a rule goes
-  missing, and the size ceiling dropped to 44KB so the saving can't drift
-  back. *(2.31.0)*
-- **The mode question states each mode's token cost, and MCP disabling is one
-  command per server.** Each mode option carries one plain line on how it uses
-  tokens: in manual on a local session, commands run outside Claude and are
-  free; in semi-autonomous, every executed command resends the conversation. The MCP
-  check now gives a ready-to-paste `/mcp disable <server>` line for each active
-  server instead of a bare `/mcp`. *(2.32.0)*
-- **[No merge without a test artifact.](#gate-2--build-)** For any project
-  that builds a Docker image, `.exe`, `.apk` or binary, a test artifact built
-  from the exact commit being merged must exist and be handed to you first,
-  in every environment — web and Termux sessions get theirs from CI. Docker
-  test runs get a freshly generated throwaway login, shown with the run
-  command. The pre-flight hook denies merges missing either. *(2.33.0)*
-- **[Outdated skill? Update in place.](#install)** The version-check warning
-  now offers to install the new release for you, or gives you one command
-  (bash or PowerShell). The whole skill is replaced from the release file,
-  and nothing changes if the download isn't the expected version. *(2.33.0)*
-- **[The test login stays in view.](#gate-2--build-)** Every message in which
-  a Docker test container was started, rebuilt or restarted ends with its
-  full login (URL, user, password), so it doesn't get lost in the scroll
-  between test rounds. *(2.34.0)*
-- **[Project standards.](#project-standards)** Every project now considers
-  encryption at rest. Anything with a login is offered TOTP, a 30-day trusted
-  device and an unlock/rescue path. Docker projects are offered Apprise
-  notifications. Every main page links to GitHub and the current release notes,
-  with no exceptions. *(2.35.0)*
-- **[Compose quickstart standard.](#project-standards)** Docker projects
-  document a copy-paste quickstart: set up the directory in one line, then the
-  compose block with its notes as `#` comments at the bottom of the YAML,
-  then the `compose.yaml` filename. Every volume is a bind mount under
-  `/opt/docker/<name>/`, and the image tag follows the version. *(2.36.0)*
-- **[Test containers you can reach.](#gate-2--build-)** Docker test runs
-  publish on the network, and the login URL uses the host's LAN IP (checked
-  to answer before it's handed over), never `127.0.0.1`. *(2.36.1)* The LAN
-  IP comes from the default route, not a Docker bridge, and the binding is
-  read back with `docker port` before the URL is handed over. *(2.37.0)*
-- **[Fewer turns, clearer blocks in manual mode.](#manual-and-semi-autonomous-mode)**
-  One labeled `▶️ RUN THIS` block per decision, with START/END markers and a
-  ✅/❌ result line, and no `cd`. A release is two blocks (commit → PR, then
-  merge → tag), and you never need to reply "done". *(2.37.0)*
-- **[Host networking needs your permission.](#gate-3--security--quality-)**
-  `network_mode: host` / `--network host` is never used without your explicit
-  yes for that container. *(2.37.0)*
+
+Earlier releases, back to 2.1.0, are in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -367,7 +177,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.18.0 — all refs agree
+     🔢 VERSION    ✅ v2.45.2 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -384,9 +194,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.18.0
+Version: 2.45.2
 
-🔢 VERSION    ✅ all refs at 2.18.0; prev v2.17.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.45.2; prev v2.45.1 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -401,21 +211,42 @@ Marks mean: ✅ passed · 🚫 blocked · ⏳ in progress · ⬜ pending · ➖ 
 ## Install
 
 Download `dev-skills.skill` from the [latest release](../../releases/latest),
-then:
+then install it **one** of these ways. Don't install both: in the CLI the
+hand-installed copy takes the `/dev-skills` name, the synced copy becomes
+`anthropic-skills:dev-skills`, and both can end up loaded in one session.
 
 | Where | How |
 |---|---|
-| **[claude.ai](https://claude.ai)** (recommended) | **Customize** → **Skills** → upload the `.skill` file. Syncs to Desktop and Claude Code on the web automatically. |
-| **Claude Desktop** (Win/macOS) | **Customize** → **Skills** → upload the `.skill` file. |
-| **Claude Code (CLI)** | Skills uploaded via claude.ai sync automatically. To install by hand, see below. |
-| **Claude Code on the web** | Syncs from claude.ai. Project skills committed to `.claude/skills/` also load when the repo is cloned. |
+| **[claude.ai](https://claude.ai)** (recommended) | **Customize** → **Skills** → upload the `.skill` file. It syncs to Claude Desktop, Claude Code on the web, and the Claude Code CLI in sessions signed in with that account (CLI 2.1.273 or later). |
+| **Claude Code CLI, by hand** | Unzip into your personal skills folder (below). Use this when your CLI sessions don't sync: signed in with an API key, on Bedrock or Vertex, or with sync turned off. |
+| **One repo only** | Commit the unzipped folder to the repo's `.claude/skills/dev-skills/`. Cloud sessions load it from there too. |
 
-Manual CLI install — the `.skill` file is a zip:
+**Enforcement needs Python 3**, and on Windows, Git for Windows (the checks
+run in Git Bash). Without them the skill still works as instructions, the
+banner says `⚠️ not active`, and git, gh and docker commands are blocked
+rather than let through unchecked. See [Enforcement checks](#enforcement-checks).
+
+Hand install. The `.skill` file is a zip with no top-level folder, so unzip it
+into a folder named `dev-skills`:
 
 ```bash
 mkdir -p ~/.claude/skills/dev-skills
-unzip dev-skills.skill -d ~/.claude/skills/dev-skills/
+unzip -o dev-skills.skill -d ~/.claude/skills/dev-skills/
 ```
+
+```powershell
+Copy-Item dev-skills.skill dev-skills.zip
+Expand-Archive dev-skills.zip "$HOME\.claude\skills\dev-skills" -Force
+```
+
+If you set `CLAUDE_CONFIG_DIR`, use that folder in place of `~/.claude`.
+
+**Synced and hand-installed copies enforce the same way.** Claude Code
+registers a synced skill's frontmatter hooks just as it does a local skill's
+(tested on Claude Code 2.1.284). The limits on synced skills (no `!` commands,
+no `@` attachments and no placeholder substitution in the skill's text) don't
+touch anything this skill uses. Start a fresh session after you install or
+update, and check the banner reads `Hook enforcement: ✅ active`.
 
 **Updating:** when a session finds your copy out of date, it offers to
 install the new release for you or to give you a one-line command (bash or
@@ -476,12 +307,12 @@ from the default route (a Docker bridge such as `172.17.0.1` is rejected), the
 app inside listens on `0.0.0.0`, and `docker port` must show the LAN IP before
 the URL is handed over. *(2.37.0)* The login
 is repeated at the bottom of every message after the test container is
-started, rebuilt or restarted, never just "see above". *(2.34.0)* Where the [pre-flight
-hook](hooks/README.md) is installed, it enforces the offer deterministically:
-a BUILD gate marked ✅ with no `handoff` annotation on its tracker line, in a
-repo with a Docker/.exe/.apk build signal, is denied — reading the tracker
-row's full text, not just its first line, so a wrapped annotation isn't
-misread as missing. *(2.23.0, 2.25.0)*
+started, rebuilt or restarted, never just "see above". *(2.34.0)* The
+[enforcement checks](#enforcement-checks) hold the offer to this: a BUILD gate
+marked ✅ with no `handoff` annotation on its tracker line, in a repo with a
+Docker/.exe/.apk build signal, is denied — reading the tracker row's full
+text, not just its first line, so a wrapped annotation isn't misread as
+missing. *(2.23.0, 2.25.0, 2.37.0)*
 
 A web/remote container with the Docker CLI but no reachable daemon is a
 separate, earlier problem than the handoff offer: session start measures
@@ -597,9 +428,9 @@ to the default branch that bumps nothing, tags nothing, and publishes
 nothing — a tracker-bookkeeping commit, a docs typo fix — is still a work
 commit, with RELEASE/SHIP marked ➖ N/A and the reason stated. Treating every
 default-branch merge as release-track by default is what turns a five-line
-housekeeping commit into a six-gate ceremony. (If the [enforcement
-hook](#enforcement-checks) is installed, it is stricter here: see its
-table.) When a repo's own convention
+housekeeping commit into a six-gate ceremony. (The [enforcement
+checks](#enforcement-checks) are stricter here: see their table.) When a
+repo's own convention
 here is genuinely unclear, the skill asks once at session start rather than
 discovering it mid-PR.
 
@@ -639,7 +470,7 @@ ref operations GitHub denies Claude.
 |---|---|---|
 | **Commit approval** | required, every commit | **required, every commit** |
 | Commit, branch push, PR | presented for you to run | Claude runs them |
-| PR merge | presented | Claude runs it after confirming CI on the merge commit, without `--delete-branch` |
+| PR merge | presented | Claude runs it once the PR's checks pass, without `--delete-branch`; CI on the merge commit is confirmed before the tag |
 | **Tag push** | always yours | **always yours — with a full report above the block** |
 | **Branch / tag deletion** | always yours | **always yours** |
 | Release publish, notes, verification | presented / Claude | Claude runs them |
@@ -920,9 +751,9 @@ release breaks.
   gives the `/mcp disable <server>` command for each one
 - **Git command presentation** — on local sessions, presents git as a single
   copy-once block per operation rather than several, formatted for your shell
-  (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and starting with the right
-  `cd` (tag and ref-deletion blocks carry none). Remote container sessions execute directly instead, since a
-  presented block would operate on the wrong clone
+  (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and with no `cd`, since
+  your terminal is already in the repo. Remote container sessions execute
+  directly instead, since a presented block would operate on the wrong clone
 - **Fewer round trips** — session start is one read-only probe call instead of
   about ten, the session-end checkpoint reads its evidence in one call, and any
   step made of several commands is chained into one invocation in every mode
@@ -1011,11 +842,11 @@ The skill uses tiered loading to keep token costs down:
 |---|---|---|
 | `SKILL.md` | ~40KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `ENFORCEMENT.md` | ~19KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `ENFORCEMENT.md` | ~22KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
-| `SESSION_END.md` | ~3KB | Only when a handoff is written or the token impact estimate is due — where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
+| `SESSION_END.md` | ~6KB | When the session winds down, a handoff is written or the token impact estimate is due — the session-end checkpoint, where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
 | `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
@@ -1041,6 +872,7 @@ The skill uses tiered loading to keep token costs down:
 | `WORKFLOW_HYBRID.md` | ~13KB | Workflow help, only when environment detection matches a Capacitor/Ionic hybrid app — npm build, `cap sync`, then the signed APK |
 | `WORKFLOW_PYTHON.md` | ~8KB | Workflow help, only when environment detection matches a Python package — the PyPI template |
 | `WORKFLOW_NODEJS.md` | ~8KB | Workflow help, only when environment detection matches Node.js — the npm template |
+| `checks/enforce.py` | ~85KB | Never loaded into Claude's context. Claude Code runs it as the [enforcement checks](#enforcement-checks) |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -1098,16 +930,20 @@ commit — without it, tagging an unreviewed branch would publish a real release
 from unreviewed code. Every workflow pins `actions/checkout` to a commit SHA
 rather than a mutable version tag, checks out with `persist-credentials: false`,
 declares least-privilege `permissions:`, and carries a concurrency group and
-timeouts. `lint-workflows.yml` runs actionlint (checksum-verified) on any change
+timeouts. `validate.yml` runs `validate.sh`, which includes the check test
+cases in `scripts/test-checks.py`, on every push and pull request.
+`lint-workflows.yml` runs actionlint (checksum-verified) on any change
 to the workflow files or the templates. `check-pins.yml` resolves every action
 pin, templates included, against the tag its comment names, weekly and on any
-pull request that touches one.
+pull request that touches one. `audit-repos.yml` runs `scripts/audit-repos.py`
+weekly against the workflows of every repo you own and keeps one "Weekly
+workflow audit" issue here up to date.
 
 ---
 
-## Migrating from the old skills
+## Migrating from the old skills (pre-2.0)
 
-This single skill replaces all four previous ones:
+From 2.0.0 this single skill replaces all four previous ones:
 
 | Old skill | Now |
 |---|---|
@@ -1124,4 +960,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.45.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.45.2` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

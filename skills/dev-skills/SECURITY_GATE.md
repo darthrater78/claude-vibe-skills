@@ -129,7 +129,7 @@ provenance, not a terminal state.
 `🔒 SECURITY` row:
 
 ```
-  workflows: audited 3 against skill 2.45.0 — 0 open (lint-workflows, release, validate)
+  workflows: audited 3 against skill 2.45.2 — 0 open (lint-workflows, release, validate)
 ```
 
 The skill version is the running skill's `version:`, not the project's. The
@@ -170,6 +170,14 @@ commit, no build, no anything until resolved. Medium and Low do not stop a work
 commit — you must be able to save progress — but **no finding of any severity
 may be open when the release track runs.** Gate 5 (PR), Gate 6 (merge, tag,
 publish) are all blocked while anything is open.
+
+The SECURITY row says which case you're in, and the checks read it:
+
+```
+🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 2 Medium, 1 Low    commits and branch pushes pass
+🔒 SECURITY   ⏳ open — 0 Critical, 1 High                     nothing passes
+🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High                   PRs, merges and releases pass
+```
 
 A finding leaves the open state in exactly three ways:
 

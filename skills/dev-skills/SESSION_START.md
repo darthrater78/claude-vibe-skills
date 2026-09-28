@@ -29,7 +29,7 @@ export B="<this skill's base directory>"
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
-p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
+p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1"
 p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
@@ -43,8 +43,8 @@ p gh_installed bash -o pipefail -c 'command -v gh || echo no'
 p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission,defaultBranchRef'
 p gh_login gh api user -q .login
 p default_branch bash -o pipefail -c "git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##' || git remote show origin | sed -n 's/.*HEAD branch: //p'"
-p latest_tag bash -o pipefail -c "git ls-remote --tags origin | sed 's#.*refs/tags/##' | grep -v '\^{}' | sort -V | tail -1"
-p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | grep -v '\^{}'); grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
+p latest_tag bash -o pipefail -c "t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1) && echo \"\${t:-none}\""
+p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | { grep -v '\^{}' || true; }) || exit 1; { grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' || true; } | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
 p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
 p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
 p enforcement bash -o pipefail -c '[ -f "$B/checks/enforce.py" ] || echo checks-file-missing; for py in python3 python "py -3"; do $py -c "import getpass,os,re,sys,tempfile; u=re.sub(r\"[^A-Za-z0-9_.-]\",\"\",getpass.getuser())[:64]; f=os.path.join(tempfile.gettempdir(),\"dev-skills-enforcement-\"+u,os.environ.get(\"CLAUDE_CODE_SESSION_ID\",\"none\")); print(\"active\" if os.path.isfile(f) else \"NOT-ACTIVE\")" 2>/dev/null && exit 0; done; echo NOT-ACTIVE-no-python3'
@@ -63,18 +63,16 @@ instructions only until it's fixed.
 
 Reading it:
 
-- **`key=ERROR …` is a finding, not a blank.** Every key prints every time, and
-  a failed command prints `ERROR` with its message. It is never skipped. Handle
-  it the way the step it answers says to, for example
+- **`key=ERROR …` is a finding, not a blank.** A failed command prints `ERROR`
+  with its message. Handle it the way the step it answers says to, for example
   `skill_latest=ERROR` → "version check skipped — no network access".
 - **Git keys with `ERROR` when `repo_root=ERROR`** mean no git repo. The git
   steps do not apply.
 - **`gh_installed=no` or `gh_repo=ERROR`** → use the GitHub MCP equivalents
   (`REMOTE_SESSION.md`, item 3) for step 1a, and for anything the probe could
   not answer.
-- **`untagged` lists changelog versions with no remote tag.** The version being
-  built right now shows there too, and that is expected. Step 7 is about the
-  versions before it.
+- **`untagged` lists changelog versions with no remote tag**, including the
+  one being built (step 7 is about older ones). `latest_tag=none`: no tags yet.
 - **`origin` has any credentials in the URL stripped** (`https://user:token@…`
   becomes `https://…`) so a token never lands in the transcript.
 - **`enforcement=active`**: the checks ran on this very probe. Anything else
@@ -430,7 +428,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.45.0 active.
+Dev Skills v2.45.2 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -466,7 +464,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.2
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

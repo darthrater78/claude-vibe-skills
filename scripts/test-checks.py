@@ -46,6 +46,10 @@ Standards: BUILD docs ✅
 🚀 SHIP       ⬜
 """
 GATES_WORK = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅ 0 open")
+GATES_OPEN_LOW = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 4 Medium, 5 Low")
+GATES_OPEN_HIGH = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 0 Critical, 1 High, 2 Medium")
+GATES_OPEN_10C = GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ⏳ open — 10 Critical, 0 High")
+GATES_OPEN_ALL = GATES_ALL.replace("🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High", "🔒 SECURITY   ⏳ open — 0 Critical, 0 High, 1 Medium")
 GATES_SEMI = GATES_NONE.replace("Mode: manual", "Mode: semi-autonomous (approved 2026-09-24)")
 GATES_UNCHOSEN = GATES_ALL.replace("Mode: manual", "Mode: unchosen")
 GATES_DECLINED = GATES_NONE.replace("Mode: manual", "Mode: manual\nHook enforcement: declined (2026-09-24)")
@@ -169,8 +173,8 @@ def bash_cd_other(cmd: str, other_gates: str | None = None) -> str:
                             "tool_input": {"command": cmd.format(other=other)}})
 
 
-def bash_docker(cmd: str, build_row: str) -> str:
-    d = repo(GATES_ALL.replace("🔨 BUILD      ➖ N/A — no build system", build_row))
+def bash_docker(cmd: str, build_row: str, gates: str = GATES_ALL) -> str:
+    d = repo(gates.replace("🔨 BUILD      ➖ N/A — no build system", build_row))
     with open(os.path.join(d, "Dockerfile"), "w", encoding="utf-8") as fh:
         fh.write("FROM alpine:3.20\n")
     return run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": d, "tool_input": {"command": cmd}})
@@ -369,6 +373,13 @@ CASES = [
     # --- A4: gates, strict rows, wrappers
     ("A4 commit, gates pending (decoy lines)", lambda: bash("git commit -m 'feat: x'", gates=GATES_NONE), "deny"),
     ("A4 commit, SECURITY ok", lambda: bash("git commit -m 'feat: x'", gates=GATES_WORK), "allow"),
+    ("A4 commit, only Medium/Low open ok", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_LOW), "allow"),
+    ("A4 push feature branch, only Medium/Low open ok", lambda: bash("git push origin feat/x", gates=GATES_OPEN_LOW), "allow"),
+    ("A4 commit, a High open", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_HIGH), "deny"),
+    ("A4 commit, 10 Critical is not 0 Critical", lambda: bash("git commit -m 'feat: x'", gates=GATES_OPEN_10C), "deny"),
+    ("A4 PR, only Medium/Low open", lambda: bash("gh pr create --fill", gates=GATES_OPEN_ALL), "deny"),
+    ("A4 merge, only Medium/Low open", lambda: bash("gh pr merge 5 --merge", gates=GATES_OPEN_ALL), "deny"),
+    ("A4 push master, only Medium/Low open", lambda: bash("git push origin master", gates=GATES_OPEN_ALL), "deny"),
     ("A4 bash -c wrapper", lambda: bash("bash -c 'git commit -m x'", gates=GATES_NONE), "deny"),
     ("A4 env prefix", lambda: bash("env A=1 git commit -m x", gates=GATES_NONE), "deny"),
     ("A4 sudo", lambda: bash("sudo git push origin feat/x", gates=GATES_NONE), "deny"),
@@ -406,6 +417,14 @@ CASES = [
                                                               "🔨 BUILD      ✅ handoff offered · test artifact: img:pr-5 @ abc"), "deny"),
     ("A4 Dockerfile repo: all notes ok", lambda: bash_docker("gh pr merge 5 --merge",
                                                              "🔨 BUILD      ✅ handoff offered · test artifact: img:pr-5 @ abc · test creds: per run"), "allow"),
+    ("A4 Dockerfile repo: work merge, no app code changed ok", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed", gates=GATES_WORK_MERGE), "allow"),
+    ("A4 Dockerfile repo: work merge still needs the n/a line", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only", gates=GATES_WORK_MERGE), "deny"),
+    ("A4 Dockerfile repo: release can't use no app code changed", lambda: bash_docker("gh pr merge 5 --merge",
+        "🔨 BUILD      ✅ docs only\n  handoff offered\n  test artifact: n/a — no app code changed\n  test creds: per run"), "deny"),
+    ("A4 Dockerfile repo: n/a line doesn't block a release-track commit", lambda: bash_docker("git commit -m x",
+        "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed"), "allow"),
     ("A4 Dockerfile repo: notes on evidence lines ok", lambda: bash_docker("gh pr merge 5 --merge",
                                                                          "🔨 BUILD      ✅ built; handoff offered, user tried it\n  test artifact: img:pr-5 @ abc\n  test creds: generated per run"), "allow"),
     ("A4 ✅ on an evidence line doesn't pass", lambda: bash("git commit -m x",
@@ -544,8 +563,30 @@ CASES = [
         "old_string": "waived M1)", "new_string": "waived M1 M2)"}, gates=WAIVED_GATES), "ask"),
     ("B5 a second identical waiver clause asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
         "old_string": "📄 DOCS       ✅", "new_string": "📄 DOCS       ✅ (waived M1)"}, gates=WAIVED_GATES), "ask"),
+    ("B5 adding test artifact n/a asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
+        "old_string": "🔨 BUILD      ➖ N/A — no build system", "new_string": "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed"}), "ask"),
     ("B5 settings file", lambda: edit("Write", {"file_path": ".claude/settings.json", "content": "{}"}), "ask"),
-    ("B5 bash write to gate file", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "ask"),
+    ("B5 bash routine write to gate file ok", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "allow"),
+    ("B5 bash sed of a gate row ok", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open/' .dev-skills-gates.md"), "allow"),
+    ("B5 bash heredoc row update ok", lambda: bash("python3 - <<'EOF'\np='.dev-skills-gates.md'; s=open(p).read()\nopen(p,'w').write(s.replace('⬜','✅'))\nEOF"), "allow"),
+    ("B5 bash ignore entry naming gate file ok", lambda: bash("printf '.dev-skills-gates.md\\n' >> .gitignore"), "allow"),
+    ("B5 probe naming gate file ok", lambda: bash("p() { o=$(\"$@\" 2>&1); echo \"$1=$o\"; }\np local_tracked bash -c 'git ls-files -- .dev-skills-gates.md | tr \"\\n\" \" \"'"), "allow"),
+    ("B5 bash waiver into gate file asks", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open (waived M1)/' .dev-skills-gates.md"), "ask"),
+    ("B5 bash heredoc waiver asks", lambda: bash("python3 - <<'EOF'\np='.dev-skills-gates.md'; s=open(p).read()\nopen(p,'w').write(s+'🔕 waived by user: M1')\nEOF"), "ask"),
+    ("B5 bash cp onto gate file asks", lambda: bash("cp /tmp/g.md .dev-skills-gates.md"), "ask"),
+    ("B5 bash cat file into gate file asks", lambda: bash("cat /tmp/g.md > .dev-skills-gates.md"), "ask"),
+    ("B5 bash decoded text into gate file asks", lambda: bash("echo d2FpdmVk | base64 -d >> .dev-skills-gates.md"), "ask"),
+    ("B5 bash octal escapes into gate file ask", lambda: bash("printf '\\167aived M1' >> .dev-skills-gates.md"), "ask"),
+    ("B5 bash emptying gate file asks", lambda: bash(": > .dev-skills-gates.md"), "ask"),
+    ("B5 bash find -delete gate file asks", lambda: bash("find . -name .dev-skills-gates.md -delete"), "ask"),
+    ("B5 bash git checkout of gate file asks", lambda: bash("git checkout HEAD~3 -- .dev-skills-gates.md"), "ask"),
+    ("B5 bash git show into gate file asks", lambda: bash("git show HEAD~1:.dev-skills-gates.md > .dev-skills-gates.md"), "ask"),
+    ("B5 bash heredoc rows ok", lambda: bash("cat >> .dev-skills-gates.md <<'EOF'\n  build ok\nEOF"), "allow"),
+    ("B5 bash backup copy of gate file ok", lambda: bash("cp .dev-skills-gates.md /tmp/backup.md"), "allow"),
+    ("B5 bash cat read piped ok", lambda: bash("cat .dev-skills-gates.md | head -5"), "allow"),
+    ("B5 bash commit message naming gate file ok", lambda: bash("git add x && git commit -m 'waived M1 in .dev-skills-gates.md'", gates=GATES_WORK), "allow"),
+    ("B5 bash enforcement decline asks", lambda: bash("printf 'Hook enforcement: declined\\n' >> .dev-skills-gates.md"), "ask"),
+    ("B5 bash host network approval asks", lambda: bash("echo 'Host network: 8080 approved' >> .dev-skills-gates.md"), "ask"),
     ("B5 bash write into checks via ~", lambda: run("pre-tool", {"session_id": "t", "tool_name": "Bash", "cwd": repo(GATES_ALL),
                                                                   "tool_input": {"command": "cp x ~/.claude/skills/dsk/checks/enforce.py"}},
                                                      env={"CLAUDE_PLUGIN_ROOT": os.path.expanduser("~/.claude/skills/dsk")}), "ask"),
@@ -679,10 +720,12 @@ CASES = [
     ("A4 command after heredoc checked", lambda: bash("cat <<'EOF' > x\nhi\nEOF\ngit push", gates=GATES_NONE), "deny"),
     ("A4 quoted << is not a heredoc", lambda: bash('python3 -c "x=1<<y"\ngit push\ny', gates=GATES_NONE), "deny"),
     ("A4 <<- heredoc with tab delimiter", lambda: bash("cat <<-EOF > x\n\tgit push\n\tEOF\ngit push", gates=GATES_NONE), "deny"),
-    ("B5 PowerShell Set-Content gate file", lambda: pwsh('Set-Content .dev-skills-gates.md "x"'), "ask"),
-    ("B5 PowerShell Out-File gate file", lambda: pwsh("'x' | Out-File .dev-skills-gates.md"), "ask"),
+    ("B5 PowerShell Set-Content gate file ok", lambda: pwsh('Set-Content .dev-skills-gates.md "x"'), "allow"),
+    ("B5 PowerShell Out-File gate file ok", lambda: pwsh("'x' | Out-File .dev-skills-gates.md"), "allow"),
+    ("B5 PowerShell waiver into gate file asks", lambda: pwsh("Add-Content .dev-skills-gates.md 'waived M1'"), "ask"),
+    ("B5 PowerShell Remove-Item gate file asks", lambda: pwsh("Remove-Item .dev-skills-gates.md"), "ask"),
     ("B5 PowerShell Copy-Item settings", lambda: pwsh("Copy-Item x C:\\Users\\me\\.claude\\settings.json"), "ask"),
-    ("B5 PowerShell .NET write gate file", lambda: pwsh("[IO.File]::WriteAllText('.dev-skills-gates.md', 'x')"), "ask"),
+    ("B5 PowerShell .NET write gate file ok", lambda: pwsh("[IO.File]::WriteAllText('.dev-skills-gates.md', 'x')"), "allow"),
     ("B5 PowerShell read gate file ok", lambda: pwsh("Get-Content .dev-skills-gates.md"), "allow"),
     ("B5 other file ok", lambda: edit("Write", {"file_path": "README.md", "content": "hi"}), "allow"),
     # --- C: replies

@@ -4,6 +4,98 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.45.2] — 2026-09-28
+
+**Shell commands that name the gate file stop asking for permission.** Four
+earlier fixes (2.39.0, 2.39.1, 2.40.0, 2.45.0) relaxed edits made with
+Edit/Write. The shell check still asked whenever a command contained
+`dev-skills-gates.md` and anything write-like (`>`, `python3`, `cp`, `rm`,
+`install`), which caught the session-start probe, `git add`, ignore entries
+and routine row updates. Replayed through the checks, 188 commands from past
+sessions asked; 13 do now, most of them real waiver or settings writes.
+Also in this release: open Medium and Low findings stop blocking work
+commits, docs-only merges can skip the test artifact with your OK, the
+session-start probe stops reporting `ERROR` on repos with no tags, and the
+README's install section is rewritten.
+
+### Changed
+- **B5, shell commands on the gate file** (`checks/enforce.py`,
+  `ENFORCEMENT.md`): they follow the same rule as an Edit. A command asks only
+  when it deletes the file (`rm`, `git rm` without `--cached`,
+  `Remove-Item`), or when it writes the file and carries a waiver clause,
+  `Hook enforcement: declined` or `Host network: … approved`. It also asks
+  when the command writes the file from text it doesn't show (`cp`/`mv` onto
+  it, `git checkout` of it, a redirect from `cat <file>`, `base64 -d`,
+  `git show` or escape codes) or empties it, since those can't be checked for
+  waivers. Settings files and the installed checks folder still ask on any
+  shell write. Scripts that copy another file's text into it remain a known
+  gap (`ENFORCEMENT.md`, "What they can't catch").
+- **The session-end checkpoint procedure moved to `SESSION_END.md`**, which
+  already loads at that moment. `SKILL.md` keeps the trigger and the
+  never-wind-down-silently rule, and is about 1.7KB smaller on every turn.
+- **A docs-only merge can skip the test artifact** (A4, B5,
+  `GATE_REFERENCE.md` Gate 2, `ENFORCEMENT.md`). In a repo that builds a
+  Docker image, `.exe` or `.apk`, every merge needed a handoff and a
+  `test artifact:` line, even one that only changed README screenshots. On
+  `Track: work commit`, `test artifact: n/a — no app code changed` under
+  BUILD now stands in for both. Adding that line asks you, like a waiver, and
+  the release track refuses it.
+- **Install covers every surface.** It explains how to install one way only
+  (a hand-installed copy and a synced one can both load), when to install by
+  hand (CLI sessions that don't sync, such as ones using an API key, Bedrock
+  or Vertex), the Python 3 and Git Bash requirement for the checks, a
+  PowerShell hand install, and `CLAUDE_CONFIG_DIR`.
+- **Synced copies enforce like hand-installed ones, tested.** On Claude Code
+  2.1.284 a copy synced from claude.ai registered its 3 hooks and ran the
+  checks, the same as a hand-installed copy. The limits Claude Code puts on
+  synced skills (no `!` commands, `@` attachments or placeholder substitution
+  in the skill's text) don't touch anything this skill uses. The README says
+  so, and `ENFORCEMENT.md` records the test and that Claude Code's own hook
+  error calls `CLAUDE_PLUGIN_ROOT` available for skill hooks.
+- **"What's new" lists the last few releases only**, not every release back
+  to 2.12. The CHANGELOG has the rest.
+
+### Tests
+- 10 new B5 cases and 4 changed: routine `sed`, heredoc and PowerShell writes
+  pass; the probe and ignore entries pass; waivers, declines, host-network
+  approvals and deletes written from the shell still ask.
+- 7 new A4 cases: a commit or feature-branch push passes with only Medium/Low
+  open; a High, `10 Critical`, a PR, a merge or a push to master does not.
+- 5 new cases for `test artifact: n/a — no app code changed`: a work-commit
+  merge passes with it and not without it, a release merge is refused, a
+  release-track commit isn't, and adding the line asks.
+- 12 new B5 cases for text the command doesn't show: copies, restores,
+  decoded or escaped text and emptying ask; heredoc rows, backups, piped
+  reads and commit messages naming the file pass.
+
+### Fixed
+- **Gate 2 covers artifacts `gh run download` refuses** (`GATE_REFERENCE.md`).
+  An artifact uploaded with `archive: false` can fail with "path traversal";
+  the handover gives the `gh api …/artifacts/<id>/zip` download and a digest
+  check instead.
+- **A ship check that didn't run is not ✅** (`SHIP_REFERENCE.md` step 6). A
+  missing tool, or one that printed help instead of a result (older `gh` has
+  no `attestation`), is reported as what was and wasn't checked.
+- **The session-start probe no longer reports `ERROR` for a repo with no
+  tags** (`SESSION_START.md`). With `pipefail`, a `grep` with nothing to read
+  failed the whole line, so a new repo looked like a failed remote query.
+  `latest_tag` now prints `none`, `untagged` handles a changelog with no
+  version headings, and `ERROR` means only that the remote query failed.
+- **Open Medium and Low findings no longer block a work commit** (A4,
+  `ENFORCEMENT.md`, `SECURITY_GATE.md`, `SKILL.md` §2). The docs always said
+  they don't, but the check needed SECURITY ✅ or ➖ for every commit, and ✅
+  needs `0 open`, so one open Low blocked saving unrelated work. A commit, PR
+  branch update or push to a non-default branch now also passes with
+  `🔒 SECURITY   ⏳ open — 0 Critical, 0 High, …`. PRs, merges and releases
+  still need `✅ 0 open`.
+- Stale README text: command blocks no longer "start with the right `cd`",
+  the build handoff and the two tracks referred to a hook you had to
+  install (the checks turn on by themselves since 2.37.0), and the
+  semi-autonomous merge row had CI on the merge commit checked before the
+  merge.
+- The README's "What's inside" table lists `checks/enforce.py`, and "For
+  maintainers" covers `validate.yml` and `audit-repos.yml`.
+
 ## [2.45.0] — 2026-09-27
 
 **Repos nobody is working in get audited too, and a dev version can't reach
