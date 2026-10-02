@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.47.0] — 2026-10-02
+
+**A docs-only change never gets a full CI run.** 2.46.0 made it a Medium
+audit finding and a heads-up before pushing; it is now a rule.
+
+### Changed
+- **`SKILL.md` §5.1**: before pushing a docs-only change, Claude checks that
+  CI skips its build and test jobs for it. If it wouldn't, it doesn't push:
+  the workflow is fixed first, or the docs ride the next code push. Only the
+  user, told the cost, can say push anyway. Gate 4 points at it.
+- **`WORKFLOW_REFERENCE.md`**: build or test jobs that run on a docs-only
+  change are a ⚠️ High audit finding (a job that reads the docs may still
+  run). Job-level change detection is required in generated workflows, with
+  a ready `changes` job that fails closed: an unknown or missing base
+  (new branch, force-push) runs everything.
+
+### Fixed
+- **A `!`-prefixed run block escaped the reply checks** (C2, C3,
+  `checks/enforce.py`): `! git push …` (Claude Code's run-in-session prefix)
+  wasn't recognized as a git write, so an unlabeled block with it was never
+  gated. The checks now drop a leading `!` before reading a block (3 tests).
+
+### Added
+- **`.claude/agents/skill-pass.md`**: a read-only Sonnet subagent that runs
+  the `CLAUDE.md` cost and logic pass and reports findings.
+
 ## [2.46.1] — 2026-10-02
 
 **Cost and logic pass over 2.46.0.** No behavior changes; about 3.9KB less

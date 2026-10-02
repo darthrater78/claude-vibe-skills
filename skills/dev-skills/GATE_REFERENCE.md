@@ -305,9 +305,8 @@ If documentation is missing or stale:
 >
 > Fixing now...
 
-Fix any issues found. Rebuild if doc fixes affected source files. Before
-pushing a docs-only fix to an open PR, say whether CI will re-run in full
-(no change detection, `WORKFLOW_REFERENCE.md`, Reliability).
+Fix any issues found. Rebuild if doc fixes affected source files. A
+docs-only fix never triggers a full CI run (`SKILL.md` §5.1).
 
 ---
 

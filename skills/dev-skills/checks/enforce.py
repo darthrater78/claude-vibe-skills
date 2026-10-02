@@ -1749,6 +1749,17 @@ def blocks(text: str) -> tuple[list[str], list[tuple[int, int, list[str]]]]:
     return lines, out
 
 
+def unbang(body: list[str]) -> list[str]:
+    """Drop a leading `!` (Claude Code's run-in-session prefix) before checking, so a
+    pasteable `! git push` block is still read as a git write and gated (C2, C3)."""
+    for k, line in enumerate(body):
+        if line.strip():
+            if line.lstrip().startswith("!"):
+                body = body[:k] + [line.lstrip()[1:].lstrip()] + body[k + 1:]
+            break
+    return body
+
+
 def near(lines: list[str], idx: int, step: int) -> str:
     j = idx + step
     while 0 <= j < len(lines):
@@ -1773,6 +1784,7 @@ def stop_check(payload: dict) -> NoReturn:
     reading = set()
     run = []
     for start, end, body in blks:
+        body = unbang(body)
         label = near(lines, start, -1)
         if "📄 FOR READING" in label:
             reading.update(range(start, end + 1))
