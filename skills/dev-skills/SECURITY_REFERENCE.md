@@ -60,6 +60,7 @@ These rules apply as code is written, not just during Gate 3 scans.
 
 **Network and HTTP:**
 - Never disable TLS: `verify=False`, `rejectUnauthorized: false`, `InsecureSkipVerify: true`
+- Set a TLS 1.2 floor on every context you build: Python `ctx.minimum_version = ssl.TLSVersion.TLSv1_2`, Node `minVersion: 'TLSv1.2'`, Go `MinVersion: tls.VersionTLS12`. A default context can still negotiate 1.0/1.1 on older runtimes
 - Validate and allowlist URLs before server-side requests (SSRF prevention)
 - Never reflect stack traces or internal paths to clients
 
@@ -181,6 +182,8 @@ return {"error": traceback.format_exc()}
 
 # good
 resp = requests.get(url)  # verify=True is default
+ctx = ssl.create_default_context()
+ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # on every context you build
 logger.exception("Request failed")
 return {"error": "An internal error occurred"}, 500
 ```

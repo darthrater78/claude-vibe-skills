@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_HYBRID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md WORKFLOW_DEPENDABOT.md WORKFLOW_DEVRELEASE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md SESSION_END.md checks/enforce.py)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md RELEASE_GATES.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_HYBRID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md WORKFLOW_DEPENDABOT.md WORKFLOW_DEVRELEASE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md SESSION_END.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -161,7 +161,8 @@ ceiling_for() {
     # §10's full rules to STANDARDS_REFERENCE.md.
     # Lowered to 40 in 2.44.0: the handoff, token-estimate and usage-limit
     # procedures moved to SESSION_END.md, their triggers stayed.
-    SKILL.md) echo 40 ;;
+    # Lowered to 39 in 2.46.0: the model ceiling (§5.2) was removed.
+    SKILL.md) echo 39 ;;
     # Lowered from 44 to 36 in 2.43.0, when Dependabot and dev releases moved
     # to WORKFLOW_DEPENDABOT.md and WORKFLOW_DEVRELEASE.md. Best practices stay:
     # the checklist and SHIP_REFERENCE.md point into them.

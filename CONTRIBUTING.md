@@ -37,6 +37,11 @@ bash scripts/validate.sh
 table, and the bundle against its source — so a stale `dev-skills.skill` fails
 validation even when every source file is correct.
 
+**Every change to the skill ends with a cost and logic pass** — see
+[`CLAUDE.md`](CLAUDE.md). `validate.sh` catches size drift; the pass catches
+what it can't: duplicated rules, contradictions and prose that costs tokens
+without changing behavior.
+
 **On Git Bash (Windows), `validate.sh` may stall partway through and never
 return.** It spawns a few hundred subprocesses across its per-file loops, and
 Git Bash emulates `fork()` rather than calling it. This is not a failure — the

@@ -91,8 +91,7 @@ we do?"). The only skip condition is the one gates use: the session modified no
 tracked file. "This felt like a small task" is *not* a skip condition.
 
 It is approximate, since billing data is not visible. Build it from per-request
-overhead (MCP tools, skills), conversation growth, files loaded, and any time
-spent above the Sonnet ceiling. A header and at most 3 lines. Include the MCP
+overhead (MCP tools, skills), conversation growth, files loaded and turns. A header and at most 3 lines. Include the MCP
 line only when connections changed since the session-start MCP check:
 
 ```

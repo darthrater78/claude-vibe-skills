@@ -69,8 +69,10 @@ session start detects workflows that exist but may have issues — read every
      job already required CI to have passed for that exact commit, a Gradle
      build with no wrapper validation (`setup-gradle` with
      `validate-wrappers: false`, or no `setup-gradle`/`wrapper-validation`
-     step before the first `./gradlew`)
-   - 💡 **Low** — missing shellcheck for projects with shell scripts, no
+     step before the first `./gradlew`), expensive jobs (multi-OS matrix,
+     browser tests, image or installer builds) with no change detection, so
+     a docs-only commit runs them all
+   - 💡 **Low** — a cheap suite with no change detection, missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
 
@@ -325,7 +327,7 @@ jobs:
   for the current version and its published `_checksums.txt` when bumping —
   never write the checksum from memory.
 - This workflow is why the CI build check's own trigger can safely carry
-  `paths-ignore: ['.github/workflows/**']` (see Reliability, above) — without
+  skip workflow-file changes (see Reliability, above) — without
   it, that exclusion would leave workflow-file edits completely unchecked.
 
 ---
@@ -527,13 +529,18 @@ and match the patterns already used in this repo's own workflows.
       branches: ['**']   # not just `push:` — that also matches tag pushes
     pull_request:
   ```
-- **`paths-ignore` for changes nothing tests reads** (README, CHANGELOG,
-  `docs/**`) — but verify what the suite actually reads before excluding a
-  path, don't assume. Excluding paths creates an edge case the release gate
-  above must handle: a commit that only touched an ignored path has no CI run
-  to check. Give the CI workflow a `workflow_dispatch` trigger too, so that
-  commit can get a manual run before it's tagged — the gate's error message
-  should point at this option.
+- **Job-level change detection, so docs-only commits skip the heavy jobs.**
+  A first `changes` job diffs the push/PR range (`git diff --name-only` in
+  bash, or a SHA-pinned paths-filter action) and outputs `code`; heavy jobs
+  get `needs: changes` and `if: needs.changes.outputs.code == 'true'`.
+  Skipped jobs count as passing for required status checks, and every commit
+  still gets a successful run, so the CI-passed release gate needs no
+  workaround. Verify what the suite actually reads before treating a path as
+  docs. Workflow-level `paths-ignore` (no run at all) only fits a repo with
+  no required checks (`gh api repos/{o}/{r}/branches/{b}/protection -q
+  .required_status_checks.contexts`) and no CI-passed release gate: otherwise
+  a docs-only PR waits forever on a check that never runs, and the gate finds
+  no run for the tagged commit.
 - **`DEBIAN_FRONTEND=noninteractive` around any `apt-get install`** on an
   `ubuntu-latest` job. Some packages (`wireshark-common`, `tzdata`, others
   with a postinst debconf prompt) ask an interactive question on install; without
@@ -666,6 +673,8 @@ every item:
       the gate's job is proof it already ran and passed; redoing it in the
       release job burns runner time re-proving what's already known
 - [ ] CI calls project's own scripts, not inline reimplementations
+- [ ] Heavy jobs skip docs-only changes via job-level change detection
+      (Reliability), with branch protection read before suggesting `paths-ignore`
 - [ ] Secrets used only in `env:` blocks, never in `run:` strings
 - [ ] Artifact verification after upload (release workflows)
 - [ ] Shell scripts checked with shellcheck (Linux/script projects)

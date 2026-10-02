@@ -34,7 +34,7 @@ SKILL|Do not chain across a stop
 SKILL|Before composing the session's first command block, load `SHELL_REFERENCE.md`
 SKILL|Reference files load once per session
 SKILL|Forks: `origin` is the fork, and nothing targets upstream
-SKILL|Treat Sonnet as the maximum model
+SKILL|never ask about it, gate on it, or record it
 SKILL|Never silently wind down
 SKILL|| "just push it" |
 SKILL|| Hook flags uncommitted changes |
@@ -57,13 +57,12 @@ ANY|`git ls-remote --heads origin <branch>` returning nothing
 ANY|Say the cost trade once
 SKILL|Deleting a release, force-pushing and rewriting history keep their own explicit approval on top
 SKILL|There is no "this change is too small" exemption
-SKILL|Never spawn a subagent on a more expensive model than the main session is approved for
-SKILL|Do not proceed with substantial work on an above-ceiling model
+SKILL|Never spawn a subagent on a more expensive model than the main session
 SKILL|covering every ecosystem
 ANY|The cost line is part of each option and is shown every time
 ANY|the install always comes whole from the release
 SKILL|Nothing merges to the default branch without a test artifact
-ANY|Docker test runs get fresh credentials, every run
+ANY|Docker test runs get one throwaway login per session
 ANY|Echo the login every time the test container changes
 SKILL|Encryption at rest is always considered
 SKILL|The main page links to GitHub and the latest release notes, without exception

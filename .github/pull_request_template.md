@@ -8,4 +8,5 @@
 - [ ] `CHANGELOG.md` entry added for the new version
 - [ ] Security scan run on changes (no Critical or High findings)
 - [ ] README updated if user-facing behavior changed
+- [ ] Cost and logic pass done (`CLAUDE.md`): no redundancy, no contradictions, no unneeded prose, load triggers still right
 - [ ] `bash scripts/validate.sh` passes

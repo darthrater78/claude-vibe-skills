@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.45.2`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.46.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.45.2](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.2)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.46.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.46.0)
 
 ---
 
@@ -121,6 +121,12 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **No more Sonnet ceiling.** The model is your choice; the skill no longer
+  asks about it. Savings come from how sessions are worked and from loading
+  less: Gates 1 and 5 now load only on the release track. *(2.46.0)*
+- **Ten recorded lessons applied.** A TLS 1.2 floor, a UI visual pass,
+  README screenshots checked before the release PR, CI that skips heavy jobs
+  on docs-only changes, one Docker test login per session, and more. *(2.46.0)*
 - **Far fewer gate-file prompts.** A shell command that names the gate file
   no longer asks just for naming it, which prompted on nearly every session.
   It asks only when it deletes the file or writes a waiver, an enforcement
@@ -177,7 +183,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.45.2 — all refs agree
+     🔢 VERSION    ✅ v2.46.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -194,9 +200,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.45.2
+Version: 2.46.0
 
-🔢 VERSION    ✅ all refs at 2.45.2; prev v2.45.1 tagged on remote
+🔢 VERSION    ✅ all refs at 2.46.0; prev v2.45.2 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -357,8 +363,8 @@ Critical, 0 High).**
 ### Gate 4 — Docs 📄
 
 Checks that README/CHANGELOG has an entry for this version, new features are
-documented, removed features leave no stale references, and architecture docs
-match the code.
+documented, removed features leave no stale references, architecture docs
+match the code, and README screenshots and walkthroughs still match the app.
 
 ### Gate 5 — Release 📦
 
@@ -740,13 +746,13 @@ release breaks.
 
 **Automatic — these fire on their own:**
 
-- **Sonnet ceiling** — flags a session running on an expensive model and asks
-  before proceeding
+- **Model is your choice** — no model question or gate; savings come from
+  how the session is worked (bounded output, minimal context, fewer turns)
 - **Effort fit** — recommends `/effort` changes when the task doesn't match the
   level
 - **Subagent model delegation** — when spawning subagents, uses the cheapest
   model tier that fits the task (Haiku for lookups, Sonnet for code, Opus/Fable
-  only when approved)
+  only for the hardest reasoning)
 - **MCP awareness** — identifies unused MCP servers adding token overhead and
   gives the `/mcp disable <server>` command for each one
 - **Git command presentation** — on local sessions, presents git as a single
@@ -840,14 +846,15 @@ The skill uses tiered loading to keep token costs down:
 
 | File | Size | Loaded when |
 |---|---|---|
-| `SKILL.md` | ~40KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
+| `SKILL.md` | ~38KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
 | `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
 | `ENFORCEMENT.md` | ~22KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
-| `GATE_REFERENCE.md` | ~25KB | When gates 1, 2, 4 or 5 run, pass, or are marked ➖ N/A — each gate's checks and pass criteria; also when the state file must be re-derived or user-driven work credited |
-| `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-run test credentials, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
+| `GATE_REFERENCE.md` | ~18KB | When gate 2 or 4 runs, passes, or is marked ➖ N/A — build, test artifact and docs checks; also when the state file must be re-derived or user-driven work credited |
+| `RELEASE_GATES.md` | ~9KB | Release track only, when gate 1 or 5 runs, passes, or is marked ➖ N/A — version checks, branch sync, release commit, PR and release notes |
+| `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-session test login, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
 | `SESSION_END.md` | ~6KB | When the session winds down, a handoff is written or the token impact estimate is due — the session-end checkpoint, where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
-| `SECURITY_GATE.md` | ~16KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
+| `SECURITY_GATE.md` | ~19KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~13KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
@@ -960,4 +967,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.45.2` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.46.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

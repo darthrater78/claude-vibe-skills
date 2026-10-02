@@ -7,7 +7,8 @@ shell questions, workflow detection, the unfinished-release check, and the
 session banner.
 
 Nothing here is needed again after the session has started. The gate recipes
-are in `GATE_REFERENCE.md` (gates 1–5) and `SHIP_REFERENCE.md` (gate 6);
+are in `GATE_REFERENCE.md` (gates 2, 4), `RELEASE_GATES.md` (gates 1, 5),
+`SECURITY_GATE.md` (gate 3) and `SHIP_REFERENCE.md` (gate 6);
 semi-autonomous execution is in `AUTO_MODE.md`.
 
 Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
@@ -30,7 +31,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE RELEASE_GATES SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -318,9 +319,7 @@ defaulted, and asked again if skipped.
   it on its own. Never skip it.
 - **One call when it fits, and it usually does.** A call holds at most four
   questions. In order: enforcement, mode, shell (local and Termux), then
-  whichever of model ceiling (only above Sonnet, `SKILL.md` §5.2; the answer
-  goes on the `Model:` row and covers the session), branch
-  (only on the default branch) and sync (only when behind) apply. Only when
+  whichever of branch (only on the default branch) and sync (only when behind) apply. Only when
   more than four apply does the rest go in a second call. Nothing is edited
   until every question has an answer.
 - **Word it neutrally, with manual first and no recommendation:**
@@ -398,7 +397,6 @@ state and mode for the rest of the session.
 # Dev Skills gate state
 Track: release sequence
 Mode: manual
-Model: Sonnet 5 (within ceiling)
 Origin: owner/repo (not a fork)
 Start: 1a2b3c4
 Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅
@@ -428,7 +426,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.45.2 active.
+Dev Skills v2.46.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>

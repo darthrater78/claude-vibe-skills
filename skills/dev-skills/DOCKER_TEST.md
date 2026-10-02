@@ -5,20 +5,23 @@ container or hands the user a `docker run`/`docker compose up` for testing**
 (Gate 2, `GATE_REFERENCE.md`, "Test artifact before merge"). A project with no
 Docker build signal never needs it.
 
-It holds the per-run test credentials, LAN-only publishing, temp-mount and
+It holds the per-session test login, LAN-only publishing, temp-mount and
 restart rules, the login echo, and teardown. The enforcement checks hold the
 container side of it (`ENFORCEMENT.md`, A1, A2, A9, A10, A12).
 
 ---
 
-**Docker test runs get fresh credentials, every run.** Each time a container
-is started for testing — by Claude, or in a run command handed to the user —
-generate a new username and password for that run and show them to the user
-in the same message as the run command:
+**Docker test runs get one throwaway login per session.** The username is
+always `tester`; the password is generated the first time a test container
+starts in the session, kept in Claude's session scratchpad (mode 0600, never
+the repo), and reused for every test container that session, so a rebuild
+doesn't change the login. A new session generates a new one. Show it in the
+same message as the run command:
 
 ```bash
-TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
-TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
+# one password per session, kept in the session scratchpad (never the repo)
+P="<scratchpad>/test-pass"; [ -s "$P" ] || (umask 077; LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12 >"$P")
+TEST_USER=tester; TEST_PASS="$(cat "$P")"
 # the address the host actually uses on the LAN, not the first of `hostname -I`,
 # which can be a Docker bridge (172.17.0.1). macOS: ipconfig getifaddr en0
 HOST_IP="$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
@@ -34,8 +37,9 @@ case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) e
 IP with `Find-NetRoute`. From Git Bash (Claude's Bash tool on Windows):
 
 ```bash
-TEST_USER="test-$(LC_ALL=C tr -dc 'a-km-z2-9' </dev/urandom | head -c4)"
-TEST_PASS="$(LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12)"
+# one password per session, kept in the session scratchpad (never the repo)
+P="<scratchpad>/test-pass"; [ -s "$P" ] || (umask 077; LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | head -c12 >"$P")
+TEST_USER=tester; TEST_PASS="$(cat "$P")"
 HOST_IP=$(powershell.exe -NoProfile -Command "(Find-NetRoute -RemoteIPAddress 1.1.1.1)[0].IPAddress" | tr -d '\r')
 case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) echo "not a private LAN IP: $HOST_IP" >&2; false ;; esac \
   && docker run -d --rm --name <app>-test --label dev-skills.test="$CLAUDE_CODE_SESSION_ID" -p "$HOST_IP:8080:8080" \
@@ -49,8 +53,9 @@ tool):
 
 ```powershell
 $HOST_IP = (Find-NetRoute -RemoteIPAddress 1.1.1.1)[0].IPAddress
-$TEST_USER = "test-" + -join ((50..57) + (97..107) + (109..122) | Get-Random -Count 4 | ForEach-Object { [char]$_ })
-$TEST_PASS = -join ((50..57) + (65..72) + (74..78) + (80..90) + (97..107) + (109..122) | Get-Random -Count 12 | ForEach-Object { [char]$_ })
+$P = "<scratchpad>\test-pass"
+if (-not (Test-Path $P)) { -join ((50..57) + (65..72) + (74..78) + (80..90) + (97..107) + (109..122) | Get-Random -Count 12 | ForEach-Object { [char]$_ }) | Set-Content -NoNewline $P }
+$TEST_USER = "tester"; $TEST_PASS = Get-Content -Raw $P
 docker run -d --rm --name <app>-test --label dev-skills.test="$env:CLAUDE_CODE_SESSION_ID" -p "$($HOST_IP):8080:8080" `
   -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image>
 if ($?) { Start-Sleep 3; docker port <app>-test; curl.exe -fsS -o NUL "http://$($HOST_IP):8080/" }
@@ -63,9 +68,9 @@ can't be picked by mistake. Temp-folder mounts and `--user` don't apply on
 Windows (A9, A10 are Linux-host rules), but `--rm`, no restart policy and the
 label do.
 
-> 🔑 **Test login for this run**: throwaway, reachable on your network,
-> and gone when the container is removed.
-> URL: http://192.168.1.50:8080 · User: `test-k3xm` · Password: `Hq7vT2mWz9Ka`
+> 🔑 **Test login for this session**: throwaway, reachable on your network,
+> same for every rebuild until the session ends.
+> URL: http://192.168.1.50:8080 · User: `tester` · Password: `Hq7vT2mWz9Ka`
 
 - **Simple on purpose:** letters and digits only, with look-alikes (`0 O 1 l
   I`) left out, so they can be read off the screen and typed.
@@ -108,9 +113,11 @@ label do.
   created first with `mkdir -p` and used by a container running as you
   (`--user "$(id -u):$(id -g)"`, or `PUID`/`PGID`). A container that has to
   run as root mounts from outside temp (`/opt/docker/<name>-test/`). Label
-  every test container (`--label dev-skills.test=…`, or compose
-  `-p dev-skills-test-<name>`) so leftovers are found (`ENFORCEMENT.md`,
-  A10 and A12).
+  every test container (`--label dev-skills.test="$CLAUDE_CODE_SESSION_ID"`,
+  or compose `-p dev-skills-test-<name>`) so leftovers are found
+  (`ENFORCEMENT.md`, A10 and A12). **Write the label literally on every
+  `docker run`**: the check can't expand a shell variable, so `L="--label
+  …"; docker run $L …` is denied.
 - **Gone when it stops.** Test containers run with `--rm` and **no restart
   policy**, and never bind-mount from a temp folder (`/tmp`, Claude's
   `/tmp/claude-*` scratchpad) with one. A reboot wipes `/tmp`, Docker
@@ -121,11 +128,11 @@ label do.
   So bind to the LAN IP, and **if that IP is not private** (outside
   `10/8`, `172.16/12` and `192.168/16`, for example on a VPS), **stop and ask**
   rather than publish. Never set up a port-forward, tunnel or public bind.
-  With the random single-run credentials and the teardown below, that is
+  With a random per-session password and the teardown below, that is
   exposure enough for a test.
 - **Never** written to a file in the repo, baked into the image (`ENV`/`ARG`),
-  reused across runs or sessions, or the project's real credentials.
-  Displaying them is the point: they die with the container.
+  reused across sessions, or the project's real credentials. Displaying them
+  is the point: they die with the session.
 - **An app with no login** needs none: say so, and record `test creds n/a (no
   login)`.
 
@@ -137,11 +144,8 @@ in which the test container was started, rebuilt, restarted or recreated, or
 in which the user is asked to try it again. That includes a rebuild after a
 one-line fix. The bottom of the message is where the user's eye lands, so
 nothing goes below it. A pointer such as "same login as before" or "see
-above" does not count. When the credentials changed with the new container,
-say so on the block's first line (`🔑 **New test login, the previous one no
-longer works**`). If the current credentials are no longer in context, for
-example after compaction, never reconstruct them from memory. Recreate the
-container with fresh ones and show those.
+above" does not count. After compaction, read the password back from the scratchpad file, never
+from memory.
 
 **Tear it down once its purpose is served.** A container started here — or for
 Gate 2's "prove a never-run release step" check (`GATE_REFERENCE.md`), or for
