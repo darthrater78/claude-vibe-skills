@@ -318,7 +318,9 @@ of reads only (`git status`, `log`, `diff`, `fetch`, `ls-remote`) is left
 alone unless it is labeled. When a reply is sent back for C3, C5 or C7, the
 message includes the block shape to copy.
 - `### ▶️ RUN THIS — <what it does>` directly above it
-- `# ════════ ▶️ START: <what>` as its first line
+- `# ════════ ▶️ START: <what>` as its first line (a leading `!`, Claude
+  Code's run-in-session prefix, is dropped before any check, so a `! git …`
+  line is still read as a git write)
 - `# ════════ ⏹️ END` as its last line
 - `### ⏹️ END` directly below it
 

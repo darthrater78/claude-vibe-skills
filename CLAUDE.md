@@ -31,4 +31,7 @@ report it in one line per finding (or "pass clean").
 - **Cheap to follow.** A new step doesn't add round trips, questions or
   re-reads the session didn't need; it chains into existing calls.
 
+For a large pass, the `skill-pass` agent (`.claude/agents/`, Sonnet,
+read-only) can do the reading and report findings to apply.
+
 Then rebuild and validate: `bash scripts/build-skill.sh && bash scripts/validate.sh`.

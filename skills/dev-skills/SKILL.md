@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.46.1
+version: 2.47.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -575,6 +575,12 @@ out the context and brings compaction closer.
   exception is a compaction, which drops it.
 - **Minimize agent spawns**, since each starts cold, and prefer page text to
   screenshots.
+- **Never trigger a full CI run for a docs-only change** (README, CHANGELOG,
+  `docs/`, screenshots: files no build or test reads). Before pushing one,
+  check that CI skips its build and test jobs for it (`WORKFLOW_REFERENCE.md`,
+  Reliability). If it wouldn't, don't push: fix the workflow first, or batch
+  the docs into the next code push. Only the user, told the cost, can say
+  push anyway.
 
 **Chain shell commands into one invocation — in every mode.** Session-start
 reads, gate evidence, the session-end checkpoint, and any step that is several

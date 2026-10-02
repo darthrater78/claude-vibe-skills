@@ -59,7 +59,10 @@ session start detects workflows that exist but may have issues — read every
      block (every job gets the repo's default token scope), a first-party
      action (`actions/*`, `github/*`) on a branch ref such as `@main`, a
      Docker release that puts a version tag on an image no scan has passed
-     (`WORKFLOW_DOCKER.md`: push by digest, Trivy gate, then tag)
+     (`WORKFLOW_DOCKER.md`: push by digest, Trivy gate, then tag), build or
+     test jobs that run on a docs-only change (no job-level change
+     detection, Reliability); a job that reads the docs (a link or version
+     check) may run, nothing else
    - 📝 **Medium** — CI reimplements build inline instead of calling project
      scripts, no `set -euo pipefail` in multi-line run blocks, no artifact
      verification after upload, CI trigger is a bare `push:` (also matches tag
@@ -69,10 +72,8 @@ session start detects workflows that exist but may have issues — read every
      job already required CI to have passed for that exact commit, a Gradle
      build with no wrapper validation (`setup-gradle` with
      `validate-wrappers: false`, or no `setup-gradle`/`wrapper-validation`
-     step before the first `./gradlew`), expensive jobs (multi-OS matrix,
-     browser tests, image or installer builds) with no change detection, so
-     a docs-only commit runs them all
-   - 💡 **Low** — a cheap suite with no change detection, missing shellcheck for projects with shell scripts, no
+     step before the first `./gradlew`)
+   - 💡 **Low** — missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
 
@@ -529,10 +530,38 @@ and match the patterns already used in this repo's own workflows.
       branches: ['**']   # not just `push:` — that also matches tag pushes
     pull_request:
   ```
-- **Job-level change detection, so docs-only commits skip the heavy jobs.**
-  A first `changes` job diffs the push/PR range (`git diff --name-only` in
-  bash, or a SHA-pinned paths-filter action) and outputs `code`; heavy jobs
-  get `needs: changes` and `if: needs.changes.outputs.code == 'true'`.
+- **Job-level change detection — required: a docs-only change never runs
+  the build or test jobs.** A first `changes` job diffs the push/PR range and
+  outputs `code`; every build and test job gets `needs: changes` and
+  `if: needs.changes.outputs.code == 'true'`. Set the docs pattern to what
+  this repo's suite really doesn't read:
+  ```yaml
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          # new branch, force-push or unknown base: run everything (fail closed)
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo code=true >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --name-only "$BASE" HEAD \
+            | grep -qvE '^(docs/|README\.md$|CHANGELOG\.md$|.*\.(png|jpe?g|gif|webp)$)'; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          else
+            echo code=false >> "$GITHUB_OUTPUT"
+          fi
+  ```
   Skipped jobs count as passing for required status checks, and every commit
   still gets a successful run, so the CI-passed release gate needs no
   workaround. Verify what the suite actually reads before treating a path as
@@ -618,6 +647,8 @@ workflow:
    - `persist-credentials: false` is set on checkout
    - Concurrency groups are present
    - Timeouts are set on every job
+   - Build and test jobs are gated on a `changes` job, so a docs-only
+     change never runs them (Reliability)
    - The tag-on-default-branch check is present in release workflows
    - The tag/version match check is present in release workflows (or the
      workflow's comments document why the version is tag-derived/computed
@@ -673,8 +704,9 @@ every item:
       the gate's job is proof it already ran and passed; redoing it in the
       release job burns runner time re-proving what's already known
 - [ ] CI calls project's own scripts, not inline reimplementations
-- [ ] Heavy jobs skip docs-only changes via job-level change detection
-      (Reliability), with branch protection read before suggesting `paths-ignore`
+- [ ] Build and test jobs skip docs-only changes via job-level change
+      detection (Reliability), with branch protection read before suggesting
+      `paths-ignore`
 - [ ] Secrets used only in `env:` blocks, never in `run:` strings
 - [ ] Artifact verification after upload (release workflows)
 - [ ] Shell scripts checked with shellcheck (Linux/script projects)
