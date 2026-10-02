@@ -267,6 +267,9 @@ chain with `; if ($?) { … }` and end with
 - **Path separators:** PowerShell and Windows use `\`, everything else uses `/`
 - **Termux quirks:** limited PATH, may need `pkg install` for tools like `gh`,
   smaller screen so keep commands concise
+- **Editing a PR** (title, body, base): use `gh api -X PATCH
+  repos/<owner>/<repo>/pulls/<n> -f title=…`. `gh pr edit` fails on older
+  `gh` with an unrelated-looking "Projects (classic) is being deprecated" error
 
 ---
 
@@ -325,8 +328,9 @@ a user who does not want WSL is not thereby blocked from passing Gate 2.
 On Termux (Android), the repo may not exist on the device. This is the only
 environment where Claude presents a clone step. Remote containers arrive
 pre-cloned, and local sessions are already in the repo.
-- **First time:** a block that clones straight into its final path:
-  `git clone <url> ~/storage/shared/projects/<repo>`. Every later block's
-  label says `· in ~/storage/shared/projects/<repo>`.
+- **First time:** a block that clones into the home directory, so `cd <repo>`
+  from `~` reaches it: `git clone <url> ~/<repo>`. Every later block's label
+  says `· in ~/<repo>`. Clone under `~/storage/shared/` only when the user
+  wants the files visible to other Android apps.
 - **Already cloned:** start the block with
   `git fetch origin && git pull origin <branch>` to sync before any work.

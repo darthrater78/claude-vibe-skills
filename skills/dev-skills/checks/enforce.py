@@ -853,8 +853,8 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
                 problems.append("no 'test artifact: <path or link> @ <sha>' on the BUILD row. Nothing merges "
                                 "without a test artifact built from the merged commit (Gate 2).")
             if docker_repo(gates.root) and "test creds" not in notes:
-                problems.append("no 'test creds: …' note on the BUILD row. Docker test runs get fresh "
-                                "throwaway credentials, shown to the user (Gate 2).")
+                problems.append("no 'test creds: …' note on the BUILD row. Docker test runs get "
+                                "throwaway credentials, one login per session, shown to the user (Gate 2).")
         if op.targets_default and (dev := prerelease_versions(gates.root)):
             problems.append(f"{op.label} would put a dev version on the default branch ({'; '.join(dev)}). "
                             "Dev builds stay on their branch: set the final version first (WORKFLOW_DEVRELEASE.md).")
@@ -1216,7 +1216,8 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
         problems.extend(q for q in temp_mount_problems(who, [m for m in srcs if m not in plain], bool(as_user), text, cwd)
                         if "doesn't exist yet" not in q)
         if not labeled:
-            problems.append(f"{who} has no --label {TEST_LABEL}=\"$CLAUDE_CODE_SESSION_ID\". Test containers are "
+            problems.append(f"{who} has no --label {TEST_LABEL}=\"$CLAUDE_CODE_SESSION_ID\". Write it literally on "
+                            "each command (the check can't expand a shell variable such as $L): test containers are "
                             "labeled so the next session start can find any that were left behind.")
         if "__HOST__" in problems:
             problems.remove("__HOST__")

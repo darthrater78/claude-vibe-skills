@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.45.2
+version: 2.46.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -192,7 +192,7 @@ no behavior change), `refactor`, `perf`, `test`, `ci`, `build`, `style`,
 `revert`. Pick the *primary* effect: a fix that also updates a doc is `fix:`.
 **Breaking changes** get `!` after the type/scope (`feat!:`) and a `BREAKING
 CHANGE:` footer saying what breaks and how to adapt. Gate 1 reads these types
-as its bump signal (`GATE_REFERENCE.md`, Gate 1). The signal narrows the
+as its bump signal (`RELEASE_GATES.md`, Gate 1). The signal narrows the
 question for the user; it doesn't answer it.
 
 This governs commit messages only. `CHANGELOG.md` stays hand-written Keep a
@@ -347,8 +347,9 @@ merged without them, they are still owed on the merged code.
 ### Running a gate
 
 **Before running, passing, or marking ➖ N/A on any gate, have that gate's
-reference file in context** (this skill's base directory): Gates 1, 2, 4 and 5
-are in `GATE_REFERENCE.md`, **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
+reference file in context** (this skill's base directory): Gates 2 and 4 are
+in `GATE_REFERENCE.md`, **Gates 1 and 5 in `RELEASE_GATES.md`** (release
+track only), **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
 `SHIP_REFERENCE.md`**. Read only the one the gate you are running is in, and
 read each **once per session**: it stays in context, so reading it again for
 the next gate only adds a second copy. Re-read it only after a compaction, or
@@ -359,7 +360,7 @@ of it:
 | Gate | Passes when |
 |---|---|
 | 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
-| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get fresh throwaway credentials, re-shown at the bottom of every message after the container changes) |
+| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get a throwaway login, one per session, re-shown at the bottom of every message after the container changes) |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
@@ -553,8 +554,8 @@ Cost suggestions are one or two sentences, woven into normal responses — never
 a lecture or checklist dump. Once per session per topic. If the user declines,
 drop it.
 
-Cost drivers, roughly by impact: **model choice** (per token, Opus 5.5 is 2x
-Sonnet 5 and Fable 5.1 is 5x); **output** (5x the price of input, and effort
+The model is the user's choice (§5.2). The savings the skill controls come
+from how the session is worked: **output** (5x the price of input, and effort
 raises it); **new context** (files read, tool output, a reference file loaded
 twice); and **turns**. Every turn resends the history, but Claude Code caches
 it, and a cache read costs about a tenth of fresh input or less. So a long
@@ -600,21 +601,12 @@ A check the shell can make (`gh pr checks --watch`, a SHA comparison) is a
 chained link, not a stop, which is how manual mode puts the merge and the tag
 in one block (`SHIP_REFERENCE.md`, step 3).
 
-### 5.2 Model gating — Sonnet ceiling
+### 5.2 Model choice — the user's
 
-**Treat Sonnet as the maximum model for the session** unless the user has
-explicitly approved something stronger. If the system prompt names a model
-above Sonnet (Opus, Fable), ask once, with the session-start questions: switch
-down (`/model sonnet`) or stay on [model]. **The answer covers the whole
-session.** Record it as the gate file's `Model:` row (`Model: Opus 5.5 —
-approved for this session`) and never raise it again that session: not at the
-end of replies, not on a new task. A new session, or a switch to a different
-above-ceiling model, asks again. Do not proceed with substantial work on an
-above-ceiling model until the user switches or approves. A lower effort on the
-approved model is the cheaper lever when the answer is "stay" (§5.3). If a task genuinely warrants a stronger model
-(architecture, root-cause debugging, security analysis), say so once. Only the user can switch (`/model`); offer
-once to set `"model": "sonnet"` in `~/.claude/settings.json` if they keep
-landing on expensive models.
+**The session model is the user's choice: never ask about it, gate on it, or
+record it.** A stronger model that needs fewer turns and less rework is often
+the cheaper session. Cost is cut by working efficiently on whatever model is
+running (§5.1, §5.3, §5.4), not by steering the user to a cheaper one.
 
 ### 5.3 Effort fit
 
@@ -629,8 +621,8 @@ Use the cheapest model that can do the subagent's task: **Haiku** for "find X
 and report back" (lookups, grep, one file, mechanical checks; the read-only
 Explore agent on Haiku is the cheapest delegation there is), **Sonnet** for
 writing or reviewing code and multi-step reasoning, and **Opus/Fable** only for
-the work that justified an above-ceiling main session. Never spawn a subagent
-on a more expensive model than the main session is approved for.
+work that needs the strongest reasoning. Never spawn a subagent on a more
+expensive model than the main session.
 
 ### 5.5 MCP server and connector awareness
 

@@ -21,7 +21,7 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
 3. **The main page links to GitHub and the latest release notes, without
    exception.** The README's top section, and the app's main page or screen
    when it has a UI, links to the GitHub repo and to the release notes for the
-   current version (`GATE_REFERENCE.md`, Gate 1, checks 5–6). Gate 1 blocks
+   current version (`RELEASE_GATES.md`, Gate 1, checks 5–6). Gate 1 blocks
    without both.
 4. **Docker projects offer Apprise notifications.** When the project ships as
    a Docker container, offer notifications through
@@ -48,7 +48,7 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
    (`SECURITY_LINUX.md`). **The
    image tag is pinned to the current version**, never `latest`. Gate 1 treats
    it as a version reference, so a release that bumps the version bumps the
-   compose file too (`GATE_REFERENCE.md`, Gate 1, check 2). Gate 4 checks the
+   compose file too (`RELEASE_GATES.md`, Gate 1, check 2). Gate 4 checks the
    quickstart.
 
 

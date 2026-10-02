@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.46.0] — 2026-10-02
+
+**The Sonnet ceiling is gone.** The session model is your choice: no
+session-start model question, no `Model:` row, no block on Opus or Fable.
+The savings come from how the session is worked (bounded output, minimal
+context, fewer turns) and from the skill loading less. Also in this release:
+the ten lessons other sessions recorded, a required cost and logic pass on
+every skill change, and Gates 1 and 5 move out of `GATE_REFERENCE.md`.
+
+### Changed
+- **Model choice** (`SKILL.md` §5, §5.2, §5.4, `SESSION_START.md`,
+  `SESSION_END.md`): the ceiling, its question and its gate-file row are
+  removed. Subagents still use the cheapest model that fits the task.
+- **Gates 1 and 5 moved to `RELEASE_GATES.md`**, loaded on the release track
+  only. A work-commit merge that runs Gates 2 and 4 no longer carries ~9KB of
+  release-only gates. `GATE_REFERENCE.md` keeps Gates 2 and 4 and the
+  re-derivation.
+- **Lessons are cleared after every review** (`LESSONS_REFERENCE.md`): a
+  lesson not acted on is dropped, not carried to the next session.
+- **Docker test login: one per session** (`DOCKER_TEST.md`, A4 denial text):
+  the username is `tester` and the password is generated once per session in
+  the scratchpad, so a rebuild no longer hands you a new login.
+- **Termux clones go to `~/<repo>`** (`SHELL_REFERENCE.md`), not shared storage.
+- **CI change detection** (`WORKFLOW_REFERENCE.md`): job-level change
+  detection replaces the workflow-level `paths-ignore` advice, which left
+  required checks pending forever on docs-only PRs. The audit flags heavy
+  jobs with no change detection (Medium), and Gate 4 says before pushing a
+  docs-only fix whether CI will re-run in full.
+
+### Added
+- **Cost and logic pass** (`CLAUDE.md`, `CONTRIBUTING.md`, PR template):
+  every skill change is checked for contradictions, redundancy, unneeded
+  prose and the right load trigger before release.
+- **TLS 1.2 floor** (`SECURITY_REFERENCE.md`, Gate 3 High list): every TLS
+  context sets a minimum protocol version.
+- **UI visual pass** (Gate 2) before commit approval: an automated overflow
+  check at four widths in both themes, and a look at each touched screen.
+- **README visuals and walkthroughs** (Gate 4, item 7): retake changed
+  screenshots before the release PR, pixel-diff regenerated images against
+  HEAD so anti-aliasing noise isn't committed.
+- **Scope growth after checkpoint 1 re-runs build, visual pass and docs**,
+  not only tests (`AUTO_MODE.md`).
+- **Trivy from its container** (`SECURITY_GATE.md`): a user-owned cache
+  folder and `docker save` tarball, and scan comparison keyed on CVE +
+  package + path.
+- **PR edits use `gh api -X PATCH`** (`SHELL_REFERENCE.md`): `gh pr edit`
+  fails on older `gh`.
+- **A12 denial text** says the label must be written literally on each
+  command; the check can't expand a shell variable.
+
 ## [2.45.2] — 2026-09-28
 
 **Shell commands that name the gate file stop asking for permission.** Four

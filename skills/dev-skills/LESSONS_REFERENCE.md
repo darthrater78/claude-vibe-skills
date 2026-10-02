@@ -78,6 +78,8 @@ Then confirm in one line where it went.
 The session-start probe's `lessons` key shows a date when lessons are
 waiting. Read them (`git show refs/dev-skills/lessons:LESSONS.md`) and list
 them in one line each before "What are we building?". The user picks which to
-work on. Once they have been taken up or dismissed, clear the ref
-(`git update-ref -d refs/dev-skills/lessons`, a local ref, not a remote one).
-A lesson the user wants kept for later stays until they say otherwise.
+work on. **Clear the ref after every review**, whatever was decided
+(`git update-ref -d refs/dev-skills/lessons`, a local ref, not a remote one):
+a lesson not acted on is dropped, never carried to the next session. Applying
+lessons is a skill update, so the repo's cost and logic pass follows
+(`CLAUDE.md`).

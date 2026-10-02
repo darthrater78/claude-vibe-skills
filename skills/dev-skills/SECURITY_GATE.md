@@ -10,8 +10,8 @@ fixed, waived by the user, or withdrawn, and nothing else clears a finding —
 and the combined gate output.
 
 Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`,
-plus the platform files that project environment detection matches. Gates 1, 2,
-4 and 5 are in `GATE_REFERENCE.md`; Gate 6 is in `SHIP_REFERENCE.md`.
+plus the platform files that project environment detection matches. Gates 2 and
+4 are in `GATE_REFERENCE.md`, 1 and 5 in `RELEASE_GATES.md`, 6 in `SHIP_REFERENCE.md`.
 
 Section numbers referenced here (Section 1, 2, 4.7, …) point at `SKILL.md`.
 
@@ -60,6 +60,17 @@ current lockfile:
 | Any | `osv-scanner scan source .` |
 | Docker image | `trivy image --config trivy.yaml --ignorefile .trivyignore.yaml <image>` on the Gate 2 test image (the same config the workflows use, `WORKFLOW_DOCKER.md`) |
 
+**Trivy run from its container, locally:** write the image to a tarball and
+give it a user-owned cache folder, never a named volume (named volumes are
+root-owned, and the non-root run fails with `mkdir /cache/db: permission
+denied`): `mkdir -p <scratch>/trivy-cache && docker save <image> -o
+<scratch>/img.tar`, then `docker run --rm --label
+dev-skills.test="$CLAUDE_CODE_SESSION_ID" --user "$(id -u):$(id -g)" -v
+<scratch>/img.tar:/img.tar:ro -v <scratch>/trivy-cache:/cache -e
+TRIVY_CACHE_DIR=/cache aquasec/trivy:<pinned> image --input /img.tar`. To
+compare two scans, key findings on CVE + package + path, not Target (image
+names differ).
+
 If no audit tool is available for the ecosystem, say so explicitly rather than
 passing the step in silence — an unaudited dependency tree is an unknown, and
 unknown is never "passed" (Section 2).
@@ -76,7 +87,8 @@ version, and the fixed version:
 - 🚨 Critical: hardcoded secrets, SQL injection, `shell=True` with user input,
   disabled TLS, `pickle` on untrusted data, RCE vectors
 - ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
-  passwords, `random` for tokens, no input validation on endpoints, a runtime
+  passwords, `random` for tokens, no input validation on endpoints, a TLS
+  context with no 1.2 minimum version, a runtime
   or LTS line past its end of support (`SECURITY_REFERENCE.md`, "LTS lines")
 - 🚨⚠️ **Any dependency — direct or transitive — carrying a Critical or High
   advisory** (Section 4.1). A pinned version is not a safe version; pinning

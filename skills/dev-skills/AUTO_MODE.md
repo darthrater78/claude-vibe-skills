@@ -78,7 +78,9 @@ Three rules about that message:
 
 1. **It is an approval of the sequence it describes, and nothing else.** If the
    scope moves afterwards — more commits land, the notes change, the bump
-   changes — present it again. Do not stretch one yes over a second release.
+   changes — re-run what the new scope touches (build and test, the UI
+   visual pass, docs: `GATE_REFERENCE.md`), not only the tests, then present
+   it again. Do not stretch one yes over a second release.
 2. **It is not a summary to skim past.** The user is approving content they will
    not see again before it is public. The diff summary and the release notes go
    in it in full, not "see above."
