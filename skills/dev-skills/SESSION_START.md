@@ -426,7 +426,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.46.0 active.
+Dev Skills v2.46.1 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>

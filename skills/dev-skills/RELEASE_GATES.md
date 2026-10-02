@@ -2,10 +2,8 @@
 
 Loaded on demand by the dev-skills skill, **on the release track only**: when
 Gate 1 (Version) or Gate 5 (Release) is about to run, pass, or be marked ➖
-N/A. A work commit, and a work-commit merge (`➖ no publishing intent`), never
-needs this file. Gates 2 and 4 and the gate-state re-derivation are in
-`GATE_REFERENCE.md`, Gate 3 in `SECURITY_GATE.md`, Gate 6 in
-`SHIP_REFERENCE.md`. Section numbers point at `SKILL.md`.
+N/A. A work commit or work-commit merge never needs it. Section numbers point
+at `SKILL.md`.
 
 ---
 

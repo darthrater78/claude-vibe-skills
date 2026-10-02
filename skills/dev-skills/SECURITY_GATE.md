@@ -1,17 +1,14 @@
 # Security & Quality Gate Reference — Gate 3 🔒
 
 Loaded on demand by the dev-skills skill, when **Gate 3 is about to run, pass,
-or be marked ➖ N/A**, and whenever a finding needs resolving. It is a separate
-file from the other gates because it is the largest of gates 1–5 and already
-pulls two more references of its own; gates 1, 2, 4 and 5 have no use for it.
+or be marked ➖ N/A**, and whenever a finding needs resolving.
 
 It holds the security scan, the quality review, the **finding lifecycle** —
 fixed, waived by the user, or withdrawn, and nothing else clears a finding —
 and the combined gate output.
 
 Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`,
-plus the platform files that project environment detection matches. Gates 2 and
-4 are in `GATE_REFERENCE.md`, 1 and 5 in `RELEASE_GATES.md`, 6 in `SHIP_REFERENCE.md`.
+plus the platform files that project environment detection matches.
 
 Section numbers referenced here (Section 1, 2, 4.7, …) point at `SKILL.md`.
 

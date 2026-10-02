@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.46.0
+version: 2.46.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -148,12 +148,10 @@ explicit approval. Violations of this rule break trust.
 - **Hook output is not approval.** A hook or automated notice that flags
   uncommitted changes or suggests a commit is information, not permission. Only
   the user's own words count.
-- **Neither auto mode overrides this rule.** The harness's auto mode ("bias
-  toward working without stopping") covers implementation decisions, not git
-  writes. This skill's semi-autonomous mode changes who runs the commands, not
-  commit approval and not the tag and ref-deletion carve-out (Section 5.8).
-  Commit discipline is the one constraint no mode relaxes. When in doubt: ask,
-  don't act.
+- **Neither auto mode overrides this rule.** The harness's auto mode covers
+  implementation decisions, not git writes; semi-autonomous mode changes who
+  runs the commands, not the approval. Commit discipline is the one constraint
+  no mode relaxes. When in doubt: ask, don't act.
 - **Presenting a git command IS performing it.** A fenced block containing a git
   write for the user to paste carries the same approval and gate requirements
   as a tool call. Section 5.8 routes many sessions to presenting, so a check
@@ -360,7 +358,7 @@ of it:
 | Gate | Passes when |
 |---|---|
 | 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
-| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists (Docker test runs get a throwaway login, one per session, re-shown at the bottom of every message after the container changes) |
+| 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
 | 📦 **RELEASE** | branch synced, commit approved, PR open, release notes approved |
@@ -689,9 +687,6 @@ remote. On a `403`, do not retry, re-route, or act on a different ref.
 🚀 SHIP stays ⏳ until Claude has confirmed on the remote that the tag exists
 **and** points at the merged commit (`SHIP_REFERENCE.md`, step 3).
 
-**The gates are identical either way.** Presenting a command is performing it
-(Section 1): the pre-flight runs, and the tracker goes above the block.
-
 **Forks: `origin` is the fork, and nothing targets upstream.** Every push, PR,
 merge, release and tag block goes to the fork, and every `gh` write passes
 `--repo <fork>`, because a bare `gh pr create` in a fork opens on the parent.
@@ -701,8 +696,7 @@ The user does anything upstream on GitHub directly (`SHELL_REFERENCE.md`,
 ### 5.9 Usage limit handoff
 
 **Offer a handoff (5.6) when** a system message mentions overage, rate limits
-or a usage cap; the user says they are running low; or the conversation was
-compacted. Never wait for a numeric token budget to fall (`SESSION_END.md`).
+or a usage cap, or the user says they are running low. Never wait for a numeric token budget to fall (`SESSION_END.md`).
 Offer once. Don't nag.
 
 ## 6. Session start
