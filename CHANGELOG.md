@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.46.1] — 2026-10-02
+
+**Cost and logic pass over 2.46.0.** No behavior changes; about 3.9KB less
+across the gate files.
+
+### Changed
+- **`GATE_REFERENCE.md`**: removed the load-trigger table (every trigger is
+  already stated in `SKILL.md` or where the file is pointed at) and the
+  repeated where-each-gate-lives paragraphs; Gate 3's stub is one line.
+- **`SECURITY_GATE.md`, `SHIP_REFERENCE.md`, `AUTO_MODE.md`,
+  `RELEASE_GATES.md` headers**: dropped the gate maps and why-a-separate-file
+  justifications that `SKILL.md` §2 already covers.
+- **`SKILL.md`**: dropped §5.8's restatement of "presenting is performing",
+  the Docker-login detail in the BUILD row (`DOCKER_TEST.md` owns it), the
+  compaction trigger repeated in §5.9, and shortened the auto-mode bullet.
+
 ## [2.46.0] — 2026-10-02
 
 **The Sonnet ceiling is gone.** The session model is your choice: no

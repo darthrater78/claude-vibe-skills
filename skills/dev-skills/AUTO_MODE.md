@@ -4,11 +4,9 @@ Loaded on demand by the dev-skills skill, **only when the user has chosen
 semi-autonomous mode**, either at the session-start mode question or later
 (`SKILL.md`, "Operating modes"). A manual-mode session never needs this file.
 
-The contract is in `SKILL.md`: the user opts in explicitly, Claude runs the
-commands instead of presenting them, the tag push and every ref deletion stay
-with the user, and **commit approval is untouched**. This file is how that
-runs — the two checkpoint formats, the per-step table, the round-trip rules,
-and the stop conditions.
+The contract is in `SKILL.md`, "Operating modes"; this file is how it runs:
+the two checkpoint formats, the per-step table, the round-trip rules, and the
+stop conditions.
 
 Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 

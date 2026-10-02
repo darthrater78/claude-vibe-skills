@@ -1,47 +1,16 @@
 # Gate Reference — Gates 2 and 4
 
-Loaded on demand by the dev-skills skill, when **a gate is about to run, pass,
-or be marked ➖ N/A**, and when you are checking gate status and need a gate's
-pass criteria. This file holds the **execution detail** for gates 2 and 4 and the
-gate-state re-derivation — the recipes, not the triggers.
-
-The triggers stay in `SKILL.md` and are in effect at all times: commit
-discipline, the mandatory pre-flight, the two tracks, the gate state file, the
-tracker, and shortcut detection. This file tells you *how to run* a gate once
-the pre-flight says one is owed.
-
-**The rest of the reference set, loaded only at the moment each is owed:**
-
-| File | Load when |
-|---|---|
-| `SESSION_START.md` | the session starts — once, before anything else |
-| `RELEASE_GATES.md` | release track only: Gate 1 or Gate 5 runs, passes, or is marked ➖ N/A |
-| `SECURITY_GATE.md` | Gate 3 runs, passes, or is marked ➖ N/A, or a finding needs resolving |
-| `SHIP_REFERENCE.md` | Gate 6 runs, passes, or is marked ➖ N/A |
-| `AUTO_MODE.md` | the user has opted into semi-autonomous mode |
-| `SECURITY_REFERENCE.md`, `QUALITY_REFERENCE.md` | Gate 3 (via `SECURITY_GATE.md`), and audit mode |
-| `SHELL_REFERENCE.md` | before composing any command block |
-| `DOCKER_TEST.md` | Gate 2, before a Docker test container starts or a run command is handed over |
-| `WORKFLOW_REFERENCE.md` | a CI workflow is missing, or the user asks for workflow help |
-| `WORKFLOW_DEPENDABOT.md` | a repo needs a `dependabot.yml`, one is missing an ecosystem, or a SHA pin is refreshed by hand |
-| `WORKFLOW_DEVRELEASE.md` | the user wants a dev (pre-)release from a branch, or Cosign image signing |
-
-Do not load a file this session has no use for. Each of these is read in full;
-loading the ship path during Gate 2, or semi-autonomous execution in a manual
-session, costs the tokens without the content ever being used.
-
-Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
+Loaded on demand by the dev-skills skill when **Gate 2 or Gate 4 is about to
+run, pass, or be marked ➖ N/A**, and when the gate state file must be
+re-derived or user-driven work credited. The triggers (pre-flight, tracks,
+gate state) stay in `SKILL.md` Section 2; section numbers here point at it.
 
 ---
 
 ## Gate state file — re-derivation and resuming
 
-The rules for `.dev-skills-gates.md` are in `SKILL.md` Section 2 ("Gate
-state"). This is the detail: load it when the file is missing, stale or
-compacted away, or when a user-driven action has to be credited.
-
-The file's format and row rules are in `SESSION_START.md`, where it is first
-written ("Write the gate state file").
+The rules are in `SKILL.md` Section 2 ("Gate state"); the format and row
+rules in `SESSION_START.md` ("Write the gate state file").
 
 **Remote refs, never local ones.** Reading refs is not a write:
 
@@ -83,11 +52,7 @@ Any gate you cannot prove from evidence is ⬜ pending and must be run.
 
 ## Gates 2 and 4 — execution detail
 
-The pre-flight, the two tracks and the gate state rules live in `SKILL.md`
-Section 2; the re-derivation table is above. What follows is how gates 2 and 4 are run and
-what makes them pass. **Gates 1 and 5 are in `RELEASE_GATES.md`** (release
-track only), **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in `SHIP_REFERENCE.md`**
-— read each when its gate is owed, not before.
+How gates 2 and 4 are run and what makes them pass.
 
 ### Gate 2 — Build 🔨
 
@@ -282,13 +247,8 @@ Do not silently skip — always show the N/A status on the tracker.
 
 ### Gate 3 — Security & Quality 🔒
 
-**Gate 3 is in `SECURITY_GATE.md`** — read that file when the security gate is
-the one that is owed. It holds the scan, the quality review, the finding
-lifecycle, and the combined output, and it is where the rule lives that no
-finding of any severity may be open when the release track runs.
-
-It also loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`, so do not
-open it for any other gate.
+In `SECURITY_GATE.md`, which also loads the security and quality references:
+open it only for Gate 3.
 
 ### Gate 4 — Docs 📄
 

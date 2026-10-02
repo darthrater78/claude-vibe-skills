@@ -1,16 +1,10 @@
 # Ship Gate Reference — Gate 6 🚀
 
 Loaded on demand by the dev-skills skill, when **Gate 6 is about to run, pass,
-or be marked ➖ N/A**. It is a separate file from the other five gates because
-it is the largest of them and fires once, at the end of a release sequence —
-gates 1–5 have no use for it.
+or be marked ➖ N/A**.
 
 It holds the CI-driven ship path, the manual path for repos with no release
 workflow, the wrong-commit tag recovery, and the post-ship verification.
-
-Gates 1 and 5 are in `RELEASE_GATES.md`, 2 and 4 in `GATE_REFERENCE.md`. The pre-flight, the two tracks and the gate
-state rules are in `SKILL.md` Section 2; the re-derivation table is in
-`GATE_REFERENCE.md`, "Gate state file".
 
 Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
