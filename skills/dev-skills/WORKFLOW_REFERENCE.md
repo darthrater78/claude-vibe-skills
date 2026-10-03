@@ -539,7 +539,7 @@ and match the patterns already used in this repo's own workflows.
   a job that builds, tests or lints the project's code.** Exempt: jobs that
   read docs or repo metadata (link or version checks, hacs, hassfest) and
   guards over the change itself (dependency review, CodeQL, actionlint).
-  Each template's CI marks where the `changes` job goes; it runs
+  Every template's CI carries this `changes` job; it runs
   `scripts/ci-changes.sh` (shellchecked, runs locally):
   ```yaml
   changes:

@@ -13,9 +13,9 @@ and the weekly audit issue is a work queue.
 ### Changed
 - **Every template's CI gets the docs-only skip** (`WORKFLOW_*.md`): each
   build, test and lint job carries `needs: changes` and a fail-closed `if:`,
-  under a marker that points at the one `changes` job in
-  `WORKFLOW_REFERENCE.md`. Home Assistant's validation job stays ungated,
-  since HACS reads the README.
+  and each CI carries the `changes` job itself, so every template still
+  passes actionlint as a standalone workflow. Home Assistant's validation
+  job stays ungated, since HACS reads the README.
 - **The `changes` job runs `scripts/ci-changes.sh`** (`WORKFLOW_REFERENCE.md`,
   Reliability), so the docs pattern is shellchecked and runs locally. The
   rule now says which jobs it covers (build, test and lint of the project's
