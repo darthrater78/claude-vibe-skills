@@ -230,6 +230,9 @@ Download `dev-skills.skill` from the [latest release](../../releases/latest),
 then install it **one** of these ways. Don't install both: in the CLI the
 hand-installed copy takes the `/dev-skills` name, the synced copy becomes
 `anthropic-skills:dev-skills`, and both can end up loaded in one session.
+To check a download was built by this repo's release workflow from the tagged
+commit (2.48.0 and later): `gh attestation verify dev-skills.skill --repo
+darthrater78/claude-vibe-skills`.
 
 | Where | How |
 |---|---|

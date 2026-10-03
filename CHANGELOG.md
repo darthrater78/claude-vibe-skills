@@ -53,6 +53,10 @@ and the weekly audit issue is a work queue.
   the latest stable one as an SVG, force-pushed to an unprotected orphan
   branch the README embeds; it is empty when no dev build is ahead.
   Recorded as a lesson in cert-generator.
+- **Build provenance for `dev-skills.skill`** (`.github/workflows/release.yml`):
+  each release attests the bundle with `actions/attest-build-provenance`, so
+  `gh attestation verify dev-skills.skill --repo darthrater78/claude-vibe-skills`
+  proves it was built from the tagged commit (README, Install).
 
 ### Removed
 - **`WORKFLOW_REFERENCE.md`'s "Validate the generated workflow" list**, which
