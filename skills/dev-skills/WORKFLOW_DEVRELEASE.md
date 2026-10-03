@@ -2,7 +2,8 @@
 
 Loaded on demand by the dev-skills skill, alongside `WORKFLOW_REFERENCE.md`,
 **only when the user wants a pre-release build from a feature branch (a
-`v1.2.3-dev.1` tag) or wants a container image signed with Cosign**. The
+`v1.2.3-dev.1` tag, which brings the README dev-build banner) or wants a
+container image signed with Cosign**. The
 workflow selection and audit procedures, the review checklist and the template
 best practices stay in `WORKFLOW_REFERENCE.md`.
 
@@ -92,6 +93,36 @@ release workflow:
 **When suggesting workflows to the user,** ask whether they want dev release
 support as part of the [Step 3 questions](#step-3--ask-all-questions-in-one-turn).
 If yes, include the pre-release modifications in the generated workflow.
+
+### README banner for the current dev build — required
+
+**Whenever a pre-release is newer than the latest stable release, the
+default branch's README shows a banner for it:** the version, the first
+paragraph of its release notes, and how to get it (`docker pull <image>:<tag>`,
+or the download). It redraws on every release run and disappears when the
+stable release ships. Set it up with the project's first pre-release.
+
+CI editing the README fails three ways: the default branch is protected, a
+tag-triggered workflow runs from the tagged feature-branch commit, and a
+release made with `GITHUB_TOKEN` fires no `release` event for other
+workflows. So the banner is an image, not README text:
+
+- **A `dev-banner.yml` workflow** on the default branch, triggered by
+  `workflow_run` (`workflows: [Release]`, `types: [completed]`), `push` to the
+  default branch on its own two files (so the merge that adds it draws the
+  first banner), and `workflow_dispatch`. Concurrency `cancel-in-progress:
+  false`; `contents: write` on its one job only.
+- **A script** reads `gh api repos/{o}/{r}/releases --paginate`, picks the
+  newest pre-release ahead of the newest stable one (semver: `dev < alpha <
+  beta < rc < final`) and prints an SVG, or an empty 1x1 SVG when none is ahead.
+- **The workflow force-pushes `banner.svg` to an unprotected orphan branch**
+  (`readme-banner`), skipping the push when the image is unchanged. The
+  README embeds
+  `https://raw.githubusercontent.com/<o>/<r>/readme-banner/banner.svg`,
+  linked to the releases page.
+
+Worked example: `darthrater78/cert-generator`, `.github/workflows/dev-banner.yml`
+and `scripts/dev_banner.py`. After merging, verify the image URL returns 200.
 
 ---
 

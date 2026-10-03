@@ -275,7 +275,8 @@ does both freely, because its copy dies with the container.
 
 **B8. Workflow edits meet the workflow checklist's mechanical rules.** A
 Write or Edit to `.github/workflows/*.yml` (or `.yaml`) is **denied** when it
-adds what `WORKFLOW_REFERENCE.md` rates Critical:
+adds one of these (deny and ask are what B8 does with an edit; each finding's
+severity is `WORKFLOW_REFERENCE.md`'s scale, which the weekly audit reports):
 - a `uses:` not pinned to a 40-character commit SHA (a version tag or a
   branch like `@main`). Local actions (`./…`) and `docker://` refs pass, and
   so does `hacs/action`, the one documented exception (Template best
@@ -288,7 +289,7 @@ adds what `WORKFLOW_REFERENCE.md` rates Critical:
   `persist-credentials: true` passes, because a job that pushes needs it and
   said so.
 
-It **asks** when an edit adds what the checklist rates High: no
+It **asks** when an edit adds: no
 `permissions:` block anywhere in the file, a job without `timeout-minutes`
 (a job that calls a reusable workflow can't set one, so it passes), or a job
 whose `run:` calls `./gradlew` before any step in **that job** validates the

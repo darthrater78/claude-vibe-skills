@@ -36,6 +36,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # HACS reads the README, so validation runs on docs too. A test job you add
+  # skips docs-only changes (WORKFLOW_REFERENCE.md, "Job-level change detection").
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10

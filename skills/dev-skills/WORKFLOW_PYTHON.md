@@ -36,7 +36,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Docs-only changes skip the jobs below; a failed or unsure check runs them
+  # (WORKFLOW_REFERENCE.md, "Job-level change detection", has the script).
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/ci-changes.sh "$BASE" >> "$GITHUB_OUTPUT"
+
   lint:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -56,6 +75,8 @@ jobs:
           ruff check .
 
   test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -75,6 +96,7 @@ jobs:
           pytest
 
       # ADAPT: add matrix testing for multiple Python versions
+      # A matrix job skips by step instead (WORKFLOW_REFERENCE.md, Reliability)
       # strategy:
       #   matrix:
       #     python-version: ['3.10', '3.11', '3.12', '3.13']

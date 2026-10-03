@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.47.0
+version: 2.48.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -577,7 +577,7 @@ out the context and brings compaction closer.
   screenshots.
 - **Never trigger a full CI run for a docs-only change** (README, CHANGELOG,
   `docs/`, screenshots: files no build or test reads). Before pushing one,
-  check that CI skips its build and test jobs for it (`WORKFLOW_REFERENCE.md`,
+  check that CI skips its build, test and lint jobs for it (`WORKFLOW_REFERENCE.md`,
   Reliability). If it wouldn't, don't push: fix the workflow first, or batch
   the docs into the next code push. Only the user, told the cost, can say
   push anyway.

@@ -5,13 +5,15 @@ Gate 3 audits a repo's workflows only when a Claude session opens that repo,
 so a repo nobody is working in never meets a rule added after its last
 session. audit-repos.yml runs this weekly: it reads each repo's
 .github/workflows/ on its default branch, applies the same line-provable rules
-enforce.py B8 applies to edits (workflow_problems), and keeps one summary issue
+enforce.py B8 applies to edits (workflow_findings), and keeps one summary issue
 in this repo up to date. Nothing is written to the audited repos.
 
 Only the mechanical rules run here: unpinned actions, `${{ }}` inside run:,
 checkout keeping its credential, no permissions: block, no timeout, ./gradlew
-before wrapper validation. The judgment rules (release gates, Docker scans,
-secrets on disk) stay Gate 3's.
+before wrapper validation, each labeled with WORKFLOW_REFERENCE.md's severity
+scale. The judgment rules (release gates, Docker scans, Dependabot, concurrency,
+docs-only CI, secrets on disk) stay Gate 3's. The issue is a work queue: one
+checklist per repo, worst repo first, worst finding first.
 
 Environment:
   GITHUB_TOKEN        this repo's token: opens/updates the issue, and reads
@@ -40,10 +42,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "skills" / "dev-skills" / "checks"))
 
-from enforce import workflow_problems  # noqa: E402
+from enforce import workflow_findings  # noqa: E402
 
 API = "https://api.github.com"
 TITLE = "Weekly workflow audit"
+SEVERITIES = ("Critical", "High", "Medium", "Low")
 BOT = "github-actions[bot]"
 
 
@@ -147,27 +150,47 @@ def audit(repos: list[dict], token: str) -> tuple[list[tuple[str, str, str, str]
             continue
         for name, text in wfs:
             files += 1
-            deny, ask = workflow_problems(text)
-            findings += [(label, name, "Critical", p) for p in deny]
-            findings += [(label, name, "High", p) for p in ask]
+            findings += [(label, name, sev, p) for sev, _, p in workflow_findings(text)]
     return findings, unread, files
+
+
+def counts(findings: list) -> str:
+    n = [sum(f[2] == s for f in findings) for s in SEVERITIES]
+    return ", ".join(f"{c} {s}" for c, s in zip(n, SEVERITIES) if c)
+
+
+def checklist(findings: list) -> list[str]:
+    """One checklist per repo, the repo with the most severe findings first (by
+    Critical count, then High, ...), and within a repo the most severe first."""
+    rank = {s: i for i, s in enumerate(SEVERITIES)}
+    repos: dict[str, list] = {}
+    for f in findings:
+        repos.setdefault(f[0], []).append(f)
+    order = sorted(repos, key=lambda r: ([-sum(f[2] == s for f in repos[r]) for s in SEVERITIES], r.lower()))
+    out: list[str] = []
+    for r in order:
+        out += [f"### {cell(r)} ({counts(repos[r])})", ""]
+        out += [f"- [ ] **{s}** · {cell(f)}: {cell(t)}"
+                for _, f, s, t in sorted(repos[r], key=lambda f: (rank[f[2]], f[1], f[3]))]
+        out.append("")
+    return out[:-1]
 
 
 def report(findings: list, unread: list[str], repos: int, files: int, private: bool) -> str:
     scope = "public and private" if private else "public only (set AUDIT_TOKEN to include private repos)"
     lines = [f"Audited {files} workflow files in {repos} repos ({scope}), on each repo's default branch.", ""]
     if findings:
-        lines += [f"**{len(findings)} findings** in {len({f[0] for f in findings})} repos. "
-                  "Fix them in a session there (Gate 3 re-audits every workflow), and this issue "
-                  "updates on the next run.", "",
-                  "| Repo | Workflow | Severity | Finding |", "|---|---|---|---|"]
-        lines += [f"| {cell(r)} | {cell(f)} | {s} | {cell(t)} |" for r, f, s, t in findings]
+        lines += [f"**{len(findings)} findings** in {len({f[0] for f in findings})} repos, "
+                  f"{counts(findings)}. Work down the list: fix each repo in a session there "
+                  "(Gate 3 re-audits every workflow), and this issue updates on the next run.", ""]
+        lines += checklist(findings)
     else:
         lines.append("**No findings.**")
     if unread:
         lines += ["", "**Not audited** (couldn't read):", ""] + [f"- {cell(u)}" for u in unread]
     lines += ["", "Line-provable rules only (enforce.py B8). The workflow checklist's judgment rules "
-              "(release gates, Docker scans, secrets written to disk) still run at each repo's Gate 3."]
+              "(release gates, Docker scans, Dependabot, concurrency, docs-only CI, secrets written to "
+              "disk) still run at each repo's Gate 3."]
     return "\n".join(lines) + "\n"
 
 

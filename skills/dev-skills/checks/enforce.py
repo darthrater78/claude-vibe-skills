@@ -1368,8 +1368,23 @@ def step_has(lines: list[str], at: int, key: str) -> bool:
 
 def workflow_problems(text: str) -> tuple[list[str], list[str]]:
     """(deny, ask) problems in one workflow file."""
-    deny: list[str] = []
-    ask: list[str] = []
+    found = workflow_findings(text)
+    return [t for _, d, t in found if d], [t for _, d, t in found if not d]
+
+
+def pin_severity(action: str, version: str) -> str:
+    """A non-SHA pin on the workflow audit scale: a first-party action on a
+    version tag is Low, on a branch High; any other action is Critical."""
+    if action.split("/")[0] not in ("actions", "github"):
+        return "Critical"
+    return "Low" if re.match(r"v\d", version) else "High"
+
+
+def workflow_findings(text: str) -> list[tuple[str, bool, str]]:
+    """(severity, deny?, problem) for one workflow file. Severity is the workflow
+    audit scale (WORKFLOW_REFERENCE.md, audit step 3) that the weekly audit
+    issue reports; deny or ask is only what B8 does with an edit."""
+    out: list[tuple[str, bool, str]] = []
     lines = text.splitlines()
     run_col: int | None = None  # column of `run:` while inside its block scalar
     for n, line in enumerate(lines):
@@ -1377,7 +1392,7 @@ def workflow_problems(text: str) -> tuple[list[str], list[str]]:
         if run_col is not None:
             if not s or indent_of(line) > run_col:
                 if "${{" in line:
-                    deny.append(f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}")
+                    out.append(("Critical", True, f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}"))
                 continue
             run_col = None
         if s.startswith("#"):
@@ -1388,7 +1403,7 @@ def workflow_problems(text: str) -> tuple[list[str], list[str]]:
             if body[:1] in ("|", ">"):
                 run_col = len(m.group(1)) + len(m.group(2) or "")
             elif "${{" in body:
-                deny.append(f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}")
+                out.append(("Critical", True, f"`${{{{ }}}}` inside a run: script (pass it through env:): {s}"))
             continue
         m = USES_LINE.match(line)
         if not m:
@@ -1398,17 +1413,17 @@ def workflow_problems(text: str) -> tuple[list[str], list[str]]:
             continue
         action, _, version = ref.partition("@")
         if not SHA_PIN.match(version) and "/".join(action.split("/")[:2]) not in UNPINNED_OK:
-            deny.append(f"`{ref}` is not pinned to a 40-character commit SHA")
+            out.append((pin_severity(action, version), True, f"`{ref}` is not pinned to a 40-character commit SHA"))
         if action == "actions/checkout" and not step_has(lines, n, "persist-credentials"):
             # Keyed without the ref, so re-pinning a legacy checkout isn't "new".
-            deny.append("a checkout without `persist-credentials: false`")
+            out.append(("High", True, "a checkout without `persist-credentials: false`"))
     if not re.search(r"^\s*permissions:", text, re.M):
-        ask.append("no `permissions:` block, so every job gets the repo's default token scope")
-    ask.extend(f"job `{name}` has no `timeout-minutes`" for name in jobs_without_timeout(text))
-    ask.extend(f"job `{name}` runs ./gradlew without validating the wrapper jar first "
-               "(add gradle/actions/wrapper-validation, or setup-gradle without `validate-wrappers: false`)"
+        out.append(("High", False, "no `permissions:` block, so every job gets the repo's default token scope"))
+    out.extend(("High", False, f"job `{name}` has no `timeout-minutes`") for name in jobs_without_timeout(text))
+    out.extend(("Medium", False, f"job `{name}` runs ./gradlew without validating the wrapper jar first "
+                "(add gradle/actions/wrapper-validation, or setup-gradle without `validate-wrappers: false`)")
                for name in jobs_running_unvalidated_gradlew(text))
-    return deny, ask
+    return out
 
 
 def job_bodies(text: str) -> tuple[int, dict[str, list[str]]]:

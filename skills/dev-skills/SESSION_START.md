@@ -426,7 +426,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.47.0 active.
+Dev Skills v2.48.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -462,7 +462,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.45.2
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.48.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
