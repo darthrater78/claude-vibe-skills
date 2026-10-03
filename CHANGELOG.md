@@ -4,6 +4,60 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.48.0] — 2026-10-03
+
+**The 3 October workflow audit's five skill items, and a lesson from
+cert-generator.** Generated workflows now pass the docs-only rule on day one,
+and the weekly audit issue is a work queue.
+
+### Changed
+- **Every template's CI gets the docs-only skip** (`WORKFLOW_*.md`): each
+  build, test and lint job carries `needs: changes` and a fail-closed `if:`,
+  under a marker that points at the one `changes` job in
+  `WORKFLOW_REFERENCE.md`. Home Assistant's validation job stays ungated,
+  since HACS reads the README.
+- **The `changes` job runs `scripts/ci-changes.sh`** (`WORKFLOW_REFERENCE.md`,
+  Reliability), so the docs pattern is shellchecked and runs locally. The
+  rule now says which jobs it covers (build, test and lint of the project's
+  code; not docs or metadata checks, hacs, hassfest, dependency review,
+  CodeQL or actionlint) and when workflow-level `paths-ignore` passes (it
+  covers all the docs, and nothing requires the skipped checks).
+- **One severity scale** (`checks/enforce.py`, `scripts/audit-repos.py`):
+  B8's findings carry `WORKFLOW_REFERENCE.md`'s severity instead of Critical
+  for every denial and High for every ask. A checkout keeping its credential
+  is High, a first-party action on a version tag Low, on a branch High, and
+  `./gradlew` before wrapper validation Medium. B8 still denies and asks
+  exactly as before. A test fails if the reference's scale drifts from B8's.
+- **The weekly audit issue is a checklist per repo**, worst repo first and
+  worst finding first, and names the judgment rules it can't check
+  (Dependabot, concurrency, docs-only CI among them).
+- **Report-only steps may drop `-e`** (`WORKFLOW_REFERENCE.md`, Reliability):
+  a scheduled audit that writes to the job summary uses `set -uo pipefail`
+  under a comment saying it never fails, and isn't a Medium finding.
+
+### Fixed
+- **A failed `changes` job skipped every build and test** (`WORKFLOW_REFERENCE.md`):
+  `if: needs.changes.outputs.code == 'true'` skips when `changes` fails, and
+  a skipped job reads as passing. The condition is now
+  `!cancelled() && code != 'false'`, so a failure runs everything.
+- **A matrix job skipped at job level never reported its required checks**:
+  it reports under its bare name, so `test (os, version)` never arrives.
+  Matrix jobs now skip by step.
+- **The session banner's release-notes link pointed at v2.45.2**
+  (`SESSION_START.md`).
+
+### Added
+- **README banner for the current dev build** (`WORKFLOW_DEVRELEASE.md`):
+  required for any project that publishes pre-releases. A `workflow_run`
+  workflow on the default branch renders the newest pre-release ahead of
+  the latest stable one as an SVG, force-pushed to an unprotected orphan
+  branch the README embeds; it is empty when no dev build is ahead.
+  Recorded as a lesson in cert-generator.
+
+### Removed
+- **`WORKFLOW_REFERENCE.md`'s "Validate the generated workflow" list**, which
+  repeated the review checklist; the step now points at the checklist.
+
 ## [2.47.0] — 2026-10-02
 
 **A docs-only change never gets a full CI run.** 2.46.0 made it a Medium

@@ -59,12 +59,12 @@ session start detects workflows that exist but may have issues — read every
      block (every job gets the repo's default token scope), a first-party
      action (`actions/*`, `github/*`) on a branch ref such as `@main`, a
      Docker release that puts a version tag on an image no scan has passed
-     (`WORKFLOW_DOCKER.md`: push by digest, Trivy gate, then tag), build or
-     test jobs that run on a docs-only change (no job-level change
-     detection, Reliability); a job that reads the docs (a link or version
-     check) may run, nothing else
+     (`WORKFLOW_DOCKER.md`: push by digest, Trivy gate, then tag), a job
+     the docs-only rule covers that runs on a docs-only change (Reliability,
+     "Job-level change detection")
    - 📝 **Medium** — CI reimplements build inline instead of calling project
-     scripts, no `set -euo pipefail` in multi-line run blocks, no artifact
+     scripts, no `set -euo pipefail` in multi-line run blocks (report-only
+     steps exempt, Reliability), no artifact
      verification after upload, CI trigger is a bare `push:` (also matches tag
      pushes — runs the suite twice on release) instead of `branches: ['**']`,
      no `lint-workflows.yml` for a repo with multiple workflow files, a
@@ -76,6 +76,8 @@ session start detects workflows that exist but may have issues — read every
    - 💡 **Low** — missing shellcheck for projects with shell scripts, no
      release notes extraction, actions pinned to version tags instead of SHAs
      (first-party GitHub actions)
+
+   `enforce.py` B8 and the weekly audit issue label findings on this scale.
 
 4. **Check for missing workflows.** After auditing what exists, check what's
    missing per the environment detection table and report the gaps. No
@@ -520,6 +522,9 @@ and match the patterns already used in this repo's own workflows.
       make build
       make test
   ```
+  **Exempt: a report-only step** (a scheduled audit writing to the job
+  summary) uses `set -uo pipefail` without `-e`, under a comment saying it
+  reports and never fails.
 - **`branches: ['**']`, not a bare `push:`, on the CI trigger.** A bare
   `push:` also matches a tag push — which is exactly what the release
   workflow's tag trigger fires on — so tagging a commit CI already passed on
@@ -531,10 +536,11 @@ and match the patterns already used in this repo's own workflows.
     pull_request:
   ```
 - **Job-level change detection — required: a docs-only change never runs
-  the build or test jobs.** A first `changes` job diffs the push/PR range and
-  outputs `code`; every build and test job gets `needs: changes` and
-  `if: needs.changes.outputs.code == 'true'`. Set the docs pattern to what
-  this repo's suite really doesn't read:
+  a job that builds, tests or lints the project's code.** Exempt: jobs that
+  read docs or repo metadata (link or version checks, hacs, hassfest) and
+  guards over the change itself (dependency review, CodeQL, actionlint).
+  Each template's CI marks where the `changes` job goes; it runs
+  `scripts/ci-changes.sh` (shellchecked, runs locally):
   ```yaml
   changes:
     runs-on: ubuntu-latest
@@ -549,27 +555,40 @@ and match the patterns already used in this repo's own workflows.
       - id: diff
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -euo pipefail
-          # new branch, force-push or unknown base: run everything (fail closed)
-          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            echo code=true >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          if git diff --name-only "$BASE" HEAD \
-            | grep -qvE '^(docs/|README\.md$|CHANGELOG\.md$|.*\.(png|jpe?g|gif|webp)$)'; then
-            echo code=true >> "$GITHUB_OUTPUT"
-          else
-            echo code=false >> "$GITHUB_OUTPUT"
-          fi
+        run: bash scripts/ci-changes.sh "$BASE" >> "$GITHUB_OUTPUT"
   ```
-  Skipped jobs count as passing for required status checks, and every commit
-  still gets a successful run, so the CI-passed release gate needs no
-  workaround. Verify what the suite actually reads before treating a path as
-  docs. Workflow-level `paths-ignore` (no run at all) only fits a repo with
-  no required checks (`gh api repos/{o}/{r}/branches/{b}/protection -q
-  .required_status_checks.contexts`) and no CI-passed release gate: otherwise
-  a docs-only PR waits forever on a check that never runs, and the gate finds
-  no run for the tagged commit.
+  ```bash
+  #!/usr/bin/env bash
+  # code=false only if every file changed since $1 is docs; unsure runs all
+  set -euo pipefail
+  base="${1:-}"
+  all() { echo "ci-changes: $1, running everything" >&2; echo code=true; exit 0; }
+  [ -n "$base" ] && [ "$base" != 0000000000000000000000000000000000000000 ] || all "no base"
+  git cat-file -e "$base^{commit}" 2>/dev/null || all "base $base not in clone"
+  changed=$(git diff --name-only "$base" HEAD)
+  [ -n "$changed" ] || all "empty diff"
+  while IFS= read -r f; do
+    case "$f" in
+      # ADAPT: only what no build, test or lint step reads (screenshot folders too)
+      *.md | docs/* | LICENSE | *.png | *.jpg | *.jpeg | *.gif | *.webp) ;;
+      *) all "$f is not docs" ;;
+    esac
+  done <<< "$changed"
+  echo code=false
+  ```
+  Each covered job gets `needs: changes` and `if: ${{ !cancelled() &&
+  needs.changes.outputs.code != 'false' }}`, so a failed `changes` job runs
+  everything (fail closed). **A matrix job skips by step, not by job:**
+  skipped at job level it reports under its bare name, so required checks
+  like `test (ubuntu-latest, 3.12)` never arrive. Give it `if: ${{
+  !cancelled() }}` and put the `code != 'false'` condition on each step.
+  Skipped jobs count as passing required checks and the run still succeeds,
+  so the CI-passed release gate needs no workaround. Workflow-level
+  `paths-ignore` (no run at all) passes the rule only when it covers all the
+  repo's docs (`*.md` misses `docs/`), and fits only a repo with no required
+  checks (`gh api repos/{o}/{r}/branches/{b}/protection -q
+  .required_status_checks.contexts`) and no CI-passed release gate:
+  otherwise a docs-only PR waits forever on a check that never runs.
 - **`DEBIAN_FRONTEND=noninteractive` around any `apt-get install`** on an
   `ubuntu-latest` job. Some packages (`wireshark-common`, `tzdata`, others
   with a postinst debconf prompt) ask an interactive question on install; without
@@ -642,20 +661,8 @@ workflow:
 3. **Ask all questions in one turn** (Step 3 above)
 4. **Generate the workflow** from the matching template file, adapted with the
    user's answers
-5. **Validate the generated workflow** — check that:
-   - All action references use pinned commit SHAs
-   - `persist-credentials: false` is set on checkout
-   - Concurrency groups are present
-   - Timeouts are set on every job
-   - Build and test jobs are gated on a `changes` job, so a docs-only
-     change never runs them (Reliability)
-   - The tag-on-default-branch check is present in release workflows
-   - The tag/version match check is present in release workflows (or the
-     workflow's comments document why the version is tag-derived/computed
-     and exempt)
-   - Release notes extraction is present
-   - The generated workflow calls the project's own build scripts where they
-     exist, rather than reimplementing the build inline
+5. **Validate the generated workflow** against every item of the
+   [workflow review checklist](#workflow-review-checklist) below
 
 ### Workflow review checklist
 
@@ -704,13 +711,13 @@ every item:
       the gate's job is proof it already ran and passed; redoing it in the
       release job burns runner time re-proving what's already known
 - [ ] CI calls project's own scripts, not inline reimplementations
-- [ ] Build and test jobs skip docs-only changes via job-level change
+- [ ] Build, test and lint jobs skip docs-only changes via job-level change
       detection (Reliability), with branch protection read before suggesting
       `paths-ignore`
 - [ ] Secrets used only in `env:` blocks, never in `run:` strings
 - [ ] Artifact verification after upload (release workflows)
 - [ ] Shell scripts checked with shellcheck (Linux/script projects)
-- [ ] `set -euo pipefail` in multi-line run blocks
+- [ ] `set -euo pipefail` in multi-line run blocks (report-only steps exempt)
 - [ ] Dependabot configured (`.github/dependabot.yml`) — with an entry for
       GitHub Actions **and** for every package ecosystem the repo uses
 - [ ] OIDC trusted publishing used where supported (PyPI, cosign)

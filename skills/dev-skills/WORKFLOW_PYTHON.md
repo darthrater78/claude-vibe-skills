@@ -36,7 +36,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # changes: the job from WORKFLOW_REFERENCE.md, "Job-level change detection"
   lint:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -56,6 +59,8 @@ jobs:
           ruff check .
 
   test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -75,6 +80,7 @@ jobs:
           pytest
 
       # ADAPT: add matrix testing for multiple Python versions
+      # A matrix job skips by step instead (WORKFLOW_REFERENCE.md, Reliability)
       # strategy:
       #   matrix:
       #     python-version: ['3.10', '3.11', '3.12', '3.13']

@@ -39,7 +39,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # changes: the job from WORKFLOW_REFERENCE.md, "Job-level change detection"
   lint:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

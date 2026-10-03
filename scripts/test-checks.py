@@ -815,8 +815,67 @@ CASES = [
 ]
 
 
+def b8_severity_fails() -> list[str]:
+    """Each B8 rule carries its WORKFLOW_REFERENCE.md severity."""
+    sys.path.insert(0, os.path.dirname(ENFORCE))
+    from enforce import workflow_findings
+    want = {
+        "legacy workflow": (BAD_WF, ["Critical", "High", "High", "High", "Low"]),
+        "third-party tag": (GOOD_WF + "      - uses: softprops/action-gh-release@v2\n", ["Critical"]),
+        "third-party branch": (GOOD_WF + "      - uses: home-assistant/actions/hassfest@master\n", ["Critical"]),
+        "first-party branch": (GOOD_WF + "      - uses: github/codeql-action/init@main\n", ["High"]),
+        "unvalidated gradlew": (GOOD_WF + "      - run: ./gradlew test\n", ["Medium"]),
+        "hardened": (GOOD_WF, []),
+    }
+    fails = []
+    for name, (text, expect) in want.items():
+        got = sorted(s for s, _, _ in workflow_findings(text))
+        if got != sorted(expect):
+            fails.append(f"severity {name}: want {sorted(expect)}, got {got}")
+    return fails
+
+
+def reference_scale_fails() -> list[str]:
+    """WORKFLOW_REFERENCE.md rates each B8 rule at the severity B8 reports."""
+    ref = open(os.path.join(os.path.dirname(SKILL_MD), "WORKFLOW_REFERENCE.md"), encoding="utf-8").read()
+    ref = " ".join(ref.split())
+    marks = {"Critical": "🚨 **Critical**", "High": "⚠️ **High**", "Medium": "📝 **Medium**", "Low": "💡 **Low**"}
+    ends = list(marks.values())[1:] + ["4. **Check for missing workflows"]
+    phrases = {
+        "Critical": ["unpinned third-party actions", "interpolated directly into a `run:` script"],
+        "High": ["`persist-credentials: true` (or missing", "no `permissions:` block", "no timeouts",
+                 "on a branch ref such as `@main`"],
+        "Medium": ["a Gradle build with no wrapper validation"],
+        "Low": ["actions pinned to version tags instead of SHAs (first-party"],
+    }
+    fails = []
+    for (sev, mark), end in zip(marks.items(), ends):
+        start, stop = ref.find(mark), ref.find(end)
+        bullet = ref[start:stop] if 0 <= start < stop else ""
+        fails += [f"WORKFLOW_REFERENCE.md {sev} bullet lacks B8's rule: {p}" for p in phrases[sev] if p not in bullet]
+    return fails
+
+
+def audit_order_fails() -> list[str]:
+    """The weekly issue lists the worst repo first, and its worst finding first."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("audit_repos", os.path.join(HERE, "audit-repos.py"))
+    audit = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(audit)
+    findings = [("o/b", "ci.yml", "Low", "low one"), ("o/a", "ci.yml", "High", "high one"),
+                ("o/b", "release.yml", "Critical", "crit one"), ("o/b", "ci.yml", "High", "high two")]
+    got = [x for x in audit.checklist(findings) if x]
+    expect = ["### o/b (1 Critical, 1 High, 1 Low)", "- [ ] **Critical** · release.yml: crit one",
+              "- [ ] **High** · ci.yml: high two", "- [ ] **Low** · ci.yml: low one",
+              "### o/a (1 High)", "- [ ] **High** · ci.yml: high one"]
+    return [] if got == expect else [f"audit checklist order: want {expect}, got {got}"]
+
+
 def main() -> None:
-    fails = 0
+    sev_fails = b8_severity_fails() + reference_scale_fails() + audit_order_fails()
+    for msg in sev_fails:
+        print(f"FAIL {msg}")
+    fails = 1 if sev_fails else 0
     for name, fn, want in CASES:
         if LAN is None and "LAN" in name:
             print(f"skip {name}: no network route on this machine")
@@ -844,7 +903,7 @@ def main() -> None:
     if seq != ["block", "block", "warn", "block"]:
         fails += 1
         print(f"FAIL stop loop guard without prompt_id: want block, block, warn, block, got {seq}")
-    total = len(CASES) + 2
+    total = len(CASES) + 3
     print(f"enforcement checks: {total - fails}/{total} passed")
     sys.exit(1 if fails else 0)
 

@@ -32,7 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # changes: the job from WORKFLOW_REFERENCE.md, "Job-level change detection"
   build:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 15
     steps:

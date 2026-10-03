@@ -32,7 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # changes: the job from WORKFLOW_REFERENCE.md, "Job-level change detection"
   test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -56,6 +59,7 @@ jobs:
         run: npm test --if-present
 
       # ADAPT: add matrix testing for the Node LTS lines still in support
+      # A matrix job skips by step instead (WORKFLOW_REFERENCE.md, Reliability)
       # (look them up: curl -s https://endoflife.date/api/nodejs.json)
       # strategy:
       #   matrix:
