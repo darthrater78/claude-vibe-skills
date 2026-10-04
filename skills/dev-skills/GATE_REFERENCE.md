@@ -228,8 +228,12 @@ passes when the debug build compiles and the app is verified working.
 the diff touches, with realistic seeded data (long names, many rows): an
 automated overflow check (`scrollWidth > clientWidth` on tables, dialogs and
 popovers) at 1920, 1440, 1280 and ~390 px wide in light and dark theme, then
-a look at each touched screen at one desktop and the phone width. Record it
-on the BUILD row (`visual pass: N screens × 4 widths × 2 themes, 0 overflow`).
+a look at each touched screen at one desktop and the phone width. With a
+`DESIGN.md` (`DESIGN_REFERENCE.md`), also: that look compares each screen
+against it, the changed UI files hold no raw colours and no generic tell it
+didn't choose, and its pinned `lint` passes when it or the tokens changed.
+Record it on the BUILD row (`visual pass: N screens × 4 widths × 2 themes,
+0 overflow · DESIGN.md: lint clean, 0 tells`).
 
 > ✅ **BUILD GATE PASSED** — debug build verified working (release build deferred
 > to CI); test artifact: Android `.apk` in `dist/` @ a1b2c3d; handoff offered,
@@ -282,7 +286,7 @@ After security passes, check:
    data. **Before staging regenerated images, diff each against HEAD** with
    a pixel threshold and keep only real changes: anti-aliasing noise is
    churn, and an unexpected change may be a harness or app bug, so look at
-   it.
+   it. If the look changed, `DESIGN.md` describes the new one.
 
 Show what was checked:
 
@@ -293,7 +297,7 @@ Show what was checked:
 > - Architecture/tables: [updated / no changes needed]
 > - Internal consistency: [README descriptions match source of truth, or list fixes]
 > - Compose quickstart: [matches the standard at v1.2.3 / N/A, not Docker]
-> - README visuals: [retaken N, unchanged M · quick start re-walked / N/A, no UI]
+> - README visuals: [retaken N, unchanged M · quick start re-walked · DESIGN.md current / N/A, no UI]
 
 If documentation is missing or stale:
 

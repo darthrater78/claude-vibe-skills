@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.49.0] — 2026-10-04
+
+**A design standard, from a cert-generator lesson.** UI work no longer falls
+back to model defaults that make every app look alike.
+
+### Added
+- **`DESIGN_REFERENCE.md`**, loaded only for UI projects: a `DESIGN.md` in
+  the [Google Labs format](https://github.com/google-labs-code/design.md),
+  covering identity, shape before colour, tokens with states and themes as
+  variants, and a Never list. Linted with the pinned `@google/design.md@0.4.0`,
+  whose contrast rule covers every declared pair. Generic tells are a
+  detection list (first- and second-order), not a ban list. The section also
+  has building rules, a screenshot loop and an audit for existing apps.
+- **Standard 6** (`SKILL.md` §10, `STANDARDS_REFERENCE.md`): UI projects keep
+  a `DESIGN.md`, read before any UI file is edited.
+
+### Changed
+- **The visual pass** (`GATE_REFERENCE.md`, Gate 2) compares touched screens
+  against `DESIGN.md`, blocks raw colours and unchosen tells in changed UI
+  files, and runs `lint` when the tokens change. The DOCS gate checks that
+  `DESIGN.md` describes a changed look.
+
 ## [2.48.0] — 2026-10-03
 
 **The 3 October workflow audit's five skill items, and a lesson from
