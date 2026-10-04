@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.50.0] — 2026-10-04
+
+**Repos tell sessions to load the skill.** A v2.49.0 tag was pushed before its
+PR merged, in a session that hadn't loaded dev-skills, so Gate 6's merge check
+never ran. The release workflow's guard caught it.
+
+### Added
+- **`claude_md` probe key** (`SESSION_START.md`): when the repo's `CLAUDE.md`
+  doesn't mention dev-skills, the first commit approval offers to add a line
+  telling sessions to load the skill before any commit, push, merge or
+  release. A decline is kept in local git config
+  (`dev-skills.claudemd declined`) and not offered again.
+
 ## [2.49.0] — 2026-10-04
 
 **A design standard, from a cert-generator lesson.** UI work no longer falls

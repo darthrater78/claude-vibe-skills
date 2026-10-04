@@ -53,6 +53,7 @@ p leftover_tests bash -c 'command -v docker >/dev/null 2>&1 || { echo no-docker;
 p local_tracked bash -c 'git ls-files -- .dev-skills-gates.md .claude/dev-skills-gates.md .dev-skills-handoff.md .claude/handoffs HANDOFF.md | tr "\n" " "; echo'
 p handoff bash -c 'git log -1 --format="%cs %h" refs/dev-skills/handoff 2>/dev/null || echo none'
 p lessons bash -c 'git log -1 --format="%cs" refs/dev-skills/lessons 2>/dev/null || echo none'
+p claude_md bash -c 'grep -qs "dev-skills" CLAUDE.md && echo yes || git config --get dev-skills.claudemd || echo no'
 p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
 ```
 
@@ -85,6 +86,11 @@ Reading it:
   line what it picks up. It is replaced when this session writes its own.
 - **`lessons` is a date only in the skill's own repo**, when other sessions
   recorded lessons for it: read `LESSONS_REFERENCE.md`, "In the skill's repo".
+- **`claude_md=no`: the repo's `CLAUDE.md` doesn't tell sessions to load
+  this skill**. At the first commit approval, offer to add this line to
+  `CLAUDE.md` (creating it if needed) in that commit: `Load the dev-skills skill before any commit, push,
+  merge or release in this repo.` A no is kept with `git config
+  dev-skills.claudemd declined` (local config) and not offered again.
 - **`leftover_tests` lists test containers an earlier session left behind**
   (`ENFORCEMENT.md`, A12). The banner shows `⚠️ Leftover test containers: N`,
   and before any new work, present a ▶️ RUN THIS block that removes them
@@ -366,9 +372,7 @@ arrives. The checks deny git writes while it reads `unchosen`. **Edit this
 file with the Write/Edit tools, never the shell**, so the checks can show the
 user each line that declines enforcement, approves host networking or waives
 a finding (`ENFORCEMENT.md`, B5). **It lives in the repo root, not in
-`.claude/`:** Claude Code asks before every edit under `.claude/` whatever the
-permission mode, so a gate file there cost the user a prompt per gate
-(2.39.1 and earlier). A file committed by an earlier session is
+`.claude/`**, where every edit prompts. A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
 sessions add `.dev-skills-gates.md` and `.dev-skills-handoff.md` to
 `.gitignore` and keep them untracked, so neither can ever block a commit, PR,
@@ -376,8 +380,8 @@ checkout or pull (the handoff is committed to its own local ref instead). An
 old `.claude/dev-skills-gates.md` is never read again; leave it alone (deleting
 it is an edit under `.claude/`, so it would prompt) and tell the user once that
 they can delete it. **`local_tracked` naming paths on a local session** means
-an earlier session committed them. A tracked gate file blocks `git checkout`
-whenever a session rewrites it (2.28.0–2.39.0 committed it): untrack it. For
+an earlier session committed them, and a tracked gate file blocks `git
+checkout`: untrack it. For
 older handoffs (`.claude/handoffs/`, `HANDOFF.md`), ask once whether to move
 the newest into `refs/dev-skills/handoff` and untrack them all, since the
 user may want them kept in the repo; their answer stands. Untrack with `git rm -r --cached <path>` plus the
@@ -386,8 +390,7 @@ approval. **Once that
 commit reaches the default branch, every other clone meets it once:** a pull
 deletes that clone's copy, or refuses with "would be overwritten" if the
 file has local edits. Say so in the approval. The fix is `git stash push
-<path>` (or discard it) before pulling. Nothing durable is
-lost, since each session rewrites the file. On remote
+<path>` (or discard it) before pulling. On remote
 containers it is committed with the work. This file, not the conversation, is the source of truth for gate
 state and mode for the rest of the session.
 
@@ -426,7 +429,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.49.0 active.
+Dev Skills v2.50.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -457,12 +460,11 @@ All work on branches — merge to default branch via PR only.
 `Checks: ✅ origin, CI, local dev, releases, default branch, skill version`. `Repo`, `Mode`,
 `Env`, `Shell` and `Enforcement` always print. They are this session's settings, not checks.
 
-**Important:** The version shown must match the `version` field in `SKILL.md`'s
-frontmatter. If they differ, the skill was not repackaged after a version bump —
-surface this to the user.
+**The version shown must match `SKILL.md`'s `version:`.** If they differ, the
+skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.49.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.50.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases
@@ -478,11 +480,8 @@ To disable for this session, run the line for each one you don't need:
 ```
 
 Rules for the MCP check:
-- **Only name servers whose `mcp__<server>__` tool prefixes are literally in your
-  context.** Never infer or guess.
-- Distinguish **active** (full tool definitions loaded — expensive, thousands of
-  tokens per request) from **deferred** (name-only, schemas loaded on demand —
-  cheap). Report deferred as a count only: "N deferred (low overhead)".
+- Name only servers whose prefixes are in context, and report deferred ones
+  as a count (`SKILL.md` §5.5): "N deferred (low overhead)".
 - **Give one ready-to-paste `/mcp disable <server>` line per active server**,
   never a bare `/mcp`. `<server>` is the name from the tool prefix. If Claude
   Code does not recognize it, the name shown in the `/mcp` list is the one to
