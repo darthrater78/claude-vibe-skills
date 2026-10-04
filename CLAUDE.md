@@ -5,6 +5,9 @@ billed on every request of every session that loads the skill, and each
 reference file is read in full when it loads, so every sentence is a
 recurring cost.
 
+Load the dev-skills skill before any commit, push, merge or release in this
+repo: the skill's own repo goes through its gates.
+
 ## Cost and logic pass — after every skill update
 
 Any change under `skills/dev-skills/` (a fix, a feature, applied lessons) is

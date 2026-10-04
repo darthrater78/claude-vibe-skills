@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.49.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.50.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.49.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.49.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.50.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.50.0)
 
 ---
 
@@ -121,6 +121,11 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Every repo learns to load the skill.** When a repo's `CLAUDE.md` doesn't
+  tell sessions to load dev-skills before a commit, push, merge or release,
+  the first commit approval offers to add that line, so a session that never
+  loads the skill can't commit around the gates. A no is remembered locally.
+  *(2.50.0)*
 - **Apps stop looking AI-made.** UI projects keep a `DESIGN.md` in Google's
   open format: an identity chosen from the product, tokens for every state
   and theme, and a Never list. Its linter checks contrast. The BUILD gate
@@ -198,7 +203,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.49.0 — all refs agree
+     🔢 VERSION    ✅ v2.50.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -215,9 +220,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.49.0
+Version: 2.50.0
 
-🔢 VERSION    ✅ all refs at 2.49.0; prev v2.48.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.50.0; prev v2.49.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -986,4 +991,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.49.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.50.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
