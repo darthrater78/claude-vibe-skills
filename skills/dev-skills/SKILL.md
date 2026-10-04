@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.48.0
+version: 2.49.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -776,3 +776,6 @@ full, and how to build it.
    mount under `/opt/docker/<container-name>/`. Never `network_mode: host`
    without the user's explicit permission for that container. The image tag
    is pinned to the current version, never `latest`.
+6. **UI projects keep a `DESIGN.md`**, and it is read before any UI file is
+   edited and followed over model defaults. No `DESIGN.md`, a new screen, or
+   a design audit: read `DESIGN_REFERENCE.md` first.

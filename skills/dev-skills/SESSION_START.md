@@ -31,7 +31,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE RELEASE_GATES SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE RELEASE_GATES SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE DESIGN_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -399,7 +399,7 @@ Track: release sequence
 Mode: manual
 Origin: owner/repo (not a fork)
 Start: 1a2b3c4
-Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅
+Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅ · design ✅ DESIGN.md
 Version: 2.12.0
 Updated: 2026-09-07
 
@@ -426,7 +426,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.48.0 active.
+Dev Skills v2.49.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -462,7 +462,7 @@ frontmatter. If they differ, the skill was not repackaged after a version bump �
 surface this to the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.48.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.49.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

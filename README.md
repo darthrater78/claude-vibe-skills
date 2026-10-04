@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.48.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.49.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.48.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.48.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.49.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.49.0)
 
 ---
 
@@ -121,6 +121,11 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Apps stop looking AI-made.** UI projects keep a `DESIGN.md` in Google's
+  open format: an identity chosen from the product, tokens for every state
+  and theme, and a Never list. Its linter checks contrast. The BUILD gate
+  holds changes to it, and existing apps get an audit that derives one from
+  the code. *(2.49.0)*
 - **Generated CI skips docs-only changes from day one, and the weekly audit
   issue is a work queue.** Every template gates its build, test and lint jobs
   on one fail-closed `changes` job (matrix jobs skip by step). Workflow
@@ -193,7 +198,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.48.0 — all refs agree
+     🔢 VERSION    ✅ v2.49.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -210,9 +215,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.48.0
+Version: 2.49.0
 
-🔢 VERSION    ✅ all refs at 2.48.0; prev v2.47.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.49.0; prev v2.48.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -873,6 +878,7 @@ The skill uses tiered loading to keep token costs down:
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
 | `STANDARDS_REFERENCE.md` | ~2KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — how the login protections are built, and the compose quickstart example |
+| `DESIGN_REFERENCE.md` | ~5KB | Only for a project with a UI: when it is designed, gets a new screen or has no `DESIGN.md`, at Gate 2's visual pass, and for a design audit — the `DESIGN.md` format and lint, the generic tells to spot, building rules, the audit |
 | `SECURITY_REFERENCE.md` | ~16KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
@@ -980,4 +986,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.48.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.49.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

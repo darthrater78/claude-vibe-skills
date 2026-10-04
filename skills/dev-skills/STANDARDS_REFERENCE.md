@@ -50,6 +50,8 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
    it as a version reference, so a release that bumps the version bumps the
    compose file too (`RELEASE_GATES.md`, Gate 1, check 2). Gate 4 checks the
    quickstart.
+6. **UI projects keep a `DESIGN.md`.** Its rules and the audit are in
+   `DESIGN_REFERENCE.md`; Gates 2 and 4 check it (`GATE_REFERENCE.md`).
 
 
 ## Login: TOTP, 30-day trust, and a rescue path
