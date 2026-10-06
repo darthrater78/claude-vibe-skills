@@ -122,7 +122,9 @@ def run(mode: str, payload: dict, env: dict | None = None) -> str:
     obj = json.loads(out)
     hso = obj.get("hookSpecificOutput", {})
     if hso.get("permissionDecision"):
-        return hso["permissionDecision"]
+        # "allow!" is an explicit allow, which skips Claude Code's own prompt; plain
+        # "allow" is silence, which leaves the decision to Claude Code.
+        return "allow!" if hso["permissionDecision"] == "allow" else hso["permissionDecision"]
     if obj.get("decision") == "block":
         return "block"
     if hso.get("additionalContext"):
@@ -203,6 +205,36 @@ def edit(tool: str, inp: dict, gates: str | None = GATES_ALL) -> str:
     inp = dict(inp)
     inp["file_path"] = os.path.join(d, inp["file_path"])
     return run("pre-tool", {"session_id": "t", "tool_name": tool, "cwd": d, "tool_input": inp})
+
+
+GATE_ROW_EDIT = {"old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ⏳ scanning"}
+
+
+def edit_from_subdir() -> str:
+    d = repo(GATES_NONE)
+    os.makedirs(os.path.join(d, "src", "deep"))
+    return run("pre-tool", {"session_id": "t", "tool_name": "Edit", "cwd": os.path.join(d, "src", "deep"),
+                            "tool_input": dict(GATE_ROW_EDIT, file_path=os.path.join(d, ".dev-skills-gates.md"))})
+
+
+def edit_from_other_repo(project_dir: bool = True) -> str:
+    """The session opened in one repo and a `cd` left its cwd in another."""
+    d, other = repo(GATES_NONE), repo(GATES_NONE)
+    return run("pre-tool", {"session_id": "t", "tool_name": "Edit", "cwd": other,
+                            "tool_input": dict(GATE_ROW_EDIT, file_path=os.path.join(d, ".dev-skills-gates.md"))},
+               env={"CLAUDE_PROJECT_DIR": d} if project_dir else {"CLAUDE_PROJECT_DIR": ""})
+
+
+def edit_linked_gate(new: str = "✅ 0 open") -> str:
+    """The gate file is a symlink to a file elsewhere, so an edit lands outside the repo."""
+    d = repo(None)
+    target = os.path.join(tempfile.mkdtemp(prefix="dsk-link-"), "elsewhere.md")
+    with open(target, "w", encoding="utf-8") as fh:
+        fh.write(GATES_NONE)
+    path = os.path.join(d, ".dev-skills-gates.md")
+    os.symlink(target, path)
+    return run("pre-tool", {"session_id": "t", "tool_name": "Edit", "cwd": d, "tool_input": {
+        "file_path": path, "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   " + new}})
 
 
 GOOD_WF = """name: CI
@@ -538,24 +570,24 @@ CASES = [
     # --- B5: gate file and settings edits
     ("B5 manual gate to ✅ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                             "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 0 open"},
-                                   gates=GATES_NONE), "allow"),
+                                   gates=GATES_NONE), "allow!"),
     ("B5 mode set ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                           "old_string": "Mode: unchosen", "new_string": "Mode: manual"},
-                                 gates=GATES_UNCHOSEN), "allow"),
+                                 gates=GATES_UNCHOSEN), "allow!"),
     ("B5 decline", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                          "old_string": "Mode: manual", "new_string": "Mode: manual\nHook enforcement: declined"}), "ask"),
     ("B5 host net approval", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                     "content": GATES_ALL + "Host network: x approved today\n"}), "ask"),
     ("B5 gate to ⏳ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ⏳ scanning"},
-                                      gates=GATES_NONE), "allow"),
+                                      gates=GATES_NONE), "allow!"),
     ("B5 declined can't skip B5", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                         "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
                                                gates=GATES_DECLINED), "ask"),
     ("B5 edit beside an approved waiver ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
-        "old_string": "(fixed H1; waived M1)", "new_string": "(fixed H1 L2; waived M1)"}, gates=WAIVED_GATES), "allow"),
+        "old_string": "(fixed H1; waived M1)", "new_string": "(fixed H1 L2; waived M1)"}, gates=WAIVED_GATES), "allow!"),
     ("B5 whole-file rewrite keeping waivers ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
-        "content": WAIVED_GATES.replace("📄 DOCS       ✅", "📄 DOCS       ✅ changelog 1.2.0")}, gates=WAIVED_GATES), "allow"),
+        "content": WAIVED_GATES.replace("📄 DOCS       ✅", "📄 DOCS       ✅ changelog 1.2.0")}, gates=WAIVED_GATES), "allow!"),
     ("B5 new waiver record asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
         "old_string": "    open notes", "new_string": "    🔕 waived 2026-09-27 by user: M2 accepted\n    open notes"},
         gates=WAIVED_GATES), "ask"),
@@ -565,10 +597,23 @@ CASES = [
         "old_string": "📄 DOCS       ✅", "new_string": "📄 DOCS       ✅ (waived M1)"}, gates=WAIVED_GATES), "ask"),
     ("B5 adding test artifact n/a asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
         "old_string": "🔨 BUILD      ➖ N/A — no build system", "new_string": "🔨 BUILD      ✅ docs only\n  test artifact: n/a — no app code changed"}), "ask"),
+    ("B5 first write of the gate file ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
+                                                                  "content": GATES_NONE}, gates=None), "allow!"),
+    ("B5 gate file outside the repo root is left to Claude Code", lambda: edit("Write", {
+        "file_path": os.path.join("sub", ".dev-skills-gates.md"), "content": GATES_NONE}), "allow"),
+    ("B5 gate edit from a subdirectory ok", lambda: edit_from_subdir(), "allow!"),
+    ("B5 gate edit after cwd moved to another repo ok", lambda: edit_from_other_repo(), "allow!"),
+    ("B5 another repo's gate file is left to Claude Code", lambda: edit_from_other_repo(project_dir=False), "allow"),
+    ("B5 symlinked gate file is left to Claude Code", lambda: edit_linked_gate(), "allow"),
+    ("B5 symlinked gate file still asks for a waiver", lambda: edit_linked_gate("✅ (waived M9)"), "ask"),
     ("B5 settings file", lambda: edit("Write", {"file_path": ".claude/settings.json", "content": "{}"}), "ask"),
-    ("B5 bash routine write to gate file ok", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "allow"),
-    ("B5 bash sed of a gate row ok", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open/' .dev-skills-gates.md"), "allow"),
-    ("B5 bash heredoc row update ok", lambda: bash("python3 - <<'EOF'\np='.dev-skills-gates.md'; s=open(p).read()\nopen(p,'w').write(s.replace('⬜','✅'))\nEOF"), "allow"),
+    ("B5 bash routine write to gate file goes to Edit", lambda: bash("echo 'x' >> .dev-skills-gates.md"), "deny"),
+    ("B5 bash sed of a gate row goes to Edit", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open/' .dev-skills-gates.md"), "deny"),
+    ("B5 bash heredoc row update goes to Edit", lambda: bash("python3 - <<'EOF'\np='.dev-skills-gates.md'; s=open(p).read()\nopen(p,'w').write(s.replace('⬜','✅'))\nEOF"), "deny"),
+    ("B5 bash copy of the gate file elsewhere ok", lambda: bash("cp .dev-skills-gates.md /tmp/gates.bak"), "allow"),
+    ("B5 bash read of the gate file ok", lambda: bash("cat .dev-skills-gates.md && grep -c ✅ .dev-skills-gates.md"), "allow"),
+    ("B5 bash stash of the gate file ok", lambda: bash("git stash push .dev-skills-gates.md"), "allow"),
+    ("B5 bash sed -i on another file naming the gate file ok", lambda: bash("sed -i '/dev-skills-gates.md/d' .gitignore"), "allow"),
     ("B5 bash ignore entry naming gate file ok", lambda: bash("printf '.dev-skills-gates.md\\n' >> .gitignore"), "allow"),
     ("B5 probe naming gate file ok", lambda: bash("p() { o=$(\"$@\" 2>&1); echo \"$1=$o\"; }\np local_tracked bash -c 'git ls-files -- .dev-skills-gates.md | tr \"\\n\" \" \"'"), "allow"),
     ("B5 bash waiver into gate file asks", lambda: bash("sed -i 's/^🔒 SECURITY .*/🔒 SECURITY   ✅ 0 open (waived M1)/' .dev-skills-gates.md"), "ask"),
@@ -581,7 +626,7 @@ CASES = [
     ("B5 bash find -delete gate file asks", lambda: bash("find . -name .dev-skills-gates.md -delete"), "ask"),
     ("B5 bash git checkout of gate file asks", lambda: bash("git checkout HEAD~3 -- .dev-skills-gates.md"), "ask"),
     ("B5 bash git show into gate file asks", lambda: bash("git show HEAD~1:.dev-skills-gates.md > .dev-skills-gates.md"), "ask"),
-    ("B5 bash heredoc rows ok", lambda: bash("cat >> .dev-skills-gates.md <<'EOF'\n  build ok\nEOF"), "allow"),
+    ("B5 bash heredoc rows goes to Edit", lambda: bash("cat >> .dev-skills-gates.md <<'EOF'\n  build ok\nEOF"), "deny"),
     ("B5 bash backup copy of gate file ok", lambda: bash("cp .dev-skills-gates.md /tmp/backup.md"), "allow"),
     ("B5 bash cat read piped ok", lambda: bash("cat .dev-skills-gates.md | head -5"), "allow"),
     ("B5 bash commit message naming gate file ok", lambda: bash("git add x && git commit -m 'waived M1 in .dev-skills-gates.md'", gates=GATES_WORK), "allow"),
@@ -596,19 +641,19 @@ CASES = [
     ("B5 bash read gate file ok", lambda: bash("cat .dev-skills-gates.md"), "allow"),
     ("B5 semi-auto gate to ✅ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                      "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 0 open"},
-                                            gates=GATES_SEMI), "allow"),
+                                            gates=GATES_SEMI), "allow!"),
     ("B5 semi-auto waiver still asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                              "old_string": "🔒 SECURITY   ⬜", "new_string": "🔒 SECURITY   ✅ 1 waived"},
                                                     gates=GATES_SEMI), "ask"),
     ("B5 semi-auto mode change ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                                                   "old_string": "Mode: semi-autonomous", "new_string": "Mode: manual"},
-                                                         gates=GATES_SEMI), "allow"),
+                                                         gates=GATES_SEMI), "allow!"),
     ("B5 leaving semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                                            "content": GATES_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
-                                                                  gates=GATES_SEMI), "allow"),
+                                                                  gates=GATES_SEMI), "allow!"),
     ("B5 switching to semi-auto + gate in one edit ok", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                                                  "content": GATES_SEMI.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅")},
-                                                                        gates=GATES_NONE), "allow"),
+                                                                        gates=GATES_NONE), "allow!"),
     # --- B6: the gate file stays out of local commits
     ("B6 git add gate file", lambda: bash("git add .dev-skills-gates.md"), "deny"),
     ("B6 git add -f gate file", lambda: bash("git add -f .dev-skills-gates.md"), "deny"),
@@ -720,12 +765,12 @@ CASES = [
     ("A4 command after heredoc checked", lambda: bash("cat <<'EOF' > x\nhi\nEOF\ngit push", gates=GATES_NONE), "deny"),
     ("A4 quoted << is not a heredoc", lambda: bash('python3 -c "x=1<<y"\ngit push\ny', gates=GATES_NONE), "deny"),
     ("A4 <<- heredoc with tab delimiter", lambda: bash("cat <<-EOF > x\n\tgit push\n\tEOF\ngit push", gates=GATES_NONE), "deny"),
-    ("B5 PowerShell Set-Content gate file ok", lambda: pwsh('Set-Content .dev-skills-gates.md "x"'), "allow"),
-    ("B5 PowerShell Out-File gate file ok", lambda: pwsh("'x' | Out-File .dev-skills-gates.md"), "allow"),
+    ("B5 PowerShell Set-Content gate file goes to Edit", lambda: pwsh('Set-Content .dev-skills-gates.md "x"'), "deny"),
+    ("B5 PowerShell Out-File gate file goes to Edit", lambda: pwsh("'x' | Out-File .dev-skills-gates.md"), "deny"),
     ("B5 PowerShell waiver into gate file asks", lambda: pwsh("Add-Content .dev-skills-gates.md 'waived M1'"), "ask"),
     ("B5 PowerShell Remove-Item gate file asks", lambda: pwsh("Remove-Item .dev-skills-gates.md"), "ask"),
     ("B5 PowerShell Copy-Item settings", lambda: pwsh("Copy-Item x C:\\Users\\me\\.claude\\settings.json"), "ask"),
-    ("B5 PowerShell .NET write gate file ok", lambda: pwsh("[IO.File]::WriteAllText('.dev-skills-gates.md', 'x')"), "allow"),
+    ("B5 PowerShell .NET write gate file goes to Edit", lambda: pwsh("[IO.File]::WriteAllText('.dev-skills-gates.md', 'x')"), "deny"),
     ("B5 PowerShell read gate file ok", lambda: pwsh("Get-Content .dev-skills-gates.md"), "allow"),
     ("B5 other file ok", lambda: edit("Write", {"file_path": "README.md", "content": "hi"}), "allow"),
     # --- C: replies

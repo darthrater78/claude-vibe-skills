@@ -298,6 +298,13 @@ session can reach that endpoint, say that plainly — the finding stays open on
 the user's word alone, or they waive it. Do not mark it fixed from an
 unverified "I turned it on".
 
+**Code scanning: read the default branch, not only the PR.** A query scoped
+to a PR ref lists only alerts new against the base, so its `0` is not a
+verdict. When the repo has code scanning, read
+`GET /repos/{owner}/{repo}/code-scanning/alerts?state=open&ref=refs/heads/<default>`
+as well as the working branch, and account for each default-branch alert by
+number: fixed by this diff (check the sink it flags), or still open.
+
 #### Step 2 — Quality review
 
 Scan the changed code for every quality pattern in `QUALITY_REFERENCE.md`, plus

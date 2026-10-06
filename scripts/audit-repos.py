@@ -133,9 +133,19 @@ def workflow_files(repo: dict, token: str) -> list[tuple[str, str]]:
 def cell(text: str) -> str:
     """Workflow text is data from another repo: keep it from breaking the table,
     mentioning anyone, or running long."""
-    text = " ".join(text.split()).replace("|", "\\|").replace("@", "&#64;").replace("<", "&lt;")
-    text = text.replace("[", "\\[").replace("!", "&#33;")
-    return text if len(text) <= 180 else text[:177] + "..."
+    text = " ".join(text.split())
+    text = text if len(text) <= 180 else text[:177] + "..."
+    # GitHub shows entities literally inside a code span, and nothing in one can
+    # mention or link, so only the text outside the spans is escaped. Backticks
+    # that don't pair up cleanly mean no span can be trusted: escape it all.
+    parts = text.split("`")
+    spans = len(parts) % 2 == 1 and "``" not in text
+    return "`".join(p.replace("|", "\\|") if spans and i % 2 else escape(p) for i, p in enumerate(parts))
+
+
+def escape(text: str) -> str:
+    text = text.replace("|", "\\|").replace("@", "&#64;").replace("<", "&lt;")
+    return text.replace("[", "\\[").replace("!", "&#33;")
 
 
 def audit(repos: list[dict], token: str) -> tuple[list[tuple[str, str, str, str]], list[str], int]:

@@ -152,6 +152,11 @@ Execution (merge, tag, publish) happens in Gate 6.
    > Do these accurately describe what's in this build? Reply "yes" to ship,
    > or tell me what to change.
 
+   **Read the title and body back after changing them** (`gh pr view <n>
+   --json title,body`). `gh pr edit` can fail on a GraphQL "Projects
+   (classic)" error and change nothing; then use
+   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -f title=… -F body=@<file>`.
+
 8. Wait for explicit approval of the PR content and release notes. **In
    semi-autonomous mode this approval already happened** — the release notes were part
    of the single commit checkpoint. Post the PR and the notes for the record and

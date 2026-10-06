@@ -160,11 +160,16 @@ means a new artifact.
 |---|---|
 | **Local, Linux host** (Linux Terminal, WSL) | Built here: Docker image, `.exe`, `.apk`, binary |
 | **Local, Windows host** (PowerShell, Git Bash) | Built here: `.exe`, `.apk`. Docker only if `docker info` answers; otherwise from CI, as in the next row |
-| **Remote container or Termux** | Built by CI from the PR head commit: a PR build workflow that uploads it (`actions/upload-artifact`; a Docker image as a `docker save` tarball artifact or pushed with a `pr-<number>` tag), or a pre-release tag the user pushes (`WORKFLOW_REFERENCE.md`, "Dev releases"). Give the user the link to that run's artifact or the pre-release |
+| **Remote container or Termux** | Built by CI from the PR head commit: a PR build workflow that uploads it (`actions/upload-artifact`; a Docker image as a `docker save` tarball artifact or pushed with a `pr-<number>` tag), or a pre-release tag the user pushes (`WORKFLOW_DEVRELEASE.md`). Give the user the link to that run's artifact or the pre-release |
 
 **No way to produce one is a blocked merge, not a skipped step.** If CI has no
 job that publishes a test artifact for a PR, offer to create one (`SKILL.md`
-§9) or a dev pre-release, and hold the merge until one exists. A container
+§9) or a dev pre-release, and hold the merge until one exists. **When the
+artifact is needed before the PR can open** (the checks hold a PR to gates
+1–4), build it from the branch with `workflow_dispatch`
+(`gh workflow run <ci file> --ref <branch>`; add the trigger if the workflow
+lacks it). Not a PR opened to start CI, and not CI on every branch push,
+which runs twice for each PR. A container
 that cannot build Docker at all is the earlier problem in `REMOTE_SESSION.md`,
 item 8.
 

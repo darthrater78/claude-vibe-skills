@@ -88,20 +88,26 @@ Reading it:
   recorded lessons for it: read `LESSONS_REFERENCE.md`, "In the skill's repo".
 - **`claude_md=no`: the repo's `CLAUDE.md` doesn't tell sessions to load
   this skill**. At the first commit approval, offer to add this line to
-  `CLAUDE.md` (creating it if needed) in that commit: `Load the dev-skills skill before any commit, push,
-  merge or release in this repo.` A no is kept with `git config
+  `CLAUDE.md` (creating it if needed) in that commit: `Load the dev-skills skill at session start in this
+  repo, before any edit.` A no is kept with `git config
   dev-skills.claudemd declined` (local config) and not offered again.
 - **`leftover_tests` lists test containers an earlier session left behind**
   (`ENFORCEMENT.md`, A12). The banner shows `⚠️ Leftover test containers: N`,
   and before any new work, present a ▶️ RUN THIS block that removes them
   (`docker rm -f …`) and their temp mount folders
   (`docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}'` lists them).
+  Ask first about one the handoff records as kept.
 - **`head` is the commit this session starts on.** Write it to the gate file's
   `Start:` row: the session-end checkpoint diffs against it (`SKILL.md` §8),
   and a row survives compaction where a remembered hash does not.
 - **The probe only reads, plus one `git fetch`**, which updates the
   remote-tracking refs and nothing in the working tree. So `status`'s
   ahead/behind counts are current, and step 3 asks only when they say behind.
+
+**Loaded mid-session** (edits made, containers running): skip nothing
+below. `Start:` is `merge-base HEAD origin/<default>`. Before any git write,
+check containers this session started against A1 and A12
+(`ENFORCEMENT.md`); restart any that fail.
 
 Steps 2 and 3 are questions for the user, not reads. Every step below still
 applies: the probe changes how many calls it takes, never what gets checked.
@@ -371,12 +377,11 @@ probe's `head`, and `Mode: unchosen`
 arrives. The checks deny git writes while it reads `unchosen`. **Edit this
 file with the Write/Edit tools, never the shell**, so the checks can show the
 user each line that declines enforcement, approves host networking or waives
-a finding (`ENFORCEMENT.md`, B5). **It lives in the repo root, not in
-`.claude/`**, where every edit prompts. A file committed by an earlier session is
+a finding (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
 overwritten, not inherited: its `Mode:` line describes that session. On local
 sessions add `.dev-skills-gates.md` and `.dev-skills-handoff.md` to
 `.gitignore` and keep them untracked, so neither can ever block a commit, PR,
-checkout or pull (the handoff is committed to its own local ref instead). An
+checkout or pull. An
 old `.claude/dev-skills-gates.md` is never read again; leave it alone (deleting
 it is an edit under `.claude/`, so it would prompt) and tell the user once that
 they can delete it. **`local_tracked` naming paths on a local session** means
@@ -391,8 +396,7 @@ commit reaches the default branch, every other clone meets it once:** a pull
 deletes that clone's copy, or refuses with "would be overwritten" if the
 file has local edits. Say so in the approval. The fix is `git stash push
 <path>` (or discard it) before pulling. On remote
-containers it is committed with the work. This file, not the conversation, is the source of truth for gate
-state and mode for the rest of the session.
+containers it is committed with the work.
 
 **Format:**
 
@@ -429,7 +433,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.50.0 active.
+Dev Skills v2.51.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -464,7 +468,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.50.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.51.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

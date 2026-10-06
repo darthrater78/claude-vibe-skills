@@ -276,7 +276,10 @@ session stays semi-autonomous; the tracker is updated before Claude reports.
 | Branch push returns `403` | Present the block, report it plainly. No retry, no re-route, no different ref |
 | The tag or a ref deletion is due | Not a failure — the block goes to the user by design, with the report above it (checkpoint 2) |
 | `src refspec ... does not match any` | Not a permissions failure: the tag was never created. Re-run `git tag`, then push (`SHIP_REFERENCE.md`, step 3) |
-| CI fails on the PR | Stop before merging. Report the failing job and its output, propose a fix, wait |
+| Claude Code itself denies a git write Claude is meant to run (a merge, a push) | It is the harness's permission check, not GitHub and not a gate: say so. Don't retry by another route. Present the block, and name the two ways to let Claude run it: say so for this operation, or add a permission rule such as `Bash(gh pr merge:*)` |
+| A CI job failed on the code | Stop before merging. Report the failing job and its output, propose a fix, wait |
+| A CI job never ran (no runner, cancelled, an outage) | Not a code failure, and not green: a run concludes `failure` even when every job that ran passed. Check githubstatus.com, and re-run the failed jobs once service is back, not during the outage |
+| A check can't be re-run (CodeQL default setup and other GitHub-managed runs, with a `dynamic/…` workflow path) | Say so, and offer both on the record: an empty commit to re-trigger CI (commit approval; the tree is unchanged, so the test artifact still matches), or a waiver of that one check with the reason. "Not a required check" is not a pass |
 | The release workflow fails after the tag | Stop. Recovery needs a tag deletion, which needs its own approval (`SKILL.md`, Operating modes) |
 | A Critical or High security finding | Hard stop, same as manual |
 | A decision with more than one defensible answer | Ask. Semi-autonomous mode is not permission to pick for the user |

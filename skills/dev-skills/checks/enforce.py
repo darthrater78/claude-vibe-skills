@@ -1216,8 +1216,9 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
         problems.extend(q for q in temp_mount_problems(who, [m for m in srcs if m not in plain], bool(as_user), text, cwd)
                         if "doesn't exist yet" not in q)
         if not labeled:
-            problems.append(f"{who} has no --label {TEST_LABEL}=\"$CLAUDE_CODE_SESSION_ID\". Write it literally on "
-                            "each command (the check can't expand a shell variable such as $L): test containers are "
+            problems.append(f"{who} has no --label {TEST_LABEL}=\"$CLAUDE_CODE_SESSION_ID\". Write it on each "
+                            "command exactly like that, $CLAUDE_CODE_SESSION_ID included, and not behind another "
+                            "variable such as $L, which the check can't read: test containers are "
                             "labeled so the next session start can find any that were left behind.")
         if "__HOST__" in problems:
             problems.remove("__HOST__")
@@ -1323,6 +1324,14 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
     new = new_content(tool, inp, current)
     added = sensitive_lines(new) - sensitive_lines(current)
     if not added:
+        # Answer allow, not silence: silence hands the edit to Claude Code's own
+        # permission prompt, which asked the user to approve every row update.
+        # Only for the session's own gate file (the repo the command runs in, or
+        # the one the session opened in), and never through a symlink.
+        for r in (root, repo_root(os.environ.get("CLAUDE_PROJECT_DIR") or None) if os.environ.get("CLAUDE_PROJECT_DIR") else None):
+            own = os.path.join(r, STATE_REL) if r else None
+            if own and os.path.realpath(path) == os.path.realpath(own) and not os.path.islink(own):
+                return ("allow", "a routine gate-file update: no waiver, decline or approval added.")
         return None
     return ("ask", "the gate file change needs the user's OK:\n" + "\n".join(f"  + {line}" for line in sorted(added)))
 
@@ -1572,6 +1581,13 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
         return ("ask", "this shell command may write a waiver, an enforcement decline or a host-network approval "
                        "into the gate file. Make that change with Edit/Write so the user sees it:\n"
                        + "\n".join(f"  + {a}" for a in added[:5]))
+    # A routine shell write would pass here and then stop at Claude Code's own
+    # Bash prompt, which is the prompt B5 exists to spare the user. Edit/Write
+    # are allowed outright (file_edit_check), so send the change there.
+    if GATE_WRITE_TARGET.search(cmd) or any(GATE_INPLACE.match(s) for s in segments) \
+            or (INTERPRETER.search(cmd) and SCRIPT_WRITE.search(cmd)):
+        return ("deny", "write the gate file with the Edit or Write tool, not the shell. Those go through "
+                        "without a prompt; a shell write stops for the user's approval.")
     return None
 
 
@@ -1581,6 +1597,8 @@ GATE_WRITE_TARGET = re.compile(r"(>>?|\btee(\s+-a)?|\b(set|add)-content(\s+-path
                                r"\b(write|append)all(text|lines|bytes)\(|\btee-object(\s+-filepath)?)\s*" + GATE_PATH, re.I)
 GATE_WRITE_CMD = re.compile(r"^\s*(sudo\s+)?(sed\s+-i|perl\s+-[a-z]*i|cp|mv|install|ln|truncate|dd|copy|move|"
                             r"copy-item|move-item|cpi|mi)\b", re.I)
+# An in-place edit whose target (last argument) is the gate file.
+GATE_INPLACE = re.compile(r"^\s*(sudo\s+)?(sed\s+-i|perl\s+-[a-z]*i)\b.*dev-skills-gates\.md['\"]?\s*$", re.I)
 GATE_FIND_DELETE = re.compile(r"\bfind\b.*(-delete\b|-exec\s+rm\b)", re.I)
 GATE_EMPTY = re.compile(r"(^|[;&|\n(]\s*)(:|true)?\s*>\s*" + GATE_PATH + r"['\"]?\s*($|[;&|)\n])|"
                         r"\b(truncate|clear-content|clc)\b[^;&|\n]*dev-skills-gates\.md", re.I)

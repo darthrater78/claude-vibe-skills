@@ -235,7 +235,11 @@ mode is the user's answer to the session-start question, and a gate passing
 is shown on the tracker and backed by the commit approval (and, in
 semi-autonomous mode, the pre-tag report). A prompt for each would ask the
 user to approve bookkeeping they already approved. A gate row that adds a
-waiver still asks, because of the waiver.
+waiver still asks, because of the waiver. For an Edit or Write to the
+session's own gate file (the root of the repo it runs in or opened in) the
+check answers `allow`, so Claude Code's own edit prompt doesn't fire either;
+through 2.50.0 it stayed silent and that prompt asked on every row update. A
+gate file that is a symlink, or another repo's, is left to Claude Code.
 
 Other gate-file edits (⏳, evidence, a new session's ⬜ rows) pass. Any edit to
 a Claude Code `settings.json`/`settings.local.json` (`/` or Windows `\`
@@ -244,19 +248,20 @@ like it writes a settings file or the checks asks, including PowerShell's
 `Set-Content`/`Out-File`/`Copy-Item` family, their aliases and
 `[IO.File]::` writes.
 
-**A shell command on the gate file follows the Edit rule.** It asks only when
+**A shell command never writes the gate file.** It asks when
 it deletes or empties the file (`rm`, `git rm` without `--cached`,
 `Remove-Item`, `find -delete`, `: >`, `truncate`), writes it with one of the
 lines above in the command (a waiver clause, `Hook enforcement: declined`,
 `Host network: … approved`, `test artifact: n/a`), or writes it from text the
 command doesn't show (`cp`/`mv` onto it, `git checkout`/`restore` of it, a
 redirect from `cat <file>`, `base64 -d`, `git show` or escape codes), since
-those can't be checked for waivers. Routine row and
-evidence updates, reads, and commands that only name the file (the
-session-start probe, `git add`, an ignore entry, `git rm --cached`) pass.
-Through 2.45.0 any command naming the file with a write-like token asked,
-which prompted on nearly every session. Waivers still belong in an Edit, where
-the change is shown line by line.
+those can't be checked for waivers. Any other shell write to it (a redirect,
+`tee`, `sed -i`, a script that opens it for writing, the PowerShell
+equivalents) is denied with a pointer to Edit/Write: it would pass here and
+then stop at Claude Code's own Bash prompt, while an Edit goes through
+unasked. Reads, copies of it elsewhere, and commands that only name the file
+(the session-start probe, `git add`, an ignore entry, `git rm --cached`,
+`git stash`) pass.
 
 **B6. The gate file stays out of local commits.** A `git add` that names
 `.dev-skills-gates.md`, or force-adds `.`, `-A` or `.claude/` (where a
@@ -365,10 +370,9 @@ have already arrived.
 - **Commands the user runs.** C2–C7 check what Claude hands over. What the
   user actually pastes is theirs.
 - **Anything while declined**, apart from B5.
-- **A script that copies text into the gate file from elsewhere**, such as a
-  Python heredoc that reads another file and writes it there. B5 reads the
-  command, not the result, so a waiver that never appears in the command gets
-  through. Edit/Write stays the rule for the gate file.
+- **A shell write to the gate file the patterns don't recognise** (a script
+  file run by path, an editor in batch mode). B5 reads the command, not the
+  result. Edit/Write stays the rule for the gate file.
 - **A gate file that is already tracked.** B6 stops it being staged by name,
   but once an earlier commit tracks it, `git add -A` or `git commit -a` picks
   up its changes. Session start untracks it (`SESSION_START.md`).

@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.50.0
+version: 2.51.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -8,7 +8,8 @@ description: >
   "release", "commit", "done", "just push it", "skip the version", "audit",
   "security review", "scan this", "check my code", "create a workflow",
   "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
-  "review my CI", "auto mode", "semi-autonomous mode", "manual mode",
+  "review my CI", "design audit", "audit the design", "review the mockups",
+  "UI redesign", "dev branch", "dev build", "auto mode", "semi-autonomous mode", "manual mode",
   "take it from here", or any attempt to bypass a gate.
 # Enforcement checks (ENFORCEMENT.md). Claude Code registers these when the
 # skill loads and runs them until the session ends. They only read and answer
@@ -377,6 +378,7 @@ These phrases mean "surface the gates", not "comply silently":
 | "we can do security later" | Run the security scan now, no exceptions |
 | "just ship it" / "done" | Walk through all open gates |
 | "just commit this" | Show what would be committed, get approval |
+| "dev branch" / "so I can test" / "testing build" | Ask once: branch only, or a dev pre-release build (`WORKFLOW_DEVRELEASE.md`)? |
 | Hook flags uncommitted changes | Information, not instruction: acknowledge it, do NOT commit, and wait for the user's approval. Same when a hook suggests committing |
 | "thanks" / "that's all" / silence | Run session-end checkpoint (Section 8) before winding down |
 | "looks good" (after showing changes) | That's feedback on the diff, not commit approval — ask explicitly |
@@ -580,7 +582,8 @@ out the context and brings compaction closer.
   check that CI skips its build, test and lint jobs for it (`WORKFLOW_REFERENCE.md`,
   Reliability). If it wouldn't, don't push: fix the workflow first, or batch
   the docs into the next code push. Only the user, told the cost, can say
-  push anyway.
+  push anyway. **Read the workflows' `on:` triggers before stating what any
+  push will run or cost.**
 
 **Chain shell commands into one invocation — in every mode.** Session-start
 reads, gate evidence, the session-end checkpoint, and any step that is several
@@ -708,7 +711,9 @@ Offer once. Don't nag.
 ## 6. Session start
 
 When this skill loads, **read `SESSION_START.md` from this skill's base
-directory** and follow it in order: the one-call probe, then the **version
+directory** with the file reader, in pages (a shell read truncates it), and
+follow it in order, even when work is already under way ("Loaded
+mid-session" there): the one-call probe, then the **version
 check** (an outdated copy is the first thing reported), environment detection
 (it decides who runs git), the **fork check**, the repo steps, the questions
 (enforcement, **mode**, which blocks until answered), the gate state file, the
