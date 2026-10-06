@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.51.0] — 2026-10-06
+
+**Gate-file edits stop prompting, and the lessons recorded by sessions in
+seven repos on 4–5 October.**
+
+### Fixed
+- **Routine gate-file edits no longer ask** (`checks/enforce.py`, B5). The
+  check stayed silent on an Edit or Write that added no waiver, decline or
+  approval, which left the decision to Claude Code's own edit prompt, so
+  every row update asked. It now answers `allow` for the repo root's own gate
+  file. A symlinked gate file, or one outside the repo root, is still left to
+  Claude Code, and the lines that asked before still ask. Verified in
+  headless Claude Code 2.1.291: the same edit is refused with the 2.50.0
+  check and goes through with this one.
+- **Shell writes to the gate file are denied with a pointer to Edit/Write**
+  (B5). A routine `sed -i`, redirect or script write used to pass the check
+  and then stop at Claude Code's Bash prompt. Reads, copies elsewhere and
+  commands that only name the file still pass.
+- **Code scanning read from the PR ref alone** (`SECURITY_GATE.md`,
+  `SHIP_REFERENCE.md`): a PR-scoped query lists only new alerts, so `0 open`
+  hid one already on the default branch. Gate 3 reads the default branch too
+  and accounts for each alert by number; Gate 6 re-reads after the merge.
+- **Test login shown without its password** (`DOCKER_TEST.md`): each run
+  block ends by printing URL, user and password, and a file path or "run
+  `cat`" in place of the password is a Gate 2 failure.
+- **A12's deny text** no longer says to write the label "literally" while
+  requiring `$CLAUDE_CODE_SESSION_ID`.
+- **Weekly audit issue** (`scripts/audit-repos.py`): `@` inside a code span
+  was written as `&#64;`, which GitHub shows as typed.
+- `GATE_REFERENCE.md` pointed at a "Dev releases" section that moved to
+  `WORKFLOW_DEVRELEASE.md` in 2.43.0.
+
+### Added
+- **Loaded mid-session** (`SESSION_START.md`, `SKILL.md` §6): nothing is
+  skipped, `Start:` is the merge base, and containers already running are
+  checked against A1 and A12 before any git write. `SESSION_START.md` is read
+  with the file reader, since a shell read truncated it.
+- **"When it stops" rows** (`AUTO_MODE.md`): Claude Code's own permission
+  check refusing a merge or push; a CI job that never ran; a check that can't
+  be re-run.
+- **Shortcut row and triggers** (`SKILL.md`): "dev branch", "so I can test"
+  and "testing build" ask once: branch only, or a dev pre-release build; design-audit phrases load the skill.
+- **Design audits that lead to a redesign** start from the product's
+  identity, not from the tell table (`DESIGN_REFERENCE.md`).
+- **Run blocks** (`SHELL_REFERENCE.md`): a bounced reply is fixed in one pass
+  and carries only the blocks still owed; nothing optional rides with the tag
+  block; a block
+  for the Claude Code terminal is one line, run from `!` shell mode.
+- **A test artifact before the PR** comes from `workflow_dispatch` on the
+  branch (`GATE_REFERENCE.md`, Gate 2).
+- **A test container the user asks to keep** stays, recorded with its removal
+  command (`DOCKER_TEST.md`, `SESSION_END.md`, `SESSION_START.md`).
+- `gh pr edit` failing silently: read the PR back, REST fallback
+  (`RELEASE_GATES.md`, Gate 5).
+- CI cost statements read the workflows' `on:` triggers first (`SKILL.md`
+  §5.1).
+
+### Changed
+- The `CLAUDE.md` line offered to repos now says to load the skill **at
+  session start**, not before a commit: the earlier wording loaded it hours
+  into a session.
+
 ## [2.50.0] — 2026-10-04
 
 **Repos tell sessions to load the skill.** A v2.49.0 tag was pushed before its

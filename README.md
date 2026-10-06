@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.50.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.51.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.50.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.50.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.51.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.51.0)
 
 ---
 
@@ -100,7 +100,7 @@ to install.
 | Group | What's checked |
 |---|---|
 | **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line don't), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
+| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
@@ -121,6 +121,13 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Gate-file updates stop asking, and twenty-one lessons from real
+  sessions.** Routine edits to the gate file no longer raise Claude Code's
+  edit prompt; waivers, declines and approvals still do. Code-scanning
+  alerts are read on the default branch, the test login prints its password
+  every time a container starts, and the skill says what to do when it loads
+  mid-session, when Claude Code refuses a merge, and when a CI job never
+  ran. *(2.51.0)*
 - **Every repo learns to load the skill.** When a repo's `CLAUDE.md` doesn't
   tell sessions to load dev-skills before a commit, push, merge or release,
   the first commit approval offers to add that line, so a session that never
@@ -203,7 +210,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.50.0 — all refs agree
+     🔢 VERSION    ✅ v2.51.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -220,9 +227,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.50.0
+Version: 2.51.0
 
-🔢 VERSION    ✅ all refs at 2.50.0; prev v2.49.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.51.0; prev v2.50.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -991,4 +998,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.50.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.51.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -31,7 +31,8 @@ git status -sb; git diff --stat <start>; git log --oneline origin/<default>..HEA
    backstop: a reclaimed container, a usage limit or a crash never reaches it,
    which is why `SESSION_START.md` step 7 is the primary check.
 5. **Orphaned test containers.** Anything this session started for Gate 2
-   testing must be gone from `docker ps`. Remove it now if not.
+   testing must be gone from `docker ps`. Remove it now if not, unless the
+   user asked to keep it (`DOCKER_TEST.md`, teardown).
 6. **Token impact estimate** (Section 5.7). This checkpoint is its firm
    trigger.
 7. **Lessons for the skill itself.** If this session showed a rule, check or

@@ -30,7 +30,7 @@ case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) e
   && docker run -d --rm --name <app>-test --label dev-skills.test="$CLAUDE_CODE_SESSION_ID" -p "$HOST_IP:8080:8080" \
   -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image> \
   && sleep 3 && docker port <app>-test \
-  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
+  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "LOGIN http://$HOST_IP:8080 · $TEST_USER · $TEST_PASS"
 ```
 
 **Windows host (Docker Desktop).** There is no `ip` command, so read the LAN
@@ -45,7 +45,7 @@ case "$HOST_IP" in 10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) ;; *) e
   && docker run -d --rm --name <app>-test --label dev-skills.test="$CLAUDE_CODE_SESSION_ID" -p "$HOST_IP:8080:8080" \
   -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image> \
   && sleep 3 && docker port <app>-test \
-  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "reachable at http://$HOST_IP:8080"
+  && curl -fsS -o /dev/null "http://$HOST_IP:8080/" && echo "LOGIN http://$HOST_IP:8080 · $TEST_USER · $TEST_PASS"
 ```
 
 From PowerShell (a block handed to a PowerShell user, or Claude's PowerShell
@@ -59,7 +59,7 @@ $TEST_USER = "tester"; $TEST_PASS = Get-Content -Raw $P
 docker run -d --rm --name <app>-test --label dev-skills.test="$env:CLAUDE_CODE_SESSION_ID" -p "$($HOST_IP):8080:8080" `
   -e <APP_USER_VAR>="$TEST_USER" -e <APP_PASS_VAR>="$TEST_PASS" <image>
 if ($?) { Start-Sleep 3; docker port <app>-test; curl.exe -fsS -o NUL "http://$($HOST_IP):8080/" }
-if ($?) { "reachable at http://$($HOST_IP):8080" } else { "❌ STOPPED" }
+if ($?) { "LOGIN http://$($HOST_IP):8080 · $TEST_USER · $TEST_PASS" } else { "❌ STOPPED" }
 ```
 
 `Find-NetRoute` returns the address Windows uses for its default route, the
@@ -115,9 +115,10 @@ label do.
   run as root mounts from outside temp (`/opt/docker/<name>-test/`). Label
   every test container (`--label dev-skills.test="$CLAUDE_CODE_SESSION_ID"`,
   or compose `-p dev-skills-test-<name>`) so leftovers are found
-  (`ENFORCEMENT.md`, A10 and A12). **Write the label literally on every
-  `docker run`**: the check can't expand a shell variable, so `L="--label
-  …"; docker run $L …` is denied.
+  (`ENFORCEMENT.md`, A10 and A12). **Write the label on every `docker run` exactly as
+  shown**, `$CLAUDE_CODE_SESSION_ID` included: the check reads the command's
+  text, so a label behind another variable (`L="--label …"; docker run $L
+  …`) is denied.
 - **Gone when it stops.** Test containers run with `--rm` and **no restart
   policy**, and never bind-mount from a temp folder (`/tmp`, Claude's
   `/tmp/claude-*` scratchpad) with one. A reboot wipes `/tmp`, Docker
@@ -143,8 +144,12 @@ repeated, in full (URL, user and password), at the **bottom** of every message
 in which the test container was started, rebuilt, restarted or recreated, or
 in which the user is asked to try it again. That includes a rebuild after a
 one-line fix. The bottom of the message is where the user's eye lands, so
-nothing goes below it. A pointer such as "same login as before" or "see
-above" does not count. After compaction, read the password back from the scratchpad file, never
+nothing goes below it. This holds when Claude ran the container itself, not
+only for a block handed over: the run block's `LOGIN` line puts the password
+in the tool result for that. **The password is written out.** "Same login as
+before", "see above", the scratchpad path, or "run `cat`" in its place is a
+Gate 2 failure: it is a throwaway, and reading it off the screen is the
+point. After compaction, read the password back from the scratchpad file, never
 from memory.
 
 **Tear it down once its purpose is served.** A container started here — or for
@@ -155,3 +160,6 @@ declines to try it: `docker stop <name>` (or `docker compose down` for a
 compose stack), then `docker rm <name>` if it wasn't started with `--rm`.
 Before the session ends (`SKILL.md` Section 8) or this gate closes, `docker ps` to
 confirm nothing test-related is still running. Its credentials go with it.
+**A container the user asks to keep stays:** record `kept at user's request:
+<name>` with its removal command on the BUILD row's evidence and in the
+handoff, and show the login once more, since the next session can't.

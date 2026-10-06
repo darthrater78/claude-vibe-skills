@@ -219,6 +219,20 @@ No need to reply. Your next message starts with me checking the PR.
   labeled `📄 FOR READING — don't run`, so it can't be mistaken for a command.
 
 The enforcement checks hold every reply to this (`ENFORCEMENT.md`, C2–C7).
+**When a check bounces a reply, fix every shape rule it lists before
+re-sending.** The corrected reply opens with one line saying it replaces the
+earlier blocks, and carries only the blocks still owed, once each.
+
+**Nothing optional rides with the tag block.** Housekeeping such as leftover
+containers waits until the tag is confirmed.
+
+**A user in the Claude Code terminal runs a block from its shell mode.** Say
+"press `!`, then paste", and write that block's commands as one physical
+line with no `\` continuations, which paste as chat text there. Never put
+`!` inside the fence: bash reads it as negation, so a
+command that worked counts as failed and the chain prints ❌ with no error
+above it. A message that is only the block's text, with no output, means it
+didn't run: check the remote, then re-present it this way.
 
 **One block per stop, not per command.** Chain everything up to the next
 real decision with `&&`, so the first failure stops everything after it. **A

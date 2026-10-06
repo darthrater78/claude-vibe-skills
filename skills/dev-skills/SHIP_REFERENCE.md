@@ -120,7 +120,9 @@ looks fine and is not:
    on default branch" / "Require a passing CI run") re-checks this on the
    tagged commit, but that job runs *after* the tag is already pushed — the
    check here is what stops the wrong tag from being pushed in the first
-   place.
+   place. **With code scanning on, re-read the default branch's open alerts
+   once that run finishes** (`SECURITY_GATE.md`, "Code scanning"): an alert
+   the branch was meant to fix can reappear there under a new number.
 
 3. **Tag and push — in manual mode the user runs this block, and not before
    step 2 is confirmed.** Tag pushes are denied (`403`) to Claude's credentials far

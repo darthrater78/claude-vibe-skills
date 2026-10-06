@@ -101,7 +101,10 @@ decline is on the record and isn't offered again.
    after, shown as side-by-side sheets.
 5. **Report** a table (tell, where, replacement), then fix in two commits:
    `DESIGN.md` plus tokens first, components second. Anything only checkable
-   on another OS goes on the handoff.
+   on another OS goes on the handoff. **When the audit leads to a redesign,
+   the table is evidence, not the plan:** offer two or three directions from
+   the product's own identity, as for a new project, and mock one before
+   fixing tells. The same UI with its tells removed is still generic.
 
 A third-party scanner (e.g. a design-audit skill) can be offered as a second
 opinion, never required and never vendored into the project.
