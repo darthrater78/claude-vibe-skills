@@ -86,8 +86,8 @@ Three rules about that message:
    the diff, the message, and what Claude will do with it (commit and push to
    the branch). Most commits are work commits; do not run a release checkpoint
    for one, and a work commit has no second checkpoint because it never tags.
-4. **A test artifact that only CI can build from this commit is a third
-   stop.** It can't exist at this approval (`GATE_REFERENCE.md`, "Test
+4. **A test artifact that only CI can build from this commit adds one stop
+   between the two checkpoints.** It can't exist at this approval (`GATE_REFERENCE.md`, "Test
    artifact before merge"), so say here that the sequence pauses for it. Once
    its run is green, give the link and how to run it, and merge on the user's
    word. Ask nothing about the artifact before the link exists.
@@ -285,6 +285,7 @@ session stays semi-autonomous; the tracker is updated before Claude reports.
 | A CI job failed on the code | Stop before merging. Report the failing job and its output, propose a fix, wait |
 | A CI job never ran (no runner, cancelled, an outage) | Not a code failure, and not green: a run concludes `failure` even when every job that ran passed. Check githubstatus.com, and re-run the failed jobs once service is back, not during the outage |
 | A check can't be re-run (CodeQL default setup and other GitHub-managed runs, with a `dynamic/…` workflow path) | Say so, and offer both on the record: an empty commit to re-trigger CI (commit approval; the tree is unchanged, so the test artifact still matches), or a waiver of that one check with the reason. "Not a required check" is not a pass |
+| The remote returns 5xx on a push, a PR or a release call | Stop after two identical errors and check githubstatus.com. No other route, and no probe write beyond one the user approved |
 | The release workflow fails after the tag | Stop. Recovery needs a tag deletion, which needs its own approval (`SKILL.md`, Operating modes) |
 | A Critical or High security finding | Hard stop, same as manual |
 | A decision with more than one defensible answer | Ask. Semi-autonomous mode is not permission to pick for the user |

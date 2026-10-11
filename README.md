@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.1`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.1)
 
 ---
 
@@ -42,8 +42,8 @@ tree is dirty. This is the one rule [semi-autonomous
 mode](#manual-and-semi-autonomous-mode) doesn't relax.
 
 **2. All work happens on branches.** Never directly on `main`/`master`. At
-session start the skill finds the repo, offers to sync with origin, and flags
-you if you're sitting on the default branch.
+session start the skill finds the repo, offers to sync when you're behind
+origin, and flags you if you're sitting on the default branch.
 
 **3. Gates run before anything ships.** A work commit needs the security gate
 and your approval. Anything that bumps a version, builds an artifact, tags, or
@@ -122,12 +122,14 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Semi-autonomous is listed first in the mode question**, still with no
+  recommendation, and eight wording fixes from a review of 2.52.0. *(2.52.1)*
 - **Every repo says how it handles security.** A required "Security
   architecture" section, written for transparency: how the app was built
   with regard to security, plus a dated line for each security issue fixed.
   The security gate writes it where it's missing. Also fourteen lessons from
   real sessions, among them a check that holds a pre-release tag until the
-  dev banner is in place. *(2.52.0)*
+  dev banner is in place. This repo is now scanned by CodeQL. *(2.52.0)*
 - **Gate-file updates stop asking, and twenty-one lessons from real
   sessions.** Routine edits to the gate file no longer raise Claude Code's
   edit prompt; waivers, declines and approvals still do. Code-scanning
@@ -161,50 +163,6 @@ The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 - **Ten recorded lessons applied.** A TLS 1.2 floor, a UI visual pass,
   README screenshots checked before the release PR, CI that skips heavy jobs
   on docs-only changes, one Docker test login per session, and more. *(2.46.0)*
-- **Far fewer gate-file prompts.** A shell command that names the gate file
-  no longer asks just for naming it, which prompted on nearly every session.
-  It asks only when it deletes the file or writes a waiver, an enforcement
-  decline or a host-network approval, the same rule as an edit. *(2.45.2)*
-- **Open Medium and Low findings don't block work commits.** A SECURITY row
-  of `⏳ open — 0 Critical, 0 High, …` lets you commit and push a feature
-  branch; PRs, merges and releases still need every finding closed. *(2.45.2)*
-- **Docs-only merges skip the test artifact, with your OK.** On a work-commit
-  merge, `test artifact: n/a — no app code changed` replaces the artifact
-  and handoff; you confirm it once when it's added. *(2.45.2)*
-- **Install instructions for every surface, and synced installs checked.** The
-  install section covers the hand install on Windows, Python 3 for the checks,
-  installing one way only, and a tested answer on whether a copy synced from
-  claude.ai enforces like a hand-installed one (it does). *(2.45.2)*
-- **Idle repos get audited, and dev versions stay off the default branch.**
-  A weekly job checks every repo's workflows and keeps one issue up to date.
-  Pushing or merging a pre-release version (`-dev`, `-rc`, …) onto the default
-  branch is blocked. Every job that runs `./gradlew` must validate the wrapper
-  first. Gate-file edits stop re-asking for approved waivers. *(2.45.0)*
-- **Aliases and pulls can't slip past the gates.** A git alias (inline or in
-  your git config) is expanded before it's checked, and pulling another branch
-  into yours, which writes a merge commit, needs the same gate as `git merge`.
-  `gh pr update-branch` is gated like its API form. *(2.44.1)*
-- **No more ungated merges, and less reloading.** The checks now catch
-  auto-merge, PR branch updates, release edits, `gh api` merges and contents
-  writes, and `git merge`/`cherry-pick`/`revert`. Reference files load once
-  per session instead of before every gate and command block, and the cost
-  guidance matches current pricing and prompt caching. *(2.44.0)*
-- **Templates are linted and their pins checked.** CI runs actionlint on every
-  template workflow, and a weekly job confirms each action pin still matches
-  its tag and flags newer releases, since Dependabot can't see pins inside
-  Markdown. Dependabot and dev-release guidance moved to their own files, so a
-  workflow audit loads 10KB less. *(2.43.0)*
-- **Existing workflows get re-audited, not just new ones.** Every Gate 3 now
-  runs the workflow checklist against every file in `.github/workflows/`
-  and records which skill version it audited against, so a checklist that
-  grows re-checks everything. A fork's inherited workflows start unaudited.
-  The checklist adds secrets decoded before a dependency install, a missing
-  `permissions:` block, branch-pinned actions and Gradle wrapper
-  validation, and the audit offers dependency review, CodeQL, secret
-  scanning and build provenance. Docker images are scanned with Trivy
-  before a version tag points at them. New template for Capacitor/Ionic apps.
-  A missing or incomplete `dependabot.yml` is an audit finding. *(2.42.0,
-  2.42.1)*
 
 Earlier releases, back to 2.1.0, are in [CHANGELOG.md](CHANGELOG.md).
 
@@ -217,7 +175,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.52.0 — all refs agree
+     🔢 VERSION    ✅ v2.52.1 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -234,9 +192,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.52.0
+Version: 2.52.1
 
-🔢 VERSION    ✅ all refs at 2.52.0; prev v2.51.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.52.1; prev v2.52.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -390,7 +348,9 @@ container dependency drift (Dockerfiles hardcoding packages instead of
 installing from dependency files; imports missing from declared dependencies).
 
 **Project standards:** every scan also checks the [project standards](#project-standards)
-you decided on: encryption at rest, the login protections, and Apprise.
+you decided on (encryption at rest, the login protections, Apprise), and
+that the repo's security architecture section exists and reflects every
+security fix in the change.
 
 Critical and High must be fixed before anything else happens. Medium and Low
 don't stop a work commit, but every finding has to be fixed, waived by you, or
@@ -470,7 +430,7 @@ called "just a quick push".
 The test is *publishing intent*, not the branch a commit lands on. A merge
 to the default branch that bumps nothing, tags nothing, and publishes
 nothing — a tracker-bookkeeping commit, a docs typo fix — is still a work
-commit, with RELEASE/SHIP marked ➖ N/A and the reason stated. Treating every
+commit, with VERSION, RELEASE and SHIP marked `➖ no publishing intent`. Treating every
 default-branch merge as release-track by default is what turns a five-line
 housekeeping commit into a six-gate ceremony. (The [enforcement
 checks](#enforcement-checks) are stricter here: see their table.) When a
@@ -488,9 +448,10 @@ stated out loud on the tracker.
 ## Manual and semi-autonomous mode
 
 **You pick the mode at the start of every session.** It is one of the
-session-start questions, manual listed first and neither recommended, and
-nothing proceeds until you answer. No edits and no git writes happen before
-then, and the [enforcement checks](#enforcement-checks) deny git writes while
+session-start questions, semi-autonomous listed first and neither recommended, and
+nothing in the repo is edited and no git write happens until you answer.
+Work that touches nothing in the repo, such as a mockup, can go first.
+Also, the [enforcement checks](#enforcement-checks) deny git writes while
 the gate file reads `Mode: unchosen`.
 
 **Manual mode** is the behavior this skill has always had. Claude hands you the
@@ -523,7 +484,9 @@ ref operations GitHub denies Claude.
 | Questions and judgment calls | yours | still yours |
 
 **Two checkpoints, not none.** A release in semi-autonomous mode stops twice:
-once at the commit, once before the tag.
+once at the commit, once before the tag. When the test artifact can only be
+built by CI from that commit, there is one more stop in between, with the
+link, before the merge.
 
 **Checkpoint 1 — the commit.** The version-bump confirmation and the
 release-notes review fold in here, presented together:
@@ -572,22 +535,27 @@ Pushing v2.26.0 fires release.yml, which builds and publishes the release.
 This one is yours to run — my credentials get 403'd on tag refs. From your
 local clone of the repo:
 
-  git checkout main && git pull origin main \
-    && grep -q '^2.26.0$' VERSION \
-    && git tag v2.26.0 && git push origin v2.26.0
+  ▶️ RUN THIS — CI status → tag v2.26.0
+  git fetch origin && gh pr checks 48 && gh run watch <ci run on c3a49f7> --exit-status \
+    && git tag v2.26.0 c3a49f7… && git push origin v2.26.0
 
-Tell me when it's done and I'll take it from there.
+No need to reply. Your next message starts with me checking the tag.
 ```
+
+The block tags the merge commit by its SHA, so it needs no checkout, no pull
+and no clean working tree, and it re-shows the CI result in your own terminal
+before the tag is made.
 
 Failures, retries and deviations are the part of that report that matters most —
 a report listing only successes is the one nobody needed. Afterwards Claude
 confirms the tag on the remote itself rather than taking "done" at face value,
 then finishes the release: watch the run, add the notes, verify, and record SHIP
-✅, which ships in the next release's PR.
+✅.
 
 **It is semi-autonomous, not hands-off.** Beyond those two checkpoints, a
 blocked gate, a Critical or High security finding, an ambiguous requirement, a
-`403` on a branch push, a failed CI run, or anything that needs a tag, branch,
+`403` on a branch push, a failed CI run, repeated server errors from GitHub,
+or anything that needs a tag, branch,
 or release *deleted* stops the sequence and comes back to you. Claude deletes no
 refs in either mode — the merged PR's own branch included.
 
@@ -681,7 +649,7 @@ a bare `gh pr create` defaults to opening the PR against the **parent** repo.
 Anything you want to do upstream, like opening a PR there or syncing the fork,
 you do on GitHub directly. The gate file records this as
 `Origin: <you>/<repo> (fork of <parent>)`, and the [enforcement
-hook](#enforcement-checks) blocks a `gh` write in a fork that has no
+checks](#enforcement-checks) block a `gh` write in a fork that has no
 `--repo` or names another repo.
 
 ### Native Linux sessions get offered Remote Control
@@ -826,7 +794,8 @@ release breaks.
 Requirements that apply to every project. Claude raises each one when the
 project or feature it applies to is being designed, not first at a gate. Your
 answer goes on the tracker's `Standards:` row, so a "no" is a decision on the
-record, not a gap. Gate 3 checks the code against that row.
+record, not a gap. Gate 3 checks the code against that row. The security
+architecture section is the one you can't decline.
 
 | Standard | Applies to | What happens |
 |---|---|---|
@@ -835,6 +804,7 @@ record, not a gap. Gate 3 checks the code against that row.
 | **TOTP 2FA, "trust this device for 30 days", and unlock/rescue** | anything with a login | All three offered: RFC 6238 TOTP, a signed 30-day trusted-device token revoked on credential change, and recovery codes plus a logged admin unlock. You decide |
 | **GitHub + release-notes links on the main page** | every project, no exceptions | Gate 1 blocks until the README top section, and the app's main page if it has a UI, link to both |
 | **Apprise notifications** | Docker projects | Offered: an `APPRISE_URLS` setting (a secret, never logged), useful events, and a test-notification action. You decide |
+| **`DESIGN.md`** | projects with a UI | The design standard is read before any UI file is edited and followed over model defaults. A project without one gets it derived by a design audit |
 | **Compose quickstart** | Docker projects | The README gives a one-line `mkdir -p /opt/docker/<name>/…` setup, then the compose block with its explanations as `#` comments at the bottom of the YAML (not inline), then the filename (`compose.yaml`). Every volume is a bind mount under `/opt/docker/<name>/`, never a named volume. The image tag is pinned to the current version, so Gate 1 bumps it with every release. Gate 4 checks it |
 
 ---
@@ -893,12 +863,12 @@ The skill uses tiered loading to keep token costs down:
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-session test login, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
 | `SESSION_END.md` | ~6KB | When the session winds down, a handoff is written or the token impact estimate is due — the session-end checkpoint, where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
-| `SECURITY_GATE.md` | ~19KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn), and the combined gate output |
+| `SECURITY_GATE.md` | ~19KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn, or scheduled into the tag block), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~15KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
-| `STANDARDS_REFERENCE.md` | ~5KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — how the login protections are built, and the compose quickstart example |
+| `STANDARDS_REFERENCE.md` | ~5KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — what the security architecture section holds, how the login protections are built, and the compose quickstart example |
 | `DESIGN_REFERENCE.md` | ~5KB | Only for a project with a UI: when it is designed, gets a new screen or has no `DESIGN.md`, at Gate 2's visual pass, and for a design audit — the `DESIGN.md` format and lint, the generic tells to spot, building rules, the audit |
 | `SECURITY_REFERENCE.md` | ~16KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
@@ -919,7 +889,7 @@ The skill uses tiered loading to keep token costs down:
 | `WORKFLOW_HYBRID.md` | ~13KB | Workflow help, only when environment detection matches a Capacitor/Ionic hybrid app — npm build, `cap sync`, then the signed APK |
 | `WORKFLOW_PYTHON.md` | ~8KB | Workflow help, only when environment detection matches a Python package — the PyPI template |
 | `WORKFLOW_NODEJS.md` | ~8KB | Workflow help, only when environment detection matches Node.js — the npm template |
-| `checks/enforce.py` | ~85KB | Never loaded into Claude's context. Claude Code runs it as the [enforcement checks](#enforcement-checks) |
+| `checks/enforce.py` | ~92KB | Never loaded into Claude's context. Claude Code runs it as the [enforcement checks](#enforcement-checks) |
 
 The split follows one rule: **triggers load every turn, recipes load on demand.**
 `SKILL.md` holds what has to fire without being asked. How to actually *run* a
@@ -979,7 +949,8 @@ How this repo is built with regard to security, and what has changed.
   attaches a build provenance attestation. Workflow actions are pinned to
   commit SHAs, permissions are least-privilege, and Dependabot watches them.
 - **Static analysis.** CodeQL scans the Python and the workflows on every
-  push that changes either, and weekly.
+  push that changes either, and weekly. Dependabot's branches are scanned
+  once merged.
 
 ### Changes
 
@@ -1019,8 +990,8 @@ attached.
 
 The default-branch check matters because a tag trigger fires for a tag on *any*
 commit — without it, tagging an unreviewed branch would publish a real release
-from unreviewed code. Every workflow pins `actions/checkout` to a commit SHA
-rather than a mutable version tag, checks out with `persist-credentials: false`,
+from unreviewed code. Every workflow pins its actions to commit SHAs
+rather than mutable version tags, checks out with `persist-credentials: false`,
 declares least-privilege `permissions:`, and carries a concurrency group and
 timeouts. `validate.yml` runs `validate.sh`, which includes the check test
 cases in `scripts/test-checks.py`, on every push and pull request.
@@ -1028,8 +999,8 @@ cases in `scripts/test-checks.py`, on every push and pull request.
 to the workflow files or the templates. `check-pins.yml` resolves every action
 pin, templates included, against the tag its comment names, weekly and on any
 pull request that touches one. `codeql.yml` runs GitHub's CodeQL scanner over
-the Python and the workflows on every push that changes either, and weekly.
-`audit-repos.yml` runs `scripts/audit-repos.py`
+the Python and the workflows on every push that changes either (Dependabot's
+branches excepted), and weekly. `audit-repos.yml` runs `scripts/audit-repos.py`
 weekly against the workflows of every repo you own and keeps one "Weekly
 workflow audit" issue here up to date.
 
@@ -1054,4 +1025,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.52.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.52.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

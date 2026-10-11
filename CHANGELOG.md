@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.52.1] — 2026-10-11
+
+**Eight findings from a cost and logic pass over 2.52.0, and the mode
+question's order.** Wording and placement only; no check changed.
+
+### Fixed
+- **`SKILL.md` said the mode is chosen "before any work begins"** while the
+  next sentence let repo-free work go first. It now says work in the repo.
+- **"Two checkpoints" against a "third stop"** (`AUTO_MODE.md`): the CI-built
+  test artifact is one stop between the two checkpoints.
+- **`SECURITY_GATE.md` still said nothing but fixed, waived or withdrawn
+  clears a finding**, ahead of the scheduled case 2.52.0 added.
+- **The 5xx guidance loaded only at Gate 6** (`SHIP_REFERENCE.md`), though a
+  server error can hit a push or PR earlier. `AUTO_MODE.md`'s "When it stops"
+  table has a row for it.
+- **Nothing told a session to write the dev-banner note**
+  (`WORKFLOW_DEVRELEASE.md`), so the first pre-release tag block was held
+  once. `RELEASE_GATES.md` now names the VERSION row.
+- **CodeQL skips Dependabot's branches** (`.github/workflows/codeql.yml`):
+  its pushes get a read-only token that can't upload results. Its bumps are
+  scanned on the default branch.
+- **README re-reviewed against the skill.** The project standards table had
+  no row for `DESIGN.md`; the semi-autonomous tag example still showed the old
+  checkout-and-pull block instead of tagging the merge commit by SHA; a
+  work-commit merge was described as "➖ N/A" instead of `➖ no publishing
+  intent`; `enforce.py`'s size was understated. "What's new" now stops at
+  2.46.0.
+
+### Changed
+- **The mode question lists semi-autonomous first** (`SESSION_START.md`,
+  `SKILL.md`). Still asked every session, with both cost lines and neither
+  option recommended or pre-selected.
+- **`SKILL.md` §6 no longer repeats that a shell read truncates**; §2 says it
+  for every reference file.
+
 ## [2.52.0] — 2026-10-11
 
 **Every repo gets a security architecture section, and fourteen lessons

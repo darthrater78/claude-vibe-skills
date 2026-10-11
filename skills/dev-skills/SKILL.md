@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.52.0
+version: 2.52.1
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -66,8 +66,8 @@ begins — including work on the skill.
 ## Operating modes — manual and semi-autonomous, chosen at session start
 
 **Every session starts with the mode unchosen, and the user picks it before any
-work begins** (`SESSION_START.md`, "Mode choice"). Until it is answered,
-nothing in the repo is edited and no git write is executed or presented. A mode nobody
+work in the repo begins** (`SESSION_START.md`, "Mode choice"). Until it is
+answered, nothing there is edited and no git write is executed or presented. A mode nobody
 chose is a mode Claude guessed.
 
 **Manual mode:** git commands are presented for the user to run (Section 5.8).
@@ -79,8 +79,8 @@ nothing**, since their wakeup costs the same request as a reply. Format and
 examples: `SHELL_REFERENCE.md`, "Manual mode: few stops, clear blocks".
 
 **Semi-autonomous mode:** only the user's own words pick it, at that question or
-later ("auto mode", "take it from here"). Ask neutrally, manual first,
-recommending neither; never infer it, pre-select it, or switch it on because
+later ("auto mode", "take it from here"). Ask neutrally, semi-autonomous
+listed first, recommending neither; never infer it, pre-select it, or switch it on because
 the session is going well. **It is not the harness's own "auto mode"** (a
 permission setting), and being in that one answers nothing. It changes two
 things, detailed in `AUTO_MODE.md`:
@@ -713,7 +713,7 @@ Offer once. Don't nag.
 ## 6. Session start
 
 When this skill loads, **read `SESSION_START.md` from this skill's base
-directory** with the file reader, in pages (a shell read truncates it), and
+directory** with the file reader, in pages, and
 follow it in order, even when work is already under way ("Loaded
 mid-session" there): the one-call probe, then the **version
 check** (an outdated copy is the first thing reported), environment detection

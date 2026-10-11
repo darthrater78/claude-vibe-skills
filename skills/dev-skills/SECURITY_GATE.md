@@ -4,7 +4,7 @@ Loaded on demand by the dev-skills skill, when **Gate 3 is about to run, pass,
 or be marked ➖ N/A**, and whenever a finding needs resolving.
 
 It holds the security scan, the quality review, the **finding lifecycle** —
-fixed, waived by the user, or withdrawn, and nothing else clears a finding —
+fixed, waived by the user, or withdrawn, with one scheduled exception —
 and the combined gate output.
 
 Gate 3 additionally loads `SECURITY_REFERENCE.md` and `QUALITY_REFERENCE.md`,
@@ -191,7 +191,7 @@ The SECURITY row says which case you're in, and the checks read it:
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High                   PRs, merges and releases pass
 ```
 
-A finding leaves the open state in exactly three ways:
+A finding leaves the open state in three ways (and one scheduled case, below):
 
 | Terminal state | What it means | Who can do it |
 |---|---|---|
