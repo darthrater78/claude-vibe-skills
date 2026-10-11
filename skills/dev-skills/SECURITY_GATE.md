@@ -156,7 +156,10 @@ guards are offers, not findings: add the user's answers to the evidence line
 Part of every scan. Read the tracker's `Standards:` row, and check the code
 against it (how each standard is built: `STANDARDS_REFERENCE.md`):
 
-- **Encryption at rest:** the project's security section names what is
+- **Security architecture section: required.** A repo without one gets it
+  written now, before this gate passes; it is never declined or left for
+  later. Every security fix in this diff is reflected in it.
+- **Encryption at rest:** that section names what is
   stored and whether each store is encrypted at rest. A missing statement is
   a 📝 Medium finding. Sensitive data (credentials, TOTP secrets, tokens,
   personal data) stored in plaintext with no recorded decision is ⚠️ High.
@@ -200,6 +203,15 @@ A finding leaves the open state in exactly three ways:
 "it's not related to this change", "it's only a Medium", "we'll get it next
 release" are not terminal states. They are the sentences that carried a real
 finding across two releases of this very repo while every gate read ✅.
+
+**One kind of finding is scheduled instead: its only fix moves or deletes a
+tag that is already published.** That block needs RELEASE ✅
+(`ENFORCEMENT.md`, C2), so it can't run before the gate it would unblock.
+When the user chooses that fix, record `📌 scheduled <date> by user:
+<finding> — fixed in the tag block` under the row. It doesn't count as open,
+the fix goes into this release's tag block, and SHIP stays ⏳ until the moved
+tags are verified on the remote. A fix that is a code change is never
+scheduled.
 
 **"Pre-existing" is a provenance note, not a status.** A finding that predates
 this change is still a finding. Record where it came from if it helps; it does
@@ -303,7 +315,11 @@ to a PR ref lists only alerts new against the base, so its `0` is not a
 verdict. When the repo has code scanning, read
 `GET /repos/{owner}/{repo}/code-scanning/alerts?state=open&ref=refs/heads/<default>`
 as well as the working branch, and account for each default-branch alert by
-number: fixed by this diff (check the sink it flags), or still open.
+number: fixed by this diff (check the sink it flags), or still open. **A
+scanner this release adds has no default-branch results yet**, and its PR
+scan hides everything already there. Run it over the branch's full tree
+(`workflow_dispatch` on the branch, not `refs/pull/N/merge`) and triage every
+alert here, so the release PR is the last merge.
 
 #### Step 2 — Quality review
 

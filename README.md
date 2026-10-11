@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.51.0`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.0`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.51.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.51.0)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.0](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.0)
 
 ---
 
@@ -27,7 +27,8 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Execution environments](#execution-environments) — local vs. container vs. Termux
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
-- [Project standards](#project-standards) — encryption at rest, login protections, main-page links, Apprise, compose quickstart
+- [Project standards](#project-standards) — security architecture section, encryption at rest, login protections, main-page links, Apprise, compose quickstart
+- [Security architecture](#security-architecture) — how this repo is built with regard to security, and what has changed
 - [Audit mode](#audit-mode) · [Shortcut detection](#shortcut-detection) · [What's inside](#whats-inside) · [For maintainers](#for-maintainers)
 
 ---
@@ -101,7 +102,7 @@ to install.
 |---|---|
 | **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
 | **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
-| **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
+| **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · a pre-release tag block waits for the README dev banner to be recorded or declined · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
 Every check, with exactly what it blocks and lets through, is in
@@ -121,6 +122,12 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Every repo says how it handles security.** A required "Security
+  architecture" section, written for transparency: how the app was built
+  with regard to security, plus a dated line for each security issue fixed.
+  The security gate writes it where it's missing. Also fourteen lessons from
+  real sessions, among them a check that holds a pre-release tag until the
+  dev banner is in place. *(2.52.0)*
 - **Gate-file updates stop asking, and twenty-one lessons from real
   sessions.** Routine edits to the gate file no longer raise Claude Code's
   edit prompt; waivers, declines and approvals still do. Code-scanning
@@ -210,7 +217,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.51.0 — all refs agree
+     🔢 VERSION    ✅ v2.52.0 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -227,9 +234,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.51.0
+Version: 2.52.0
 
-🔢 VERSION    ✅ all refs at 2.51.0; prev v2.50.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.52.0; prev v2.51.0 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -387,8 +394,9 @@ you decided on: encryption at rest, the login protections, and Apprise.
 
 Critical and High must be fixed before anything else happens. Medium and Low
 don't stop a work commit, but every finding has to be fixed, waived by you, or
-withdrawn before the release track runs. **Passes at 0 open findings (0
-Critical, 0 High).**
+withdrawn before the release track runs. One exception: a finding whose only
+fix is moving a published tag is scheduled into that release's tag block.
+**Passes at 0 open findings (0 Critical, 0 High).**
 
 ### Gate 4 — Docs 📄
 
@@ -815,14 +823,15 @@ release breaks.
 
 ## Project standards
 
-Five requirements that apply to every project. Claude raises each one when the
+Requirements that apply to every project. Claude raises each one when the
 project or feature it applies to is being designed, not first at a gate. Your
 answer goes on the tracker's `Standards:` row, so a "no" is a decision on the
 record, not a gap. Gate 3 checks the code against that row.
 
 | Standard | Applies to | What happens |
 |---|---|---|
-| **Encryption at rest** | every project | The security section states what is stored, whether each store is encrypted at rest, how, and where the key lives. "Not needed, because …" is an answer. Silence is a finding |
+| **Security architecture section** | every repo, required | For transparency: the README (or a linked `SECURITY.md`) says how the app was built with regard to security, and gets a dated line whenever a security issue is fixed. A repo without one gets it written at the next security gate. [This repo's](#security-architecture) |
+| **Encryption at rest** | every project | The security architecture section states what is stored, whether each store is encrypted at rest, how, and where the key lives. "Not needed, because …" is an answer. Silence is a finding |
 | **TOTP 2FA, "trust this device for 30 days", and unlock/rescue** | anything with a login | All three offered: RFC 6238 TOTP, a signed 30-day trusted-device token revoked on credential change, and recovery codes plus a logged admin unlock. You decide |
 | **GitHub + release-notes links on the main page** | every project, no exceptions | Gate 1 blocks until the README top section, and the app's main page if it has a UI, link to both |
 | **Apprise notifications** | Docker projects | Offered: an `APPRISE_URLS` setting (a secret, never logged), useful events, and a test-notification action. You decide |
@@ -889,7 +898,7 @@ The skill uses tiered loading to keep token costs down:
 | `AUTO_MODE.md` | ~15KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
-| `STANDARDS_REFERENCE.md` | ~2KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — how the login protections are built, and the compose quickstart example |
+| `STANDARDS_REFERENCE.md` | ~5KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — how the login protections are built, and the compose quickstart example |
 | `DESIGN_REFERENCE.md` | ~5KB | Only for a project with a UI: when it is designed, gets a new screen or has no `DESIGN.md`, at Gate 2's visual pass, and for a design audit — the `DESIGN.md` format and lint, the generic tells to spot, building rules, the audit |
 | `SECURITY_REFERENCE.md` | ~16KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
@@ -939,6 +948,51 @@ on every request, so an understated figure hides a real per-turn cost.
 
 ---
 
+## Security architecture
+
+How this repo is built with regard to security, and what has changed.
+
+### Design
+
+- **What it is.** Markdown instructions for Claude, plus one Python program,
+  `skills/dev-skills/checks/enforce.py`, that Claude Code runs as a hook. It
+  uses the Python standard library only: there are no third-party packages.
+- **What the checks can do.** They read the hook's JSON input, the gate
+  file, git config and the project's version and compose files, and answer
+  allow, deny or ask. They run no commands and make no network requests.
+  Their only writes are a status marker and a counter in a per-user temp
+  folder, which is refused if it is a symlink or owned by someone else.
+- **What is trusted.** The gate file's rows are trusted as written. A line
+  that waives a finding, declines enforcement, approves host networking or
+  skips a test artifact or dev banner goes to you for confirmation first.
+  Tag pushes and ref deletions are never run by Claude.
+- **Failing closed.** If the checks file or Python 3 is missing, git, `gh`
+  and docker commands are blocked. A crash in a check denies a git, `gh` or
+  docker command, and lets other tools through so you can still decline
+  enforcement.
+- **What they don't cover** is listed in
+  [`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md), "What they can't
+  catch". Everything outside the checks is an instruction, not a control.
+- **Data at rest.** Nothing sensitive is stored, so nothing is encrypted.
+  The gate file and handoff are local and gitignored.
+- **Releases.** CI builds `dev-skills.skill` from the tagged commit and
+  attaches a build provenance attestation. Workflow actions are pinned to
+  commit SHAs, permissions are least-privilege, and Dependabot watches them.
+- **Static analysis.** CodeQL scans the Python and the workflows on every
+  push that changes either, and weekly.
+
+### Changes
+
+- **2026-10-11 (2.52.0):** a git read after a `cd` the checks couldn't
+  resolve crashed the check, which blocked the command without naming a
+  cause. It now passes. Pre-release tag blocks are held until the dev banner
+  is recorded or declined. CodeQL added: until now the check program was
+  reviewed only by its own tests and by Claude.
+
+Earlier security fixes are in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## For maintainers
 
 Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md). Build and check with:
@@ -973,7 +1027,9 @@ cases in `scripts/test-checks.py`, on every push and pull request.
 `lint-workflows.yml` runs actionlint (checksum-verified) on any change
 to the workflow files or the templates. `check-pins.yml` resolves every action
 pin, templates included, against the tag its comment names, weekly and on any
-pull request that touches one. `audit-repos.yml` runs `scripts/audit-repos.py`
+pull request that touches one. `codeql.yml` runs GitHub's CodeQL scanner over
+the Python and the workflows on every push that changes either, and weekly.
+`audit-repos.yml` runs `scripts/audit-repos.py`
 weekly against the workflows of every repo you own and keeps one "Weekly
 workflow audit" issue here up to date.
 
@@ -998,4 +1054,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.51.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.52.0` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -109,6 +109,10 @@ looks fine and is not:
    sha=$(gh pr view <number> --json mergeCommit -q '.mergeCommit.oid')
    gh run list --commit "$sha" --json status,conclusion
    ```
+   `--commit` matches only the full 40-character SHA (`git rev-parse
+   <short>`), and a run takes a few seconds to appear after a push, a PR or a
+   merge. An empty list, or `gh pr checks` saying "no checks reported", means
+   not started: retry until a run is listed, then watch it.
    The second check matters as much as the first. Being on the default
    branch proves the commit was merged; it says nothing about whether CI
    ran against *that* commit or passed. **Do not proceed to step 3 until
@@ -275,8 +279,10 @@ looks fine and is not:
 
    **A check that didn't run is not ✅.** If a tool is missing or printed
    help instead of a result (an older `gh` has no `attestation` subcommand),
-   say what was checked instead and what wasn't, e.g. "attestation present and
-   matches; signature not verified".
+   say what was checked instead and what wasn't. For an attestation, the
+   fallback is `gh api repos/<owner>/<repo>/attestations/sha256:<digest of
+   the downloaded asset>` returning one or more, recorded as "attestation
+   present for the digest; signature not verified".
 
    If CI failed:
    > 🚫 **SHIP GATE BLOCKED — CI release workflow failed.**
@@ -364,6 +370,15 @@ anyone notices. If that happens:
    (`WORKFLOW_REFERENCE.md`, "Verify tag matches the version in the tagged
    commit") — the recovery above fixes this incident; the check is what
    stops it from happening a second time.
+
+#### When the remote returns 5xx
+
+Stop after two identical server errors and check githubstatus.com before
+anything else. Creating a ref through the API (`gh api
+repos/<owner>/<repo>/git/refs`) can work when `git push` does not; a tag is
+still the user's to run. A diagnostic write is exactly the one the user
+approved, never a second probe. A draft release made as a probe is deleted by
+the user (Section 5.8): say so when asking for the approval.
 
 #### Manual path (no CI release workflow)
 

@@ -112,6 +112,8 @@ def repo_root(start: str | None) -> str | None:
 
 
 def read(path: str | None) -> str | None:
+    if not path:
+        return None
     try:
         with open(path, encoding="utf-8") as fh:
             return fh.read()
@@ -496,6 +498,7 @@ class Op:
         self.gh_repos = []
         self.is_gh = False
         self.publishes = False  # a tag or a GitHub release: never on the work-commit track
+        self.tag = None         # the tag name, when this creates or pushes one
 
 
 # Commands that write a commit without `git commit`. A flag in NO_COMMIT means this
@@ -608,6 +611,7 @@ def classify(argv: list[str], root: str | None, depth: int = 0) -> list["Op"]:
             elif names and not any(TAG_READ_FLAGS.match(f) for f in flags):
                 ops.append(Op("user_only", "creating a tag", "tag creation"))
                 ops[-1].publishes = True
+                ops[-1].tag = names[0]
         elif sub == "push":
             ops.extend(classify_push(args, root))
         elif sub == "pull" and pull_merges(args, root):
@@ -644,6 +648,7 @@ def classify_push(args: list[str], root: str | None) -> list["Op"]:
         if "refs/tags/" in spec or VERSIONISH.match(dst):
             op = Op("user_only", "pushing a tag", "tag push")
             op.publishes = True
+            op.tag = dst.replace("refs/tags/", "")
             return [op]
         dst = dst.replace("refs/heads/", "")
         if dst == "HEAD":
@@ -830,6 +835,10 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
                 miss = gates.missing(RELEASE)
                 if miss:
                     problems.append(f"{op.label} before the merge is confirmed. Not ✅: " + "; ".join(miss))
+                if op.tag and PRERELEASE.search(op.tag.lstrip("vV")) and "banner" not in gates.row_notes("VERSION").lower():
+                    problems.append(f"{op.tag} is a pre-release, and the VERSION row has no 'banner' note. The README "
+                                    "dev banner comes first (RELEASE_GATES.md, Gate 1): note 'banner ✅ dev-banner.yml "
+                                    "on <default branch>', or the user's 'banner ➖ declined <date>'.")
             continue
         required = REQUIRED[op.kind]
         miss = gates.missing(required, work=op.kind == "work")
@@ -1267,6 +1276,7 @@ SENSITIVE = [
     (re.compile(r"^(Hook )?[Ee]nforcement:\s*declined"), "declining hook enforcement"),
     (re.compile(r"^Host network:.*approved"), "a host-network approval"),
     (re.compile(r"test artifact:\s*n/a", re.I), "skipping the test artifact"),
+    (re.compile(r"banner\s*➖", re.I), "skipping the README dev banner"),
 ]
 NO_APP_CHANGE = re.compile(r"test artifact:\s*n/a\s*[—–-]+\s*no app code changed", re.I)
 # A waiver is keyed by the clause that carries it (from "waive" to the next `;`,
@@ -1587,7 +1597,9 @@ def bash_protected_check(cmd: str) -> tuple[str, str] | None:
     if GATE_WRITE_TARGET.search(cmd) or any(GATE_INPLACE.match(s) for s in segments) \
             or (INTERPRETER.search(cmd) and SCRIPT_WRITE.search(cmd)):
         return ("deny", "write the gate file with the Edit or Write tool, not the shell. Those go through "
-                        "without a prompt; a shell write stops for the user's approval.")
+                        "without a prompt; a shell write stops for the user's approval. Nothing in this "
+                        "command ran: re-run the rest without the gate write, and redo any call sent "
+                        "alongside it that relied on it.")
     return None
 
 
