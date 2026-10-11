@@ -68,6 +68,14 @@ No build starts until versioning is resolved.
    commits are identifiable, flag them otherwise. The distinction is that the
    *previous* version is the one this release is built on top of.
 
+8. **A pre-release version (`-dev`, `-rc`, …) needs the README dev banner
+   first** (`WORKFLOW_DEVRELEASE.md`, "README banner"):
+   `git ls-tree origin/<default> .github/workflows/dev-banner.yml` lists it
+   (note `banner ✅ dev-banner.yml on <default>` on this row), or the user
+   says no (`banner ➖ declined <date>`, which asks them to confirm). It merges
+   to the default branch ahead of the tag, so it is checked here, and the
+   checks hold the tag block until the row has one of the two notes.
+
 If any check fails:
 
 > 🚫 **VERSION GATE BLOCKED**

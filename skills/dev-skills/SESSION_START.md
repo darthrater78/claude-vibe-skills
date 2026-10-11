@@ -1,17 +1,7 @@
 # Session Start Reference
 
 Loaded on demand by the dev-skills skill, **once per session**, when the skill
-loads (`SKILL.md` Section 6). It holds the session-start procedure: the
-self-check, the version check, execution-environment detection, the repo and
-shell questions, workflow detection, the unfinished-release check, and the
-session banner.
-
-Nothing here is needed again after the session has started. The gate recipes
-are in `GATE_REFERENCE.md` (gates 2, 4), `RELEASE_GATES.md` (gates 1, 5),
-`SECURITY_GATE.md` (gate 3) and `SHIP_REFERENCE.md` (gate 6);
-semi-autonomous execution is in `AUTO_MODE.md`.
-
-Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
+loads (`SKILL.md` Section 6). Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
 ---
 
@@ -53,7 +43,7 @@ p leftover_tests bash -c 'command -v docker >/dev/null 2>&1 || { echo no-docker;
 p local_tracked bash -c 'git ls-files -- .dev-skills-gates.md .claude/dev-skills-gates.md .dev-skills-handoff.md .claude/handoffs HANDOFF.md | tr "\n" " "; echo'
 p handoff bash -c 'git log -1 --format="%cs %h" refs/dev-skills/handoff 2>/dev/null || echo none'
 p lessons bash -c 'git log -1 --format="%cs" refs/dev-skills/lessons 2>/dev/null || echo none'
-p claude_md bash -c 'grep -qs "dev-skills" CLAUDE.md && echo yes || git config --get dev-skills.claudemd || echo no'
+p claude_md bash -c 'grep -qs dev-skills CLAUDE.md && grep -qiE "session start|before any edit" CLAUDE.md && echo yes || git config --get dev-skills.claudemd || { grep -qs dev-skills CLAUDE.md && echo late || echo no; }'
 p local_dev bash -o pipefail -c 'for f in scripts Makefile justfile Taskfile.yml package.json tox.ini noxfile.py gradlew Cargo.toml *.sln *.csproj Dockerfile compose.yaml docker-compose.yml; do [ -e "$f" ] && printf "%s " "$f"; done; echo'
 ```
 
@@ -91,6 +81,8 @@ Reading it:
   `CLAUDE.md` (creating it if needed) in that commit: `Load the dev-skills skill at session start in this
   repo, before any edit.` A no is kept with `git config
   dev-skills.claudemd declined` (local config) and not offered again.
+  **`late`** means its line loads the skill too late (say, "before any
+  commit"): offer the same line as a replacement.
 - **`leftover_tests` lists test containers an earlier session left behind**
   (`ENFORCEMENT.md`, A12). The banner shows `⚠️ Leftover test containers: N`,
   and before any new work, present a ▶️ RUN THIS block that removes them
@@ -364,7 +356,10 @@ defaulted, and asked again if skipped.
   not silence. If the user answers the other questions and skips this one, ask
   again. The mode stays `unchosen`.
 - **Until it is answered:** no edits, no git write executed or presented, and
-  no "What are we building?". Read-only session-start checks continue. Once it
+  no "What are we building?". Read-only session-start checks continue.
+  **Work that writes nothing in the repo** (a mockup or notes in the
+  scratchpad, a published artifact) goes ahead first: the questions come
+  with the reply that delivers it, and always before the first repo edit. Once it
   is answered, write it to the state file in the same turn. If the answer is
   semi-autonomous, give the one-message confirmation from `AUTO_MODE.md`
   ("Entering the mode").
@@ -433,7 +428,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.51.0 active.
+Dev Skills v2.52.0 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -468,7 +463,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.51.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.0
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

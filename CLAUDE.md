@@ -8,6 +8,10 @@ recurring cost.
 Load the dev-skills skill at session start in this repo, before any edit:
 the skill's own repo goes through its gates.
 
+Claude Code may refuse an edit or search under `skills/dev-skills/` as
+self-modification. Don't route around it: say so, and continue once the user
+approves the file or adds a permission rule for the path.
+
 ## Cost and logic pass — after every skill update
 
 Any change under `skills/dev-skills/` (a fix, a feature, applied lessons) is

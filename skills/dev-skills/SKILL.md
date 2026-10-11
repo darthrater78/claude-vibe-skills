@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.51.0
+version: 2.52.0
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -67,7 +67,7 @@ begins — including work on the skill.
 
 **Every session starts with the mode unchosen, and the user picks it before any
 work begins** (`SESSION_START.md`, "Mode choice"). Until it is answered,
-nothing is edited and no git write is executed or presented. A mode nobody
+nothing in the repo is edited and no git write is executed or presented. A mode nobody
 chose is a mode Claude guessed.
 
 **Manual mode:** git commands are presented for the user to run (Section 5.8).
@@ -350,8 +350,9 @@ reference file in context** (this skill's base directory): Gates 2 and 4 are
 in `GATE_REFERENCE.md`, **Gates 1 and 5 in `RELEASE_GATES.md`** (release
 track only), **Gate 3 in `SECURITY_GATE.md`**, **Gate 6 in
 `SHIP_REFERENCE.md`**. Read only the one the gate you are running is in, and
-read each **once per session**: it stays in context, so reading it again for
-the next gate only adds a second copy. Re-read it only after a compaction, or
+read each **once per session**, with the file reader (a shell `cat` of
+several is truncated and costs a second read): it stays in context, so
+reading it again for the next gate only adds a second copy. Re-read it only after a compaction, or
 when you cannot quote the step you are about to run. This table says what
 each gate is *for*, not what makes it pass, so never run a gate from memory
 of it:
@@ -521,7 +522,8 @@ runs**: Gates 5 and 6 are blocked while anything is open.
 
 A finding leaves the open state three ways only: **fixed** (re-verified against
 the current diff), **waived** (by the user, for that specific finding, with a
-reason and date on the tracker), or **withdrawn** (it was wrong; say why).
+reason and date on the tracker), or **withdrawn** (it was wrong; say why). A
+fix that is itself a tag move is scheduled (`SECURITY_GATE.md`).
 "Pre-existing", "unrelated to this change", "only a Medium" and "next release"
 are not terminal states.
 
@@ -784,3 +786,6 @@ full, and how to build it.
 6. **UI projects keep a `DESIGN.md`**, and it is read before any UI file is
    edited and followed over model defaults. No `DESIGN.md`, a new screen, or
    a design audit: read `DESIGN_REFERENCE.md` first.
+7. **Every repo has a "Security architecture" section**, for transparency:
+   how the app was built, and later modified, with regard to security. If
+   it doesn't exist, create it. Update it whenever a security issue is fixed.

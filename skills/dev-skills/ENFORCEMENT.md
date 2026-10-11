@@ -211,8 +211,9 @@ commands.
 
 **A6. Tags and ref deletions are the user's.** `git tag <name>`, pushing a
 tag, `--tags`, `--delete`, `:ref`, `gh pr merge --delete-branch`,
-`gh release delete`, and `gh api` ref creation or deletion are denied in both
-modes. Listing tags and deleting a local tag pass.
+`gh release delete` (a draft this session created included), and `gh api` ref
+creation or deletion are denied in both modes. Listing tags and deleting a
+local tag pass.
 
 ### B. Files Claude edits
 
@@ -222,6 +223,7 @@ user, showing the lines:
 - `Hook enforcement: declined`
 - `Host network: … approved`
 - `test artifact: n/a` (a merge that skips the test artifact, Gate 2)
+- `banner ➖` (a pre-release without the README dev banner, Gate 1)
 - a new or changed waiver clause: the text from "waive" to the next `;`,
   `·`, `|`, `)` or line end, so `🔕 waived 2026-09-26 by user: …` and
   `(…; waived M1)` both count. The clause is compared, not the whole line:
@@ -252,7 +254,7 @@ like it writes a settings file or the checks asks, including PowerShell's
 it deletes or empties the file (`rm`, `git rm` without `--cached`,
 `Remove-Item`, `find -delete`, `: >`, `truncate`), writes it with one of the
 lines above in the command (a waiver clause, `Hook enforcement: declined`,
-`Host network: … approved`, `test artifact: n/a`), or writes it from text the
+`Host network: … approved`, `test artifact: n/a`, `banner ➖`), or writes it from text the
 command doesn't show (`cp`/`mv` onto it, `git checkout`/`restore` of it, a
 redirect from `cat <file>`, `base64 -d`, `git show` or escape codes), since
 those can't be checked for waivers. Any other shell write to it (a redirect,
@@ -316,6 +318,8 @@ the LAN URL that `curl` reached.
 checked exactly like A4 and A5, because presenting a command is performing it.
 A tag push or ref deletion in a presented block also needs every gate
 through RELEASE ✅, so it can't be handed over before the merge is confirmed.
+A pre-release tag (`v1.2.0-dev.1`, `-rc`, …) also needs a `banner` note on the
+VERSION row (`RELEASE_GATES.md`, Gate 1).
 
 **C3. Run blocks are labeled.** A code block labeled `▶️ RUN THIS`, or one
 with a `gh` command or a git command that changes something (`add`, `commit`,

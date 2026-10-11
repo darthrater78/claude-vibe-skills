@@ -9,8 +9,8 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
 
 ## The standards in full
 
-1. **Encryption at rest is always considered.** The security section of every
-   project (design notes, README "Security", Gate 3 output) states what is
+1. **Encryption at rest is always considered.** The project's security
+   architecture section (standard 7) states what is
    stored (database, config, uploads, tokens, backups), whether each is
    encrypted at rest, how, and where the key lives. "Not needed, because …" is
    an answer. Silence is not.
@@ -52,6 +52,21 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
    quickstart.
 6. **UI projects keep a `DESIGN.md`.** Its rules and the audit are in
    `DESIGN_REFERENCE.md`; Gates 2 and 4 check it (`GATE_REFERENCE.md`).
+7. **Every repo has a "Security architecture" section.** It is there for
+   transparency: anyone reading the repo can see how the app was built with
+   regard to security, and what has changed since. It lives in the README,
+   or in `SECURITY.md` with a README link when it runs long, in plain
+   statements a reader can check against the code:
+   - **Design:** how input reaches the app and what is trusted, who can do
+     what and where that is enforced, what is stored and how it is protected
+     (standard 1's statement goes here), what is exposed on the network, and
+     how dependencies and releases are kept trustworthy. Leave out what the
+     project doesn't have.
+   - **Changes:** a dated line for each security issue fixed or risk
+     accepted: what was wrong, what changed, in which version. Newest first.
+
+   **A fix updates it in the same change**: the Design statement it touches,
+   plus a Changes line.
 
 
 ## Login: TOTP, 30-day trust, and a rescue path

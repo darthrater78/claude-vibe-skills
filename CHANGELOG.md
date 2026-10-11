@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.52.0] — 2026-10-11
+
+**Every repo gets a security architecture section, and fourteen lessons
+recorded by sessions in six repos on 6–8 October.**
+
+### Added
+- **Project standard 7: a "Security architecture" section in every repo**
+  (`SKILL.md` §10, `STANDARDS_REFERENCE.md`). It is there for transparency:
+  how the app was built with regard to security, and a dated line for every
+  security issue fixed since. It is required, so Gate 3 writes it in a repo
+  that has none, and checks that each security fix in the diff is reflected
+  in it. Standard 1's encryption-at-rest statement now lives there. This
+  repo's own section is in the README.
+- **CodeQL on this repo** (`.github/workflows/codeql.yml`): the Python and the
+  workflows are scanned on every push that changes either, and weekly. Until
+  now `checks/enforce.py` had no static analysis in CI.
+- **Pre-release tag blocks wait for the README dev banner** (`checks/enforce.py`,
+  C2; `RELEASE_GATES.md`, Gate 1). A `-dev`, `-rc` or similar tag block is
+  held until the VERSION row notes `banner ✅ …` or the user's
+  `banner ➖ declined`, and adding the declined note asks the user (B5). The
+  checks read the gate file, not the remote, so the note is what they see.
+- **A "scheduled" state for a finding whose only fix is a tag move**
+  (`SECURITY_GATE.md`). The tag block needs RELEASE ✅ and RELEASE needs no
+  open finding, so such a finding could only be waived. It is now recorded as
+  scheduled by the user and fixed in that release's tag block.
+- **A third stop in semi-autonomous mode for a CI-built test artifact**
+  (`AUTO_MODE.md`): the artifact can't exist at the commit approval, so the
+  sequence pauses with the link before the merge.
+- **What to do when the remote returns 5xx** (`SHIP_REFERENCE.md`): stop after
+  two identical errors, and a diagnostic write is only the one approved.
+- **The attestation fallback** for a `gh` with no working `attestation verify`
+  (`SHIP_REFERENCE.md`, step 6).
+- **A scanner added by the release is run over the full branch before Gate 5**
+  (`SECURITY_GATE.md`): its PR scan hides alerts already in older code.
+
+### Fixed
+- **The check crashed on a git read after a `cd` it couldn't resolve**
+  (`checks/enforce.py`, `read()`), which blocked the command with no cause
+  named.
+- **CI watched before a run existed** (`SHIP_REFERENCE.md`, `AUTO_MODE.md`):
+  "no checks reported" straight after a push means not started, and
+  `gh run list --commit` needs the full SHA.
+- **The `claude_md` probe said `yes` for a line that loads the skill too
+  late** (`SESSION_START.md`). It now answers `late` and offers the standard
+  line.
+- **A denied shell write to the gate file didn't say the rest of the chain
+  was skipped** (`checks/enforce.py`). The message now does.
+- **The 2.51.0 entry understated the gate-file allow**: it covers the gate
+  file of the repo the session runs in or opened in, not only "the repo
+  root's own".
+
+### Changed
+- **Work that writes nothing in the repo goes ahead before the session
+  questions** (`SESSION_START.md`, `SKILL.md`): a mockup or notes in the
+  scratchpad no longer waits on mode, enforcement and shell.
+- **Reference files are read with the file reader** (`SKILL.md` §2): a shell
+  `cat` of several is truncated and costs a second read.
+- **`ENFORCEMENT.md` A6 says a draft release Claude created is still the
+  user's to delete.**
+- **This repo's `CLAUDE.md`** says what to do when Claude Code refuses a
+  skill edit as self-modification.
+
 ## [2.51.0] — 2026-10-06
 
 **Gate-file edits stop prompting, and the lessons recorded by sessions in

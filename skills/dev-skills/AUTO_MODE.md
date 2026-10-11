@@ -86,6 +86,11 @@ Three rules about that message:
    the diff, the message, and what Claude will do with it (commit and push to
    the branch). Most commits are work commits; do not run a release checkpoint
    for one, and a work commit has no second checkpoint because it never tags.
+4. **A test artifact that only CI can build from this commit is a third
+   stop.** It can't exist at this approval (`GATE_REFERENCE.md`, "Test
+   artifact before merge"), so say here that the sequence pauses for it. Once
+   its run is green, give the link and how to run it, and merge on the user's
+   word. Ask nothing about the artifact before the link exists.
 
 ### Checkpoint 2 — the pre-tag report, and the tag block
 
@@ -209,7 +214,7 @@ What changes is only the execution:
 |---|---|---|
 | Commit | presented | Claude runs it |
 | Branch push | presented (executed in a container) | Claude runs it |
-| PR create | presented | Claude runs it |
+| PR create | presented | Claude runs it, then watches CI only once `gh run list --commit <full SHA>` lists a run ("no checks reported" means not started) |
 | Release notes approval | separate ask (Gate 5, step 6) | folded into checkpoint 1 |
 | PR merge | presented | Claude runs it, after the merge-confirmation checks — without `--delete-branch` |
 | Pre-ship confirmation | separate "type ship" (Gate 6) | **checkpoint 2 — the full pre-tag report, handed over with the block** |
