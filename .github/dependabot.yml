@@ -13,8 +13,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    # One PR for all action bumps rather than one per action — this repo uses
-    # a single action (actions/checkout, pinned by SHA in every workflow), so
+    # One PR for all action bumps rather than one per action: this repo uses
+    # only a few (checkout, CodeQL, build provenance), all pinned by SHA, so
     # grouping keeps a quiet repo quiet.
     groups:
       actions:

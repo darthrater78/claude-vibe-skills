@@ -4,9 +4,11 @@ name: CodeQL
 # scripts/) and for the workflows themselves. Runs on pushes rather than on
 # pull_request, so each change is scanned once, as the full tree of its
 # branch: a PR-scoped scan reports only what is new against the base.
+# Dependabot's branches are left out: its pushes get a read-only token, which
+# can't upload results. Its bumps are scanned when they reach the default branch.
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!dependabot/**']
     paths:
       - '**.py'
       - '.github/workflows/**'

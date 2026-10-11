@@ -326,17 +326,17 @@ defaulted, and asked again if skipped.
   whichever of branch (only on the default branch) and sync (only when behind) apply. Only when
   more than four apply does the rest go in a second call. Nothing is edited
   until every question has an answer.
-- **Word it neutrally, with manual first and no recommendation:**
+- **Word it neutrally, with semi-autonomous first and no recommendation:**
 
   > **Operating mode for this session?**
-  > 1. **Manual:** I present git commands and you run them, one block per
-  >    decision. *Cost:* running the commands costs no tokens, since they run
-  >    outside me, and you never need to reply just to say "done".
-  > 2. **Semi-autonomous:** I run git myself after your approval of each
+  > 1. **Semi-autonomous:** I run git myself after your approval of each
   >    commit. The tag push and any ref deletion are still yours to run.
   >    *Cost:* every command I run is one more turn: the conversation is
   >    resent at the cached rate, and the command's output lands in context.
   >    I chain steps to keep that down.
+  > 2. **Manual:** I present git commands and you run them, one block per
+  >    decision. *Cost:* running the commands costs no tokens, since they run
+  >    outside me, and you never need to reply just to say "done".
 
   **The cost line is part of each option and is shown every time.** A picker
   that shows only what a mode does, without its cost, is the wrong question.
@@ -345,8 +345,8 @@ defaulted, and asked again if skipped.
 
   | Option label | Description, local and Termux sessions | Description, remote container |
   |---|---|---|
-  | `Manual` | I present git commands and you run them, one block per decision. Cost: the commands run outside me, so they cost no tokens; you never need to reply just to say "done". | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
   | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run is one more turn, with its output in context; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
+  | `Manual` | I present git commands and you run them, one block per decision. Cost: the commands run outside me, so they cost no tokens; you never need to reply just to say "done". | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
 
   In a remote container Claude runs git in both modes (`SKILL.md` §5.8), so the
   difference there is only the number of stops.
@@ -428,7 +428,7 @@ open work to the next session.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.52.0 active.
+Dev Skills v2.52.1 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -463,7 +463,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.0
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.1
 **Updates:** checked automatically every session start (above) — this line is
 only the fallback if that check was skipped for lack of network access:
 https://github.com/darthrater78/claude-vibe-skills/releases

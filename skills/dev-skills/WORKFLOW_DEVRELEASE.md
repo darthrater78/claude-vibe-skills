@@ -122,7 +122,9 @@ workflows. So the banner is an image, not README text:
   linked to the releases page.
 
 Worked example: `darthrater78/cert-generator`, `.github/workflows/dev-banner.yml`
-and `scripts/dev_banner.py`. After merging, verify the image URL returns 200.
+and `scripts/dev_banner.py`. After merging, verify the image URL returns 200,
+then note it on the gate file's VERSION row: the checks hold the pre-release
+tag block until it is there (`RELEASE_GATES.md`, Gate 1, item 8).
 
 ---
 
