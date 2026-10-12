@@ -37,6 +37,13 @@ report it in one line per finding (or "pass clean").
   Anything new in `SKILL.md` must have to fire unprompted.
 - **Cheap to follow.** A new step doesn't add round trips, questions or
   re-reads the session didn't need; it chains into existing calls.
+- **Cache-safe.** Loading a skill or reading a file appends to the
+  conversation and keeps the prompt cache. Changing the model, fast mode,
+  loaded MCP tools or plugins mid-session (and effort, on older models and
+  cloud providers) re-reads the whole conversation uncached. A step that asks
+  the user for one of those does it at session start, or states that cost.
+  The rules that must survive a compaction sit in `SKILL.md`'s first 5,000
+  tokens, which is all Claude Code re-attaches.
 
 For a large pass, the `skill-pass` agent (`.claude/agents/`, Sonnet,
 read-only) can do the reading and report findings to apply.

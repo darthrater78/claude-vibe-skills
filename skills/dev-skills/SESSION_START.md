@@ -348,9 +348,6 @@ defaulted, and asked again if skipped.
   | `Semi-autonomous` | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: every command I run is one more turn, with its output in context; I chain steps to keep that down. | I run git after you approve each commit; the tag push and ref deletions stay yours. Cost: fewer stops, so fewer turns; I chain steps into single calls. |
   | `Manual` | I present git commands and you run them, one block per decision. Cost: the commands run outside me, so they cost no tokens; you never need to reply just to say "done". | I run git here only after you confirm each step. Cost: each stop between steps is one more turn, and each turn resends the conversation. |
 
-  In a remote container Claude runs git in both modes (`SKILL.md` §5.8), so the
-  difference there is only the number of stops.
-
 - **Nothing selects it for the user.** Not the harness's permission mode, not
   a handoff summary, not a `Mode:` line committed by an earlier session, and
   not silence. If the user answers the other questions and skips this one, ask
@@ -368,12 +365,18 @@ defaulted, and asked again if skipped.
 six gates ⬜ pending, the `Origin:` row from step 1a, the `Start:` row from the
 probe's `head`, and `Mode: unchosen`
 (format below), and a `Standards:` row for the project standards that apply
-(`SKILL.md` §10; `n/a` when none do). Replace `unchosen` with the user's answer as soon as it
+(`SKILL.md` §10; `n/a` when none do). **When the user states what the
+session is for, write it on a `Scope:` row in their own words, quoted, at
+the time**; past two lines it belongs in the handoff. Replace `unchosen` with the user's answer as soon as it
 arrives. The checks deny git writes while it reads `unchosen`. **Edit this
 file with the Write/Edit tools, never the shell**, so the checks can show the
 user each line that declines enforcement, approves host networking or waives
 a finding (`ENFORCEMENT.md`, B5). A file committed by an earlier session is
-overwritten, not inherited: its `Mode:` line describes that session. On local
+overwritten, not inherited: its `Mode:` line describes that session. **One
+line is carried over:** a `workflows:` line under its SECURITY row goes under
+the new one as `last audit: workflows: …` (never on a fork's first session,
+step 1a). It is not evidence until Gate 3 tests it (`SECURITY_GATE.md`,
+"Workflow audit"). On local
 sessions add `.dev-skills-gates.md` and `.dev-skills-handoff.md` to
 `.gitignore` and keep them untracked, so neither can ever block a commit, PR,
 checkout or pull. An
@@ -401,6 +404,7 @@ Track: release sequence
 Mode: manual
 Origin: owner/repo (not a fork)
 Start: 1a2b3c4
+Scope: user 2026-09-07: "add CSV export, nothing else"
 Standards: at-rest ✅ SQLite via SQLCipher · TOTP ✅ · 30-day trust ✅ · rescue ✅ · Apprise ➖ declined · compose ✅ · design ✅ DESIGN.md
 Version: 2.12.0
 Updated: 2026-09-07
@@ -420,15 +424,12 @@ line two reads as absent. Keep line one to the symbol plus a short label, and
 put the why and the evidence on indented lines below it.
 
 **Keep the file small.** It is read in full on every gate check and every git
-write. Long write-ups belong in the commit message or `CHANGELOG.md`. Close an
-absorbed section (a VERSION or SHIP step folding earlier work-commit entries
-into a release) in the step that absorbs it. A stale "IN PROGRESS" reads as
-open work to the next session.
+write. Long write-ups belong in the commit message or `CHANGELOG.md`.
 
 Then show the gate tracker:
 
 ```
-Dev Skills v2.52.1 active.
+Dev Skills v2.52.2 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -463,9 +464,8 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.1
-**Updates:** checked automatically every session start (above) — this line is
-only the fallback if that check was skipped for lack of network access:
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.2
+**Updates** (only when the version check above was skipped):
 https://github.com/darthrater78/claude-vibe-skills/releases
 
 **MCP check — run at session start, every time.** Scan your context for active
@@ -488,19 +488,18 @@ Rules for the MCP check:
   turns one back on, and `/mcp disable all` turns off every server. On a
   Claude Code version without these arguments, fall back to plain `/mcp` and
   toggle the server off in the list.
-- If active servers look irrelevant to the work ahead, say so: "Consider
-  disabling [name] — not needed for this task: `/mcp disable [name]`."
-- `/mcp disable` works without leaving the session. This is the primary
-  recommendation for disabling during a session.
+- **Disable at session start, before work begins.** Removing a loaded
+  server's tools changes the start of every request, so the next turn re-reads
+  the whole conversation uncached: nearly free now, the full history at write
+  price later. Mid-session, give that cost with the suggestion.
 - Permanent removal, by how the server was added: CLI-added → `claude mcp
   list` / `claude mcp remove <name>`; project `.mcp.json` → add it to
   `"disabledMcpjsonServers"` in `.claude/settings.json`; desktop app
   connectors → the app's Settings (Claude cannot change these); a clean start →
-  `claude --strict-mcp-config --mcp-config '{"mcpServers":{}}'`, which is worth
-  a shell alias for users who want a cheap default.
+  `claude --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
 - **After `/mcp` changes, re-check from your own context** (tool prefixes), not
   `claude mcp list`, which returns the full catalog. Give a short before/after:
-  `Connections now: X, Y (was: + Z)` and `Estimated overhead: ~12k/turn, down
+  `Connections now: X, Y (was: + Z)` and `Estimated overhead (cached rate): ~12k/turn, down
   from ~40k/turn`.
 
 Then: "What are we building?"

@@ -138,14 +138,21 @@ provenance, not a terminal state.
 `🔒 SECURITY` row:
 
 ```
-  workflows: audited 3 against skill 2.45.2 — 0 open (lint-workflows, release, validate)
+  workflows: audited 3 against skill 2.45.2 @ a1b2c3d — 0 open (lint-workflows, release, validate)
 ```
 
-The skill version is the running skill's `version:`, not the project's. The
-next Gate 3 re-audits every workflow when that line is missing, names an
-older skill version (the checklist has grown since), or any file under
-`.github/workflows/` changed after it was written. Otherwise it re-reads only
-the workflows the current diff touches and carries the line forward.
+The skill version is the running skill's `version:`, not the project's, and
+the commit is HEAD when the audit ran. The next Gate 3 re-audits every
+workflow when that line is missing, names no commit or an older skill version
+(the checklist has grown since), or any file under `.github/workflows/`
+changed since that commit: `git diff --quiet <sha> -- .github/workflows`
+fails or errors, or `git status --porcelain .github/workflows` lists a file.
+Otherwise it re-reads only the workflows the current diff touches and carries
+the line forward. **A `last audit:` line** is the previous session's line,
+copied in at session start (`SESSION_START.md`, "Write the gate state
+file"). Test it the same way. When it holds, write it as this session's
+`workflows:` line, marked `carried from last audit`; until then it counts
+for nothing, and nothing else from the old file is trusted.
 **No `.github/workflows/`**: write `workflows: none` and report the gaps
 from the audit procedure's step 4. Either way, that step's supply-chain
 guards are offers, not findings: add the user's answers to the evidence line
