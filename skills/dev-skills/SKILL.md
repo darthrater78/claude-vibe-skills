@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.52.1
+version: 2.52.2
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -55,11 +55,13 @@ commits require approval, all work happens on branches, and security scans
 run after every build.
 
 **Self-governance:** This skill's rules apply to editing the skill itself. Changes
-to SKILL.md, SECURITY_REFERENCE.md, QUALITY_REFERENCE.md, or any file in the
-skill's directory follow the same gates, approval requirements, and controls as
-any other code. There are no exceptions and no self-exemption. The skill is
-invoked at session start precisely so these rules are in effect before any work
-begins — including work on the skill.
+to any file in the skill's directory follow the same gates, approval
+requirements, and controls as any other code. There are no exceptions and no
+self-exemption.
+
+**After a compaction, Claude Code keeps only the first part of this file**
+(about through Section 2): read `SKILL.md` from the skill's base directory
+once before continuing.
 
 ---
 
@@ -622,7 +624,10 @@ running (§5.1, §5.3, §5.4), not by steering the user to a cheaper one.
 Suggest `/effort` changes when the task doesn't fit: high/xhigh only for
 architecture, root-cause debugging and security review; medium for routine
 edits, refactors, tests and boilerplate. Suggest switching back down after a
-high-effort stretch.
+high-effort stretch. On models older than Opus/Sonnet/Haiku 5.5 and Fable 5.1, and
+through Bedrock, Vertex or a gateway, a mid-session change re-reads the whole
+conversation uncached: suggest it there only at a task boundary with a long
+stretch ahead.
 
 ### 5.4 Subagent model delegation
 
@@ -636,11 +641,12 @@ expensive model than the main session.
 ### 5.5 MCP server and connector awareness
 
 **Active** MCP servers (full tool definitions in context) cost thousands of
-tokens per request. **Deferred** ones (name-only) cost little: report them as a
-count, never by name. **Never name a server whose `mcp__<server>__` prefix is
-not literally in your context.** Flag an active server the work never touches,
-once. The session-start check, how the user disables servers, and the
-after-`/mcp` re-check are in `SESSION_START.md`, "MCP check".
+tokens per request, at the cached rate. **Deferred** ones (name-only) cost
+little: report them as a count, never by name. **Never name a server whose
+`mcp__<server>__` prefix is not literally in your context.** Flag an active
+server the work never touches once, at session start; later, only with what
+disabling it then costs. That cost, the check, how the user disables servers,
+and the after-`/mcp` re-check are in `SESSION_START.md`, "MCP check".
 
 ### 5.6 Phase transitions → fresh session
 

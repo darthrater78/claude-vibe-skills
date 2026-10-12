@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.1`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.2`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.1](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.1)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.2](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.2)
 
 ---
 
@@ -122,6 +122,13 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Cache-aware cost advice.** The skill no longer suggests disabling an MCP
+  server mid-session without naming what it costs (the whole conversation is
+  re-read uncached), re-reads `SKILL.md` after a compaction, which keeps only
+  its first part, and points the session-end estimate at `/usage`'s real
+  cache figures. Two recorded lessons: a release no longer re-reads every
+  workflow when none changed since the last audit, and the session's scope
+  is kept in your own words. *(2.52.2)*
 - **Semi-autonomous is listed first in the mode question**, still with no
   recommendation, and eight wording fixes from a review of 2.52.0. *(2.52.1)*
 - **Every repo says how it handles security.** A required "Security
@@ -175,7 +182,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.52.1 — all refs agree
+     🔢 VERSION    ✅ v2.52.2 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -192,9 +199,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.52.1
+Version: 2.52.2
 
-🔢 VERSION    ✅ all refs at 2.52.1; prev v2.52.0 tagged on remote
+🔢 VERSION    ✅ all refs at 2.52.2; prev v2.52.1 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -755,12 +762,15 @@ release breaks.
 - **Model is your choice** — no model question or gate; savings come from
   how the session is worked (bounded output, minimal context, fewer turns)
 - **Effort fit** — recommends `/effort` changes when the task doesn't match the
-  level
+  level, and only at a task boundary where the change would re-read the
+  conversation (older models, Bedrock, Vertex, gateways)
 - **Subagent model delegation** — when spawning subagents, uses the cheapest
   model tier that fits the task (Haiku for lookups, Sonnet for code, Opus/Fable
   only for the hardest reasoning)
 - **MCP awareness** — identifies unused MCP servers adding token overhead and
-  gives the `/mcp disable <server>` command for each one
+  gives the `/mcp disable <server>` command for each one, at session start.
+  Later in a session it says what disabling costs: removing loaded tools
+  makes the next turn re-read the whole conversation uncached
 - **Git command presentation** — on local sessions, presents git as a single
   copy-once block per operation rather than several, formatted for your shell
   (PowerShell, Git Bash, Termux, macOS, Linux, WSL) and with no `cd`, since
@@ -775,10 +785,22 @@ release breaks.
   folds all-clear checks into one row
 - **Token impact estimate** — part of the session-end checkpoint whenever the
   session modified a tracked file: what was saved, what was wasted, the biggest
-  win next time, in at most three lines
+  win next time, in at most three lines, with a pointer to `/usage` for the
+  real cache hit rate and misses
 - **Handoff offers** — proposed at three observable points: a release sequence
   finished, you opened unrelated work with no release in flight, or the
   conversation was compacted. Also when a usage limit is actually signalled
+
+**Prompt cache — worth knowing:** Claude Code re-reads the conversation at
+the cached rate (a tenth of the input price or less) as long as nothing
+earlier in it changes and you don't pause longer than the cache lifetime:
+an hour on a Claude subscription within plan usage, five minutes on usage
+credits, an API key or a cloud provider. The gates have built-in waits (CI
+runs, blocks you run, approvals), so on a five-minute lifetime a pause can
+cost a full uncached re-read. Setting `"promptCacheTtl": "1h"` in Claude
+Code's settings (v2.1.242+) avoids that, at a higher price per cache write.
+`/usage` shows the hit rate and misses on its `Prompt cache (main)` line.
+Details: [How Claude Code uses prompt caching](https://code.claude.com/docs/en/prompt-caching).
 
 **On request — ask by name:**
 
@@ -1025,4 +1047,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.52.1` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2.52.2` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -254,7 +254,7 @@ keep it current as each gate transitions rather than at the end.
 ### Round trips — what this mode costs, and how to spend less of it
 
 This mode's one real cost is tool-call round trips. A presented block costs
-nothing to produce; a chain of executed commands resends the whole conversation
+nothing to produce; a chain of executed commands resends the whole conversation (at the cached rate)
 on every call, so the same sequence gets more expensive the more calls it is
 split across. That is the trade the user accepted when they opted in
 ("Entering the mode") — it is not a reason to talk them out of the mode, and not a

@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.52.2] — 2026-10-11
+
+**Cost advice checked against how prompt caching works** (Anthropic's prompt
+caching guide and Claude Code's "How Claude Code uses prompt caching").
+Loading the skill and its reference files was already cache-safe; four
+pieces of advice were not, or were missing.
+
+### Fixed
+- **`SKILL.md` did not survive a compaction whole.** Claude Code re-attaches
+  only the first 5,000 tokens of an invoked skill, about through Section 2,
+  so the shortcut table, security rules, cost discipline and session-end
+  trigger were dropped. A line near the top has the session read the file
+  again once. The self-governance paragraph lost two sentences to pay for it.
+- **`/mcp disable` was recommended mid-session** (`SESSION_START.md`, "MCP
+  check"; `SKILL.md` §5.5). Removing a loaded server's tools makes the next
+  turn re-read the whole conversation uncached. It is now recommended at
+  session start, and later only with that cost stated. Overhead figures are
+  labeled as billed at the cached rate.
+- **`/effort` suggestions** (`SKILL.md` §5.3) are held to a task boundary on
+  older models and on Bedrock, Vertex or a gateway, where a change re-reads
+  the conversation. On current first-party models it is free, as before.
+- **The token impact estimate** (`SESSION_END.md`) counts uncached re-reads,
+  prices per-request overhead at the cached rate, and its header points at
+  `/usage`'s `Prompt cache (main)` line for the real hit rate and misses.
+
+### Changed
+- **Workflow audits stop repeating when nothing changed** (a recorded
+  lesson). Session start overwrote the gate file and with it the line
+  recording the last workflow audit, so every release re-read all workflows
+  and `WORKFLOW_REFERENCE.md`. That one line is now carried into the new file
+  as `last audit:`, and the audit line records the commit it ran at
+  (`SECURITY_GATE.md`), so Gate 3 can test it: same skill version, and no
+  workflow file changed since that commit. Nothing else is carried over, and
+  an untested line counts for nothing.
+- **The session's scope is written in the user's words** (a recorded lesson):
+  a quoted `Scope:` row in the gate file, when they state it
+  (`SESSION_START.md`).
+
+### Added
+- **README, "Cost discipline":** what the prompt cache is, its lifetime per
+  plan, and the `promptCacheTtl` setting for API-key and cloud sessions.
+- **`CLAUDE.md` cost pass: a "Cache-safe" item**, so a later change can't
+  add advice that breaks the cache without stating the cost.
+
 ## [2.52.1] — 2026-10-11
 
 **Eight findings from a cost and logic pass over 2.52.0, and the mode

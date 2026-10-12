@@ -91,15 +91,19 @@ dies with the container. The user can override either way.
 we do?"). The only skip condition is the one gates use: the session modified no
 tracked file. "This felt like a small task" is *not* a skip condition.
 
-It is approximate, since billing data is not visible. Build it from per-request
-overhead (MCP tools, skills), conversation growth, files loaded and turns. A header and at most 3 lines. Include the MCP
+It is approximate: Claude sees no billing data, so the header points at where
+the user can. Build it from what each turn added (files loaded, tool output),
+turns, and any uncached re-read of the conversation (a model, fast-mode or
+loaded-MCP change mid-session; a compaction). Per-request overhead (MCP tools,
+skills) is billed at the cached rate, about a tenth of its size or less. A
+header and at most 3 lines. Include the MCP
 line only when connections changed since the session-start MCP check:
 
 ```
-Token impact (rough estimate):
+Token impact (rough estimate; real hit rate and misses: /usage, "Prompt cache (main)"):
 ✅ Saved ~40k — read only 2 relevant files instead of exploring the package
-⚠️ ~30k/turn overhead — 5 connected MCP servers, none used this session
-Biggest win next time: disable unused connectors
+⚠️ 1 uncached re-read (~180k) — MCP server disabled mid-session
+Biggest win next time: disable unused connectors at session start
 ```
 
 Never let the report become longer than the savings it describes.
