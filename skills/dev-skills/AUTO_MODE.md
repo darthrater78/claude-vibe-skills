@@ -59,11 +59,11 @@ third becomes the pre-tag report below.
 
 > **Ready to commit — this is the one approval for the release.**
 >
-> **Version:** 2.25.0 → 2.26.0 (MINOR — one `feat`, no breaking change)
+> **Version:** 2026.10.19 → 2026.10.23 (today's UTC date; no breaking change)
 > **Commit:** `feat(skill): add semi-autonomous mode`
 > **Changes:** [files, line counts, what each does]
 > **Gates:** 🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ⬜ · 🚀 ⬜
-> **Release notes (v2.26.0):**
+> **Release notes (v2026.10.23):**
 > - [entry]
 > - [entry]
 >
@@ -105,7 +105,7 @@ for that autonomy here, with a full accounting handed over *with* the tag block
 Gate 6 step 2's merge confirmation and the version guard first, then report and
 hand over the block:
 
-> **Ready to tag v2.26.0 — full report of everything since your commit
+> **Ready to tag v2026.10.23 — full report of everything since your commit
 > approval.**
 >
 > **Commits** (3)
@@ -117,29 +117,29 @@ hand over the block:
 > **PR:** #48 "…" — opened, 2 review comments addressed, merged as `c3a49f7`
 > **CI:** `validate` ✅ on 257b224 · ✅ on 9ab0e12 · ✅ on merge commit c3a49f7
 >   (one earlier ❌ on 4c1a88e — shellcheck SC2086, fixed in 9ab0e12)
-> **Gates:** 🔢 ✅ all refs 2.26.0, v2.25.0 tagged on remote · 🔨 ✅ validate.sh
+> **Gates:** 🔢 ✅ all refs 2026.10.23, v2026.10.19 tagged on remote · 🔨 ✅ validate.sh
 >   green, bundle rebuilt · 🔒 ✅ 0 Critical / 0 High, docs-only diff ·
 >   📄 ✅ CHANGELOG + README · 📦 ✅ PR #48 merged
-> **Version guard:** `VERSION` in merged commit c3a49f7 reads `2.26.0`, matches
+> **Version guard:** `VERSION` in merged commit c3a49f7 reads `2026.10.23`, matches
 >   the tag about to be created ✅
 > **Deviations from what you approved:** the CI failure above added one commit
 >   that was not in the original diff; nothing else changed.
 >
-> **What the tag does:** pushing `v2.26.0` fires `.github/workflows/release.yml`,
+> **What the tag does:** pushing `v2026.10.23` fires `.github/workflows/release.yml`,
 > which builds the bundle and publishes the GitHub release with the notes you
 > approved.
 >
 > **This one is yours to run** — my credentials get `403`'d on tag refs. From
 > your local clone of the repo:
 >
-> ### ▶️ RUN THIS — CI status → tag v2.26.0 · in your clone of the repo
+> ### ▶️ RUN THIS — CI status → tag v2026.10.23 · in your clone of the repo
 > ```bash
-> # ════════ ▶️ START: CI status → tag v2.26.0 ════════
+> # ════════ ▶️ START: CI status → tag v2026.10.23 ════════
 > n=48 && sha=c3a49f7e2b…full-sha && git fetch origin \
 >   && gh pr checks "$n" \
 >   && gh run watch "$(gh run list --commit "$sha" --workflow validate.yml --json databaseId -q '.[0].databaseId')" --exit-status \
->   && git tag v2.26.0 "$sha" && git push origin v2.26.0 \
->   && echo "✅ DONE: v2.26.0 tagged" || echo "❌ STOPPED: scroll up for the error"
+>   && git tag v2026.10.23 "$sha" && git push origin v2026.10.23 \
+>   && echo "✅ DONE: v2026.10.23 tagged" || echo "❌ STOPPED: scroll up for the error"
 > # ════════ ⏹️ END ════════
 > ```
 > ### ⏹️ END — nothing else to run
@@ -173,8 +173,8 @@ are bash and need `gh` on the user's machine:
 
 ```
 git fetch origin
-git tag v2.26.0 c3a49f7e2b…full-sha
-git push origin v2.26.0
+git tag v2026.10.23 c3a49f7e2b…full-sha
+git push origin v2026.10.23
 ```
 
 With the plain block, put the CI result in the report (it is there anyway) and

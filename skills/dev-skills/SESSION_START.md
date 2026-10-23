@@ -1,7 +1,7 @@
 # Session Start Reference
 
 Loaded on demand by the dev-skills skill, **once per session**, when the skill
-loads (`SKILL.md` Section 6). Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
+loads (`SKILL.md` Section 6). Section numbers point at `SKILL.md`.
 
 ---
 
@@ -35,7 +35,7 @@ p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --jso
 p gh_login gh api user -q .login
 p default_branch bash -o pipefail -c "git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##' || git remote show origin | sed -n 's/.*HEAD branch: //p'"
 p latest_tag bash -o pipefail -c "t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1) && echo \"\${t:-none}\""
-p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | { grep -v '\^{}' || true; }) || exit 1; { grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+\$' || true; } | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
+p untagged bash -o pipefail -c "[ -f CHANGELOG.md ] || { echo no-changelog; exit 0; }; t=\$(git ls-remote --tags origin | sed 's#.*refs/tags/v\{0,1\}##' | { grep -v '\^{}' || true; }) || exit 1; { grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' CHANGELOG.md | grep -oE '[0-9.]+(-[0-9]+)?\$' || true; } | while read v; do printf '%s\n' \"\$t\" | grep -qxF \"\$v\" || printf '%s ' \"\$v\"; done"
 p workflows bash -o pipefail -c 'ls .github/workflows 2>/dev/null || echo none'
 p release_workflow bash -o pipefail -c "grep -lE '^[[:space:]]*tags:' .github/workflows/* 2>/dev/null || echo none"
 p enforcement bash -o pipefail -c '[ -f "$B/checks/enforce.py" ] || echo checks-file-missing; for py in python3 python "py -3"; do $py -c "import getpass,os,re,sys,tempfile; u=re.sub(r\"[^A-Za-z0-9_.-]\",\"\",getpass.getuser())[:64]; f=os.path.join(tempfile.gettempdir(),\"dev-skills-enforcement-\"+u,os.environ.get(\"CLAUDE_CODE_SESSION_ID\",\"none\")); print(\"active\" if os.path.isfile(f) else \"NOT-ACTIVE\")" 2>/dev/null && exit 0; done; echo NOT-ACTIVE-no-python3'
@@ -119,7 +119,7 @@ git repo in the project (it checks the skill's own upstream).
    upstream remote (never a cached clone, never a number from memory). On
    `ERROR`, say once in the banner "⚠️ version check skipped — no network
    access" and continue.
-3. **Compare** (strip the leading `v`, semver order).
+3. **Compare** (strip the leading `v`, `sort -V` order).
    - **Current:** fold a single confirmed line into the banner — no separate
      callout needed.
    - **Behind:** treat it like a failed security gate, not an FYI. It is
@@ -429,7 +429,7 @@ write. Long write-ups belong in the commit message or `CHANGELOG.md`.
 Then show the gate tracker:
 
 ```
-Dev Skills v2.52.2 active.
+Dev Skills v2026.10.23 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -464,7 +464,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.2
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.23
 **Updates** (only when the version check above was skipped):
 https://github.com/darthrater78/claude-vibe-skills/releases
 

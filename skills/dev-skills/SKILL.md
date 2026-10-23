@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2.52.2
+version: 2026.10.23
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -106,8 +106,8 @@ things, detailed in `AUTO_MODE.md`:
   history keep their own explicit approval on top.
 - **The gates, the pre-flight, the tracker, the state file.** Run them *more*
   carefully when the user is not watching each command.
-- **Questions**: an ambiguous requirement, a design choice, a finding, a bump
-  the history doesn't settle. Semi-autonomous is not hands-off.
+- **Questions**: an ambiguous requirement, a design choice, a finding.
+  Semi-autonomous is not hands-off.
 - **Section 8's session-end checkpoint** and the token impact estimate.
 
 **When something goes wrong, that operation falls back to manual; the session
@@ -192,9 +192,8 @@ Every commit message follows [Conventional Commits](https://www.conventionalcomm
 no behavior change), `refactor`, `perf`, `test`, `ci`, `build`, `style`,
 `revert`. Pick the *primary* effect: a fix that also updates a doc is `fix:`.
 **Breaking changes** get `!` after the type/scope (`feat!:`) and a `BREAKING
-CHANGE:` footer saying what breaks and how to adapt. Gate 1 reads these types
-as its bump signal (`RELEASE_GATES.md`, Gate 1). The signal narrows the
-question for the user; it doesn't answer it.
+CHANGE:` footer saying what breaks and how to adapt. Gate 1 turns these into
+the changelog's **Breaking** line (`RELEASE_GATES.md`).
 
 This governs commit messages only. `CHANGELOG.md` stays hand-written Keep a
 Changelog prose (Gate 4); neither replaces the other.
@@ -361,7 +360,7 @@ of it:
 
 | Gate | Passes when |
 |---|---|
-| 🔢 **VERSION** | every version reference in the project agrees on one bumped semver, repo and release-notes links present, prior version tagged |
+| 🔢 **VERSION** | every version reference in the project agrees on one new date version (`2026.10.19-2`), repo and release-notes links present, prior version tagged |
 | 🔨 **BUILD** | the project's **local dev workflow** builds it and the app is verified working — or ➖ N/A with no build system. CI is not a substitute: it runs after the commit this gate is protecting. Before a merge, a test artifact from the merged commit exists |
 | 🔒 **SECURITY** | security scan at 0 Critical / 0 High, plus a quality review the user has seen |
 | 📄 **DOCS** | changelog entry for this version, and every doc claim matches current behavior |
@@ -377,7 +376,7 @@ These phrases mean "surface the gates", not "comply silently":
 | User says | You do |
 |---|---|
 | "just push it" | Show gate tracker, check all prior gates |
-| "skip the version bump" | Version gate is a hard stop — ask what version to use |
+| "skip the version bump" | Version gate is a hard stop — compute today's date version |
 | "we can do security later" | Run the security scan now, no exceptions |
 | "just ship it" / "done" | Walk through all open gates |
 | "just commit this" | Show what would be committed, get approval |

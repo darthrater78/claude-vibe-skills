@@ -571,7 +571,7 @@ CMD ["python", "app.py"]
 
 ```dockerfile
 # bad — npm packages listed inline instead of from package.json
-FROM node:20-slim
+FROM node:24.22.1-slim
 WORKDIR /app
 COPY . .
 RUN npm install express cors
@@ -580,7 +580,7 @@ CMD ["node", "server.js"]
 # → container crashes: Cannot find module 'jsonwebtoken'
 
 # good — install from package.json lockfile
-FROM node:20-slim
+FROM node:24.22.1-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
