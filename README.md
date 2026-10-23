@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2.52.2`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2026.10.23`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2.52.2](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2.52.2)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2026.10.23](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.23)
 
 ---
 
@@ -182,7 +182,7 @@ Trying to skip ahead surfaces the tracker instead of complying:
 ```
 you ▸ just push it
 
-     🔢 VERSION    ✅ v2.52.2 — all refs agree
+     🔢 VERSION    ✅ v2026.10.23 — all refs agree
      🔨 BUILD      ✅ scripts/validate.sh green
      🔒 SECURITY   ⬜ not run against the current diff
      📄 DOCS       ⬜
@@ -199,9 +199,9 @@ Gate state lives in a file, not in Claude's memory:
 Track: release sequence
 Mode: manual
 Origin: you/your-repo (not a fork)
-Version: 2.52.2
+Version: 2026.10.23
 
-🔢 VERSION    ✅ all refs at 2.52.2; prev v2.52.1 tagged on remote
+🔢 VERSION    ✅ all refs at 2026.10.23; prev v2.52.2 tagged on remote
 🔨 BUILD      ➖ N/A — skill repo, no build system
 🔒 SECURITY   ✅ 0 open — 0 Critical, 0 High
 📄 DOCS       ⬜
@@ -272,7 +272,12 @@ The skill activates on its trigger phrases ("ship it", "commit", "audit",
 ### Gate 1 — Version 🔢
 
 No build starts until every version file (`package.json`, `pyproject.toml`,
-`VERSION`, …) is bumped, consistent, and includes the repository URL. Greps the
+`VERSION`, …) carries the same new version and includes the repository URL.
+**Versions are dates**, computed rather than asked: the UTC date of the bump,
+`2026.10.19`, then `2026.10.19-2` for a second release that day. Projects whose
+tooling requires strict semver (npm, Cargo, Python packaging, Docker semver
+tags) use `2026.1019.0`, `2026.1019.1`. A breaking change is called out at
+the top of the changelog entry instead of in the number. Greps the
 whole project for hardcoded version strings — source, UI templates (XAML,
 HTML), window titles, "About" dialogs, config files. Every match must be
 updated. **Every project's main page (the README's top section, and the app's
@@ -339,7 +344,8 @@ whichever platform-specific files match the detected project environment.
 **Security:** hardcoded secrets · SQL injection · command injection · disabled
 TLS · path traversal · missing auth · weak crypto · unsafe deserialization ·
 dependency auditing (typosquatting, unpinned versions, known CVEs, a runtime
-or LTS line past end of support, an LTS project moved off LTS).
+or LTS line past end of support, a runtime pinned below its line's latest
+security release, an LTS project moved off LTS; `composer audit` for PHP).
 
 Plus platform-specific rules, loaded only when that platform is detected:
 
@@ -501,11 +507,11 @@ release-notes review fold in here, presented together:
 ```
 Ready to commit — this is the one approval for the release.
 
-Version:  2.25.0 → 2.26.0 (MINOR — one feat, no breaking change)
+Version:  2026.10.19 → 2026.10.23 (today's UTC date; no breaking change)
 Commit:   feat(skill): add semi-autonomous mode
 Changes:  SKILL.md +118, GATE_REFERENCE.md +96, README.md +54 …
 Gates:    🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ⬜ · 🚀 ⬜
-Release notes (v2.26.0):
+Release notes (v2026.10.23):
   - …
 
 On your yes: commit, push, open the PR, and merge it once CI is green. Then
@@ -525,7 +531,7 @@ evidence behind it, the version guard, and anything that failed, was retried, or
 went differently than described at the commit. Then it asks:
 
 ```
-Ready to tag v2.26.0 — full report of everything since your commit approval.
+Ready to tag v2026.10.23 — full report of everything since your commit approval.
 
 Commits (3)
   257b224 feat(skill): add semi-autonomous mode — 6 files, +412/−38
@@ -535,16 +541,16 @@ PR:      #48 — opened, 2 review comments addressed, merged as c3a49f7
 CI:      validate ✅ 257b224 · ✅ 9ab0e12 · ✅ merge commit c3a49f7
          (one earlier ❌ on 4c1a88e — shellcheck SC2086, fixed in 9ab0e12)
 Gates:   🔢 ✅ · 🔨 ✅ · 🔒 ✅ 0 Critical / 0 High · 📄 ✅ · 📦 ✅ PR #48 merged
-Version guard: VERSION in c3a49f7 reads 2.26.0, matches the tag ✅
+Version guard: VERSION in c3a49f7 reads 2026.10.23, matches the tag ✅
 Deviations from what you approved: the CI failure above added one commit.
 
-Pushing v2.26.0 fires release.yml, which builds and publishes the release.
+Pushing v2026.10.23 fires release.yml, which builds and publishes the release.
 This one is yours to run — my credentials get 403'd on tag refs. From your
 local clone of the repo:
 
-  ▶️ RUN THIS — CI status → tag v2.26.0
+  ▶️ RUN THIS — CI status → tag v2026.10.23
   git fetch origin && gh pr checks 48 && gh run watch <ci run on c3a49f7> --exit-status \
-    && git tag v2.26.0 c3a49f7… && git push origin v2.26.0
+    && git tag v2026.10.23 c3a49f7… && git push origin v2026.10.23
 
 No need to reply. Your next message starts with me checking the tag.
 ```
@@ -686,7 +692,7 @@ about *that* context, not a fact about this one.
 ### Tag pushes and ref deletions come back to you
 
 In **every** environment, remote containers included, `git tag` /
-`git push origin v<X.Y.Z>` and any ref deletion (branch or tag) are presented as
+`git push origin v<version>` and any ref deletion (branch or tag) are presented as
 a block for you to run. Claude never executes them, and never creates or deletes
 a ref through a GitHub MCP tool.
 
@@ -854,7 +860,7 @@ template you review before anything is written.
 | What you say | What happens |
 |---|---|
 | "just push it" | Gate tracker shown, all prior gates checked |
-| "skip the version bump" | Hard stop — version is required |
+| "skip the version bump" | Hard stop — today's date version is computed |
 | "we can do security later" | Security scan runs now, no exceptions |
 | "just ship it" / "done" | All open gates walked through |
 | "just commit this" | Shows what would be committed, waits for approval |
@@ -885,14 +891,14 @@ The skill uses tiered loading to keep token costs down:
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-session test login, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
 | `LESSONS_REFERENCE.md` | ~4KB | Only when a session found a lesson for the skill itself, and at session start in this repo when lessons are waiting — what counts, asking once, recording to a local-only ref here or a blurb, picking them up |
 | `SESSION_END.md` | ~6KB | When the session winds down, a handoff is written or the token impact estimate is due — the session-end checkpoint, where the handoff is stored, the one-call command, the handoff format, the estimate's format, the usage-limit prompt |
-| `SECURITY_GATE.md` | ~19KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn, or scheduled into the tag block), and the combined gate output |
+| `SECURITY_GATE.md` | ~21KB | Gate 3 only — the security scan, the quality review, the finding lifecycle (fixed / waived by you / withdrawn, or scheduled into the tag block), and the combined gate output |
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~15KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
 | `STANDARDS_REFERENCE.md` | ~5KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — what the security architecture section holds, how the login protections are built, and the compose quickstart example |
 | `DESIGN_REFERENCE.md` | ~5KB | Only for a project with a UI: when it is designed, gets a new screen or has no `DESIGN.md`, at Gate 2's visual pass, and for a design audit — the `DESIGN.md` format and lint, the generic tells to spot, building rules, the audit |
-| `SECURITY_REFERENCE.md` | ~16KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
+| `SECURITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode, and when adding a package — cross-platform and language-general security rules, each with a bad/good code example, and the LTS-line rule with its lookup commands |
 | `QUALITY_REFERENCE.md` | ~18KB | Gate 3 + audit mode — cross-platform quality rules, each with a bad/good code example |
 | `SECURITY_WINDOWS.md` | ~7KB | Gate 3 + audit mode, only when project environment detection matches Windows — Windows-only security rules and examples |
 | `SECURITY_LINUX.md` | ~3KB | Gate 3 + audit mode, only when project environment detection matches Linux/Docker — Linux-only security rules and examples |
@@ -1047,4 +1053,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2.52.2` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2026.10.23` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

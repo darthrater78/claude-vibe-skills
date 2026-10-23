@@ -47,6 +47,7 @@ These rules apply as code is written, not just during Gate 3 scans.
 **Dangerous execution:**
 - No `eval()`, `exec()`, `Function()`, `shell=True` with user input, `os.system()` with user input
 - No `Invoke-Expression`, `iex`, `& $userInput` in PowerShell
+- No `system()`, `exec()`, `passthru()`, `shell_exec()`, backticks, or `include`/`require` of a user-supplied path in PHP
 - Use parameterized commands, safe parsers, allowlisted inputs
 
 **Input handling:**
@@ -486,6 +487,7 @@ npm view <pkg> version                 # Node
 pip index versions <pkg>               # Python (pip marks this experimental)
 cargo search <pkg>                     # Rust
 go list -m -versions <module>          # Go
+composer show --all <vendor/package>   # PHP
 dotnet package search <pkg>            # .NET (SDK 9+; else check nuget.org)
 ```
 
@@ -520,7 +522,7 @@ that away without anyone deciding to.
 FROM node:26.10.0-alpine         # not LTS until 2026-10-28
 
 # good — newest patch of the newest settled LTS, looked up the same day
-FROM node:24.21.0-alpine         # Active LTS
+FROM node:24.22.1-alpine         # Active LTS, 2026-10-21 security release
 ```
 
 Look up the LTS lines and their end-of-support dates; never recall them:

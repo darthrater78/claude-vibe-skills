@@ -23,9 +23,19 @@ No build starts until versioning is resolved.
    **Docker projects: the image tag in the README's compose quickstart and in
    any shipped `compose.yaml` is a version reference** (`SKILL.md` §10). It is
    bumped with the rest, and `latest` there is a gate failure.
-3. Every version reference must show the same version and it must be bumped from
-   the previous release.
-4. Version must follow semver (MAJOR.MINOR.PATCH).
+3. Every version reference must show the same version: the new one from item 4.
+4. **Date versions, not semver.** The version is the UTC date of the bump,
+   `YYYY.MM.DD`. A second release on the same date is `-2`, then `-3`: count
+   that date's tags in `git ls-remote --tags origin`. Tags are `v<version>`.
+   **Strict-semver projects** (the version lives in `package.json`,
+   `Cargo.toml`, `pyproject.toml`/`setup.cfg`, or a Docker image tagged with
+   `type=semver`) use `YYYY.MMDD.N` instead: MMDD without its leading zero and
+   N from 0 (`2026.1019.0`, `2026.1019.1`, `2026.105.0` for January 5),
+   because semver reads `-2` as a pre-release, Python rewrites it, and `01` is
+   invalid. A pre-release suffix follows the full version
+   (`2026.10.19-dev.1`, `2026.1019.0-rc.1`). The date is fixed when this gate
+   passes; a release that finishes after midnight keeps it. A project still
+   on semver switches at its next release, and its changelog entry says so.
 5. **Repository link is mandatory.** Every project that has an app manifest
    (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) must include the
    `repository` / `homepage` / `[project.urls]` field pointing to the GitHub repo
@@ -88,15 +98,13 @@ If any check fails:
 > - [e.g. "v1.2.2 has no git tag — needs retroactive tagging"]
 >
 > Current version: [version or "none found"]
-> What version should this build be? (patch / minor / major)
+> Version for this build: [computed per item 4]
 
-**Before asking, check the commit types since the last tag** (`SKILL.md`
-§1.1) — `git log <last-tag>..HEAD --oneline` — and use them as a signal:
-any `!`/`BREAKING CHANGE:` → suggest MAJOR; any `feat` with no breaking
-change → suggest MINOR; only `fix`/`chore`/`docs`/etc. → suggest PATCH.
-State which commits drove the suggestion and let the user confirm — commits
-that don't follow the convention (or a mixed history) just mean no signal,
-not a wrong answer; ask plainly in that case.
+**The version is computed, not asked.** The number no longer shows a breaking
+change, so check the commits since the last tag (`git log <last-tag>..HEAD
+--oneline`): any `!`/`BREAKING CHANGE:` (`SKILL.md` §1.1) puts a **Breaking**
+line at the top of this version's changelog entry, saying what breaks and how
+to adapt.
 
 Update ALL version files, add missing repo links and release notes links before marking passed.
 

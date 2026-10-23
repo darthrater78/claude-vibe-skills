@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.10.23] — 2026-10-23
+
+**Breaking:** release versions are now dates. A project still on semver
+switches at its next release: its version jumps from, say, `2.4.1` to
+`2026.10.23`, which still sorts above every earlier version. Nothing to do
+beyond letting Gate 1 compute it.
+
+### Changed
+- **Gate 1 computes the version instead of asking** (`RELEASE_GATES.md`).
+  It is the UTC date of the bump, `YYYY.MM.DD`; a second release that day is
+  `-2`, then `-3`. Projects whose tooling requires strict semver (npm, Cargo,
+  Python packaging, Docker `type=semver` tags) use `YYYY.MMDD.N`
+  (`2026.1023.0`, `2026.1023.1`), because semver reads `-2` as a pre-release
+  and rejects a leading zero.
+- **Breaking changes move from the number to the changelog.** The
+  MAJOR/MINOR/PATCH suggestion from commit types is gone; a `!` or
+  `BREAKING CHANGE:` commit since the last tag puts a **Breaking** line at
+  the top of the version's entry.
+- The session-start probe's unfinished-release check, the dev-version check
+  in `enforce.py` and `scripts/validate.sh` read the `-N` suffix.
+- This repo moves from 2.52.2 to 2026.10.23.
+
+### Security
+- **Gate 3 checks the runtime itself** (`SECURITY_GATE.md`). Package audits
+  never read the Node, PHP, Python or .NET version a project pins
+  (`.nvmrc`, `engines`, `FROM node:`, `composer.json` `require.php`, …). A pin
+  below its line's newest patch, with a security release in between, now
+  carries that release's severity: a hard stop for the October 21, 2026 Node
+  (CVE-2026-111497, Brotli RCE) and PHP (CVE-2026-109618/109619, "PHP2Shell"
+  RCE) releases.
+- **PHP coverage:** `composer audit` in the Gate 3 audit table, `composer
+  show --all` for version lookups, and PHP command execution and
+  user-supplied `include` paths in the flag-on-sight rules.
+- **Templates and examples off vulnerable Node:** the Node.js release
+  template pinned 22.14.0 and now pins 24.22.1 (newest patch of the newest
+  settled LTS); the LTS example and the Docker examples in
+  `QUALITY_REFERENCE.md` (Node 20, end of life) moved to 24.22.1.
+- **Seven action pins bumped** to their current releases: `codeql.yml`
+  (codeql-action v4.39.1) and the setup-java, setup-node, setup-python,
+  codeql, gradle and pypi-publish pins in the workflow templates.
+
 ## [2.52.2] — 2026-10-11
 
 **Cost advice checked against how prompt caching works** (Anthropic's prompt

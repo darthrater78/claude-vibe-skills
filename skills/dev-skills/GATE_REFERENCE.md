@@ -27,7 +27,7 @@ like it did. Rebuild from evidence:
 
 | Gate | Evidence that it passed |
 |---|---|
-| 🔢 VERSION | every version-carrying file reads the same bumped semver, and `git ls-remote --tags origin` shows the previous version tagged |
+| 🔢 VERSION | every version-carrying file reads the same new date version, and `git ls-remote --tags origin` shows the previous version tagged |
 | 🔨 BUILD | a build artifact exists newer than the last source edit — or the project has no build system (➖ N/A). **A check list with zero runs is ⬜, never ✅** (`SKILL.md` Section 2, "Absence of a verdict") |
 | 🔒 SECURITY | a scan was run against the **current** diff; a scan of earlier code does not cover edits made after it |
 | 📄 DOCS | the changelog has an entry for this version, and the README matches current behavior |

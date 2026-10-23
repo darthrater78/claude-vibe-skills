@@ -778,8 +778,8 @@ def docker_repo(root: str | None) -> bool:
 
 # A dev build's version (WORKFLOW_DEVRELEASE.md) belongs on its feature branch:
 # the default branch only ever carries versions that get a full release.
-# Semver pre-releases (1.2.0-dev.1, -rc.2, -SNAPSHOT) and PEP 440 (1.2.0.dev1, 1.2.0rc1).
-PRERELEASE = re.compile(r"\b\d+\.\d+\.\d+(-(dev|alpha|beta|rc|pre|preview|snapshot)\b[0-9A-Za-z.-]*|\.?dev\d*\b|(a|b|rc)\d+\b)",
+# Semver pre-releases (1.2.0-dev.1, 2026.10.19-2-rc.1, -SNAPSHOT) and PEP 440 (1.2.0.dev1, 1.2.0rc1).
+PRERELEASE = re.compile(r"\b\d+\.\d+\.\d+(-\d+)?(-(dev|alpha|beta|rc|pre|preview|snapshot)\b[0-9A-Za-z.-]*|\.?dev\d*\b|(a|b|rc)\d+\b)",
                         re.I)
 VERSION_SOURCES = [
     ("VERSION", re.compile(r"\A\s*v?(\S+)")),

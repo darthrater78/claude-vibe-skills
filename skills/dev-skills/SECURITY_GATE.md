@@ -51,6 +51,7 @@ current lockfile:
 | Node | `npm audit` / `pnpm audit` / `yarn npm audit` (Berry; classic is `yarn audit`) |
 | Python | `pip-audit` (note the hyphen — there is no `pip audit` subcommand) |
 | Rust | `cargo audit` |
+| PHP | `composer audit` (reads `composer.lock`) |
 | Go | `govulncheck ./...` |
 | .NET | `dotnet list package --vulnerable --include-transitive` |
 | Java | `mvn org.owasp:dependency-check-maven:check` / `gradle dependencyCheckAnalyse` |
@@ -72,6 +73,18 @@ If no audit tool is available for the ecosystem, say so explicitly rather than
 passing the step in silence — an unaudited dependency tree is an unknown, and
 unknown is never "passed" (Section 2).
 
+**The runtime is a dependency too, and no package audit reads it.** Find
+every pin of the interpreter or platform: `.nvmrc`, `.node-version`,
+`engines`, `node-version:`, `FROM node:`/`FROM php:`/`FROM python:`,
+`composer.json` `require.php` and `config.platform.php`, `.python-version`,
+`global.json`. Compare each with the newest patch of its line
+(`curl -sf https://endoflife.date/api/<product>.json`, field `latest`). A pin
+below it, with a security release in between (Node:
+`https://nodejs.org/dist/index.json` marks them `"security": true`; PHP and
+others: the release announcement), carries that release's worst severity:
+the same hard stop as a package advisory. Bump to the newest patch of the
+line.
+
 Report dependency findings with the advisory ID, the package, the installed
 version, and the fixed version:
 
@@ -86,7 +99,8 @@ version, and the fixed version:
 - ⚠️ High: path traversal, missing auth, `debug=True` in prod, weak crypto for
   passwords, `random` for tokens, no input validation on endpoints, a TLS
   context with no 1.2 minimum version, a runtime
-  or LTS line past its end of support (`SECURITY_REFERENCE.md`, "LTS lines")
+  or LTS line past its end of support (`SECURITY_REFERENCE.md`, "LTS lines"),
+  a runtime pinned below a security release of its own line (above)
 - 🚨⚠️ **Any dependency — direct or transitive — carrying a Critical or High
   advisory** (Section 4.1). A pinned version is not a safe version; pinning
   fixes *which* CVEs the project has, not *whether* it has any. Bump to the

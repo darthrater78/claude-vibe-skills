@@ -11,8 +11,8 @@ files=(SKILL.md SESSION_START.md GATE_REFERENCE.md RELEASE_GATES.md SECURITY_GAT
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
 skill_frontmatter=$(grep -m1 '^version:' skills/dev-skills/SKILL.md | sed 's/version:[[:space:]]*//' | tr -d '[:space:]')
-skill_banner=$(grep -rhoP 'Dev Skills v\K[0-9]+\.[0-9]+\.[0-9]+' skills/dev-skills/*.md | head -1)
-readme_version_codes=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
+skill_banner=$(grep -rhoP 'Dev Skills v\K[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' skills/dev-skills/*.md | head -1)
+readme_version_codes=$(grep -oP '`v\K[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' README.md)
 
 echo "=== Version sources ==="
 echo "  VERSION file:        $version_file"
