@@ -21,7 +21,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 p() { k=$1; shift; if o=$("$@" 2>&1); then echo "$k=$(printf '%s' "$o" | tr '\n' ' ')"; else echo "$k=ERROR $(printf '%s' "$o" | tr '\n' ' ' | cut -c1-200)"; fi; }
 p skill_installed bash -o pipefail -c "grep -m1 '^version:' \"\$B/SKILL.md\" | sed 's/version:[[:space:]]*//'"
 p skill_latest bash -o pipefail -c "git ls-remote --tags https://github.com/darthrater78/claude-vibe-skills.git | sed 's#.*refs/tags/##' | { grep -v '\^{}' || true; } | sort -V | tail -1"
-p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE RELEASE_GATES SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE DESIGN_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
+p skill_missing bash -o pipefail -c "for f in GATE_REFERENCE RELEASE_GATES SECURITY_GATE SHIP_REFERENCE AUTO_MODE SECURITY_REFERENCE QUALITY_REFERENCE SHELL_REFERENCE WORKFLOW_REFERENCE SECURITY_WINDOWS SECURITY_LINUX SECURITY_ANDROID QUALITY_ANDROID UPDATE_REFERENCE REMOTE_SESSION STANDARDS_REFERENCE DESIGN_REFERENCE ENFORCEMENT DOCKER_TEST LESSONS_REFERENCE SESSION_END WORKFLOW_DOCKER WORKFLOW_WINDOWS WORKFLOW_LINUX WORKFLOW_HOMEASSISTANT WORKFLOW_SCRIPTS WORKFLOW_ANDROID WORKFLOW_HYBRID WORKFLOW_PYTHON WORKFLOW_NODEJS WORKFLOW_DEPENDABOT WORKFLOW_DEVRELEASE FORGE_REFERENCE FORGE_GITEA FORGE_GITLAB SCOPED_REPO WORKFLOW_RENOVATE; do [ -f \"\$B/\$f.md\" ] || printf '%s ' \$f.md; done"
 p env_termux bash -o pipefail -c 'case "${PREFIX:-}" in *com.termux*) echo yes;; *) echo no;; esac'
 p env_wsl bash -o pipefail -c 'grep -qi microsoft /proc/version 2>/dev/null && echo yes || echo no'
 p repo_root git rev-parse --show-toplevel
@@ -30,6 +30,8 @@ p branch git branch --show-current
 p head git rev-parse --short HEAD
 p fetch git fetch --quiet origin
 p status git status -sb
+p forge bash -c 'git config --get dev-skills.forge && exit; h=$(git remote get-url origin 2>/dev/null | sed -E "s#^[a-z+]+://##; s#^[^@/]*@##; s#[:/].*##"); case "$h" in "") echo none;; github.com|*.github.com) echo github;; *) echo "other:$h";; esac'
+p role bash -c 'git config --get dev-skills.role || echo none'
 p gh_installed bash -o pipefail -c 'command -v gh || echo no'
 p gh_repo bash -o pipefail -c 'gh repo view "$(git remote get-url origin)" --json nameWithOwner,isFork,parent,viewerPermission,defaultBranchRef'
 p gh_login gh api user -q .login
@@ -60,6 +62,9 @@ Reading it:
   `skill_latest=ERROR` → "version check skipped — no network access".
 - **Git keys with `ERROR` when `repo_root=ERROR`** mean no git repo. The git
   steps do not apply.
+- **`forge` not `github`/`none`** (a self-hosted forge; `gh_repo` errors are
+  expected): read `FORGE_REFERENCE.md` before step 1a.
+- **`role=contributor:<paths>`**: read `SCOPED_REPO.md` before the questions.
 - **`gh_installed=no` or `gh_repo=ERROR`** → use the GitHub MCP equivalents
   (`REMOTE_SESSION.md`, item 3) for step 1a, and for anything the probe could
   not answer.
@@ -101,8 +106,7 @@ below. `Start:` is `merge-base HEAD origin/<default>`. Before any git write,
 check containers this session started against A1 and A12
 (`ENFORCEMENT.md`); restart any that fail.
 
-Steps 2 and 3 are questions for the user, not reads. Every step below still
-applies: the probe changes how many calls it takes, never what gets checked.
+Every step below still applies: the probe cuts the calls, never the checks.
 
 **Self-check:** `skill_missing` from the probe. If it names any file, warn
 immediately:
@@ -160,7 +164,7 @@ container. Offer the **interactive** form:
 
 Never offer `claude remote-control`: that is server mode, which takes the
 local prompt away. It is one line, once. If the user declines or ignores it,
-drop it. It changes nothing about gates, tracks or mode. It needs an eligible
+drop it. It needs an eligible
 login (`/login`), and on Team/Enterprise plans an Owner must enable it in
 Claude Code admin settings.
 
@@ -168,8 +172,6 @@ Claude Code admin settings.
 directory before step 1. It changes the clone, the shell and sync questions,
 `gh` (GitHub MCP equivalents), where the state file lives, the tag carve-out
 and Docker. Local and Termux sessions skip it.
-
-Report the detected environment in the session banner.
 
 **Measure, don't infer, for every environment capability recorded anywhere**
 (gate file, banner, handoff). `which <tool>` proves a binary is on `PATH`, not
@@ -189,7 +191,7 @@ for it or it needs something the probe does not read.
    If no remote is configured:
 
    > ⚠️ **No remote configured.** This repo has no `origin` remote set.
-   > What is the GitHub URL for this project? (e.g. `https://github.com/owner/repo`)
+   > What is the repo's URL? (e.g. `https://github.com/owner/repo`)
 
    Store the answer, and include `git remote add origin <url>` in the first
    command block presented to the user.
@@ -429,7 +431,7 @@ write. Long write-ups belong in the commit message or `CHANGELOG.md`.
 Then show the gate tracker:
 
 ```
-Dev Skills v2026.10.23 active.
+Dev Skills v2026.10.30 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -464,7 +466,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.23
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.30
 **Updates** (only when the version check above was skipped):
 https://github.com/darthrater78/claude-vibe-skills/releases
 

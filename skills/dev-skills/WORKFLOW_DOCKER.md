@@ -233,7 +233,7 @@ jobs:
       # Docker Hub: docker/login-action with DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
       # AWS ECR: aws-actions/amazon-ecr-login
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -385,7 +385,7 @@ jobs:
           echo "ref=ghcr.io/${GITHUB_REPOSITORY,,}:${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

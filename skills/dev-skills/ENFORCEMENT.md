@@ -17,7 +17,7 @@ own** at fixed points:
 
 | When | What Claude Code hands the checks |
 |---|---|
-| Before Claude runs a command, edits a file, or calls a GitHub tool | the command, the file path and the new text, or the tool's arguments |
+| Before Claude runs a command, edits a file, or calls a GitHub, Gitea, Forgejo or GitLab tool | the command, the file path and the new text, or the tool's arguments |
 | When Claude is about to end a reply | the reply text |
 | After the user answers Claude's multiple-choice questions | the questions and the answers |
 
@@ -157,8 +157,11 @@ anything else that writes a commit (`git merge`, `cherry-pick`, `revert`, `am`,
 except `--ff-only`, `--no-commit`, `--squash` and `--abort`; a `git pull` of a
 branch other than the one checked out, except `--ff-only` and `--rebase`),
 `git push`, `gh pr create|merge|update-branch`, `gh release create|edit|upload`,
-`gh repo sync <repo>`,
-or a `gh api` merge, release, pull request, branch update or contents write, even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
+`gh repo sync <repo>`, `glab mr create|merge|rebase`, `glab release create|upload`,
+`tea pr|pulls create|merge`, `tea releases create|edit`,
+or a merge, release, pull or merge request, branch update or contents write
+through `gh api`, `glab api`, or `curl`/`wget` to a forge API (`api.github.com`,
+or `/api/v1/repos/` or `/api/v4/projects/` anywhere in the URL), even behind `env`, `sudo`, `VAR=…`, `bash -c`, `eval`, `$( )`, `cd … &&`
 or `;`, is checked against the gate file. So is the PowerShell and Windows
 spelling of each: a git alias that expands to one (from `-c alias.…` or your
 git config, shell `!` aliases included), `git.exe` or a full path to it, `&`, `iex`/`Invoke-Expression`,
@@ -203,7 +206,17 @@ every `gh` write must name the fork with `--repo` and every push must go to
 `origin`. GitHub MCP tools are checked the same way, whatever the server is
 named: `create_pull_request`, `merge_pull_request`, `enable_pr_auto_merge`,
 `create_release`, `push_files`, `create_or_update_file`, `delete_file` and
-`update_pull_request_branch`. Other MCP servers never start the checks.
+`update_pull_request_branch`. Gitea, Forgejo and GitLab MCP servers are checked
+the same way (a server name containing `gitea`, `forgejo` or `gitlab`), with
+their names for the same writes: `create_merge_request`,
+`merge_merge_request`, `accept_merge_request`, `create_file`, `update_file`,
+`create_commit`, `update_release`. Other MCP servers never start the checks.
+
+**A contributor in a shared repo doesn't merge or publish.** While the gate
+file has a `Role: contributor — owns …` row (`SCOPED_REPO.md`), every merge,
+write to the default branch, tag and release is denied, whether run or
+presented, whatever the gate rows say. A PR, a branch push and commits pass on
+their usual gates.
 
 **A5. No git writes until the mode is chosen.** A `Mode:` row that is
 missing, `unchosen`, or anything but `manual`/`semi-autonomous` denies A4's
@@ -212,8 +225,18 @@ commands.
 **A6. Tags and ref deletions are the user's.** `git tag <name>`, pushing a
 tag, `--tags`, `--delete`, `:ref`, `gh pr merge --delete-branch`,
 `gh release delete` (a draft this session created included), and `gh api` ref
-creation or deletion are denied in both modes. Listing tags and deleting a
-local tag pass.
+creation or deletion are denied in both modes. So are `glab mr merge
+--remove-source-branch`, `glab mr create --remove-source-branch`, `glab
+release delete`, `tea pulls clean`, `tea releases delete`, a forge API call
+that creates a tag, deletes a branch, deletes a release or merges with
+`delete_branch_after_merge` / `should_remove_source_branch` set, and the MCP
+tools `create_tag`, `delete_tag`, `delete_branch`, `delete_ref` and
+`delete_release`. Listing tags and deleting a local tag pass.
+
+**On a self-hosted forge they ask instead.** While the gate file has
+`Forge: gitea|forgejo|gitlab …` (`FORGE_REFERENCE.md`), Claude may run them,
+and each one asks the user in Claude Code's prompt. A tag still needs every
+gate through RELEASE, and is still denied on the work-commit track.
 
 ### B. Files Claude edits
 
@@ -224,6 +247,9 @@ user, showing the lines:
 - `Host network: … approved`
 - `test artifact: n/a` (a merge that skips the test artifact, Gate 2)
 - `banner ➖` (a pre-release without the README dev banner, Gate 1)
+- `Forge: gitea|forgejo|gitlab` (it lets Claude run tags and ref deletions, A6)
+- removing a `Role: contributor` row, or adding a folder to it (adding the row
+  passes, because it only narrows what the session may do)
 - a new or changed waiver clause: the text from "waive" to the next `;`,
   `·`, `|`, `)` or line end, so `🔕 waived 2026-09-26 by user: …` and
   `(…; waived M1)` both count. The clause is compared, not the whole line:
@@ -281,7 +307,8 @@ session, so it only leaves the machine when they approve. A remote container
 does both freely, because its copy dies with the container.
 
 **B8. Workflow edits meet the workflow checklist's mechanical rules.** A
-Write or Edit to `.github/workflows/*.yml` (or `.yaml`) is **denied** when it
+Write or Edit to `.github/workflows/*.yml` (or `.yaml`, or the same under
+`.gitea/` or `.forgejo/`) is **denied** when it
 adds one of these (deny and ask are what B8 does with an edit; each finding's
 severity is `WORKFLOW_REFERENCE.md`'s scale, which the weekly audit reports):
 - a `uses:` not pinned to a 40-character commit SHA (a version tag or a
@@ -307,6 +334,13 @@ another job doesn't count.
 Only problems the edit *adds* count, compared with the file on disk, so
 fixing one thing in an old, unhardened workflow isn't blocked by everything
 else wrong with it. A new file is checked in full.
+
+**B9. A contributor edits only the folder they own.** While the gate file has
+`Role: contributor — owns <path>[, <path>]` (`SCOPED_REPO.md`), a Write or Edit
+to a file in the repo outside those folders **asks** the user. That includes
+a sibling with the same prefix (`billing-old/` when `billing/` is owned), and
+root files like `.gitignore`. The gate file and the handoff pass. So do files
+outside the repo, such as the scratchpad.
 
 ### C. Claude's replies
 
@@ -391,6 +425,11 @@ have already arrived.
   reads the working tree, so `gh pr merge 12` from a different branch checks
   that branch's version, not the PR's. Merge from the PR's branch, or let
   the release workflow's tag/version check catch it.
+- **Shell writes outside an owned folder** (B9 reads Edit and Write only),
+  and a forge API write sent any other way than `gh`, `glab`, `curl` or `wget`
+  (a script, `httpie`, a language's HTTP library).
+- **`.gitlab-ci.yml`.** B8 reads Actions syntax only; GitLab CI is audited by
+  hand (`FORGE_GITLAB.md`).
 - **Whether a gate row is honest.** Gate rows and the `Mode:` line pass
   without a prompt (B5), so the git-write checks trust what the file says.
 

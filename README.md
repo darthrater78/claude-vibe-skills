@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2026.10.23`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2026.10.30`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2026.10.23](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.23)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2026.10.30](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.30)
 
 ---
 
@@ -24,7 +24,7 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 - [Two tracks](#two-tracks) — why a work commit isn't a release
 - [Manual and semi-autonomous mode](#manual-and-semi-autonomous-mode) — who runs the commands
 - [How gates are enforced](#how-gates-are-enforced) — the state file, and why memory isn't trusted
-- [Execution environments](#execution-environments) — local vs. container vs. Termux
+- [Execution environments](#execution-environments) — local vs. container vs. Termux, [self-hosted forges](#self-hosted-forges-gitea-forgejo-gitlab), [a folder in a shared repo](#a-folder-in-a-shared-repo)
 - [Workflow detection](#workflow-detection-local-dev-vs-ci) — local dev vs. CI
 - [Cost discipline](#cost-discipline) — what's automatic, what you have to ask for
 - [Project standards](#project-standards) — security architecture section, encryption at rest, login protections, main-page links, Apprise, compose quickstart
@@ -100,7 +100,7 @@ to install.
 
 | Group | What's checked |
 |---|---|
-| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours (on a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab) Claude runs them and you're asked about each one) · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
 | **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · a pre-release tag block waits for the README dev banner to be recorded or declined · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
@@ -122,6 +122,15 @@ every session, including ones that don't load the skill, see
 
 The last few releases. Full detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **Self-hosted forges and shared repos.** Gitea, Forgejo and GitLab repos
+  on your own network get a one-time onboarding (forge, CA, CLI login,
+  canonical repo, runners, offline CI, dependency watch), and on them Claude
+  runs tag pushes and ref deletions itself, with each one asked in Claude
+  Code's prompt. A new contributor role covers a monorepo where you own one
+  folder: the folder becomes the project (its README is the main page), and
+  the open PR is the finish line. The enforcement checks now read `glab`,
+  `tea`, forge API calls through `curl`/`wget`, Gitea/Forgejo/GitLab MCP
+  servers, and `.gitea/` and `.forgejo/` workflows.
 - **Cache-aware cost advice.** The skill no longer suggests disabling an MCP
   server mid-session without naming what it costs (the whole conversation is
   re-read uncached), re-reads `SKILL.md` after a compaction, which keeps only
@@ -491,6 +500,10 @@ ref operations GitHub denies Claude.
 | PR merge | presented | Claude runs it once the PR's checks pass, without `--delete-branch`; CI on the merge commit is confirmed before the tag |
 | **Tag push** | always yours | **always yours — with a full report above the block** |
 | **Branch / tag deletion** | always yours | **always yours** |
+
+On a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab), in both
+modes, Claude runs the tag push and ref deletions and Claude Code asks you
+about each one.
 | Release publish, notes, verification | presented / Claude | Claude runs them |
 | Command blocks | the normal way commands arrive | the tag and ref deletions, plus anything that fails |
 | The six gates and the pre-flight | enforced | enforced, identically |
@@ -640,7 +653,8 @@ The skill detects where the session is running, because in
 [manual mode](#manual-and-semi-autonomous-mode) that determines whether Claude's
 working tree and your terminal are the same clone. (In semi-autonomous mode Claude
 runs every command itself except the tag push and ref deletions, which are
-always yours, and this table describes only the fallback when one fails.)
+yours on GitHub and asked on a self-hosted forge, and this table describes
+only the fallback when one fails.)
 
 | Environment | Git behavior |
 |---|---|
@@ -691,7 +705,7 @@ about *that* context, not a fact about this one.
 
 ### Tag pushes and ref deletions come back to you
 
-In **every** environment, remote containers included, `git tag` /
+In **every** environment on GitHub, remote containers included, `git tag` /
 `git push origin v<version>` and any ref deletion (branch or tag) are presented as
 a block for you to run. Claude never executes them, and never creates or deletes
 a ref through a GitHub MCP tool.
@@ -734,6 +748,46 @@ command with no shell-specific syntax. "Run this from your local clone" goes in
 the prose above it; the block itself is copyable as given.
 
 </details>
+
+### Self-hosted forges (Gitea, Forgejo, GitLab)
+
+When `origin` isn't on github.com, the session loads `FORGE_REFERENCE.md`
+and the forge's own command map (`FORGE_GITEA.md` or `FORGE_GITLAB.md`) in
+place of the `gh` steps. It assumes a **local session on the same network
+as the forge**. A cloud session can't reach a LAN forge, and the skill says
+so up front.
+
+The first session in a clone onboards it once. It identifies the forge from
+its API, trusts a private CA for that host only (never `-k`), checks the CLI
+login (`tea` / `glab`; the token never enters the conversation), asks which
+copy is canonical when there's a mirror, proves a CI runner is online, asks
+whether runners reach the internet (if not: mirrored actions, local
+registries), and replaces Dependabot with Renovate (a repo `renovate.json` and a
+scheduled job on the forge's own CI, `WORKFLOW_RENOVATE.md`) plus an offline
+vulnerability database. The result is saved in `git config dev-skills.forge`
+and a `Forge:` row in the gate file, which you confirm.
+
+On your own forge, the reason the tag push and ref deletions come back to you
+(credentials denied by GitHub) doesn't apply. **So Claude runs them, and
+Claude Code asks you to allow each one**: no blanket yes, and every gate
+before the tag is unchanged. GitLab CI (`.gitlab-ci.yml`) isn't read by the
+workflow checks yet; Gate 3 audits it by hand against a checklist.
+
+### A folder in a shared repo
+
+In a monorepo where you own one folder and the repo's maintainers merge, say
+so ("I only own `services/billing`"). Claude records a contributor role
+(`git config dev-skills.role` and a `Role:` row), and then:
+
+- **The folder is the project.** Its `README.md` is the main page, with links
+  to the folder on the forge and its changelog. CHANGELOG, VERSION,
+  `DESIGN.md`, the security architecture section and `CLAUDE.md` all live in
+  the folder, and nothing goes into the repo's root files.
+- **The PR is the finish line.** Gates run on the folder, and SHIP is ➖.
+  Merges, default-branch pushes, tags and releases are denied by the checks,
+  whatever the gate rows say.
+- **Edits outside the folder ask you first**, root `.gitignore` included (the
+  gate file is excluded through `.git/info/exclude` instead).
 
 ---
 
@@ -867,8 +921,8 @@ template you review before anything is written.
 | "just give me the commands" | Same gates as executing them — tracker shown above the block |
 | "looks good" | That's feedback on the diff, not commit approval — Claude asks explicitly |
 | "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A, for structural reasons |
-| "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it) |
-| "just delete that branch for me" | Ref deletions are yours in both modes — the block is presented, not executed |
+| "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it). On a self-hosted forge Claude runs it and you're asked |
+| "just delete that branch for me" | Ref deletions are yours in both modes — the block is presented, not executed. On a self-hosted forge Claude runs it and you're asked |
 | "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands. Commit approval stays, and the tag push and ref deletions stay yours |
 | "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
 | "that finding is pre-existing" | Provenance, not a verdict — it stays open and blocks the release until fixed, waived or withdrawn |
@@ -884,8 +938,8 @@ The skill uses tiered loading to keep token costs down:
 | File | Size | Loaded when |
 |---|---|---|
 | `SKILL.md` | ~38KB | **Every turn** (the `hooks:` header isn't loaded) — commit discipline, the operating modes (manual/semi-autonomous), gate pre-flight, the enforcement-check rules, the two tracks, gate state, shortcut detection, cost discipline, and the security layer that must fire unprompted: which patterns to flag on sight, the dependency-audit and attack-surface checklists |
-| `SESSION_START.md` | ~30KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
-| `ENFORCEMENT.md` | ~22KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
+| `SESSION_START.md` | ~31KB | Once, at session start — the one-call probe, the gate state file's format, self-check, version check, execution-environment detection, repo/shell questions, workflow detection, the unfinished-release check, the banner |
+| `ENFORCEMENT.md` | ~26KB | Its "At session start" section (~2KB) every session; the whole file whenever a check blocks — the full disclosure, the keep-or-decline question, every check as a plain rule, and what they can't catch |
 | `GATE_REFERENCE.md` | ~17KB | When gate 2 or 4 runs, passes, or is marked ➖ N/A — build, test artifact and docs checks; also when the state file must be re-derived or user-driven work credited |
 | `RELEASE_GATES.md` | ~9KB | Release track only, when gate 1 or 5 runs, passes, or is marked ➖ N/A — version checks, branch sync, release commit, PR and release notes |
 | `DOCKER_TEST.md` | ~9KB | Gate 2, only before a Docker test container is started or a run command handed over — per-session test login, LAN-only publishing, temp-mount and restart rules, the login echo, teardown |
@@ -895,6 +949,11 @@ The skill uses tiered loading to keep token costs down:
 | `SHIP_REFERENCE.md` | ~26KB | Gate 6 only — the CI-driven ship path, the manual path, wrong-commit tag recovery, post-ship verification |
 | `AUTO_MODE.md` | ~15KB | Only in semi-autonomous mode — the two checkpoint formats, the per-step table, the round-trip cost note, stop conditions |
 | `UPDATE_REFERENCE.md` | ~6KB | Only when the version check finds this copy behind the latest release — the out-of-date callout, which update options the install location allows, and the tested install commands (Claude installs it, or you run one command) |
+| `FORGE_REFERENCE.md` | ~8KB | Only when `origin` isn't on github.com — local-only scope, tags and ref deletions run by Claude on your per-operation yes, the once-per-clone onboarding (forge, CA, login, canonical repo, runners, offline CI, dependency watch) |
+| `FORGE_GITEA.md` | ~6KB | With `FORGE_REFERENCE.md` on Gitea or Forgejo — `tea` and API commands for each `gh` step, the CI wait, how Gitea/Forgejo Actions differ, link forms |
+| `FORGE_GITLAB.md` | ~5KB | With `FORGE_REFERENCE.md` on GitLab — `glab` commands for each `gh` step, auto-merge, the hand checklist for `.gitlab-ci.yml`, link forms |
+| `WORKFLOW_RENOVATE.md` | ~6KB | Only on a self-hosted forge, when the dependency watch is set up, checked or missing — proof that Renovate runs, the repo `renovate.json` (SHA-pinned actions in `.gitea`/`.forgejo` workflows, majors held for approval, offline registries), the scheduled job for Gitea/Forgejo Actions and for GitLab, bot token scopes |
+| `SCOPED_REPO.md` | ~5KB | Only when you own a folder in a shared repo — the contributor role, the folder as the main page, the gates cut off at the PR |
 | `REMOTE_SESSION.md` | ~4KB | Only in a remote container (web or mobile session) — no clone, uncommitted work is lost, `gh` → GitHub MCP, no shell question, the state file on the branch, the tag carve-out, Docker without a daemon |
 | `STANDARDS_REFERENCE.md` | ~5KB | When a project or feature a project standard applies to is being designed, and when Gates 1, 3 or 4 check one — what the security architecture section holds, how the login protections are built, and the compose quickstart example |
 | `DESIGN_REFERENCE.md` | ~5KB | Only for a project with a UI: when it is designed, gets a new screen or has no `DESIGN.md`, at Gate 2's visual pass, and for a design audit — the `DESIGN.md` format and lint, the generic tells to spot, building rules, the audit |
@@ -962,12 +1021,17 @@ How this repo is built with regard to security, and what has changed.
   folder, which is refused if it is a symlink or owned by someone else.
 - **What is trusted.** The gate file's rows are trusted as written. A line
   that waives a finding, declines enforcement, approves host networking or
-  skips a test artifact or dev banner goes to you for confirmation first.
-  Tag pushes and ref deletions are never run by Claude.
-- **Failing closed.** If the checks file or Python 3 is missing, git, `gh`
-  and docker commands are blocked. A crash in a check denies a git, `gh` or
-  docker command, and lets other tools through so you can still decline
-  enforcement.
+  skips a test artifact or dev banner goes to you for confirmation first, and
+  so does a `Forge:` row for a self-hosted forge, or removing or widening a
+  contributor `Role:` row. Tag pushes and ref deletions are never run by
+  Claude on GitHub. On a self-hosted forge Claude runs them, and Claude Code
+  asks you to allow each one; the deny becomes an ask, never an allow. A forge
+  token never enters the conversation: the forge CLI's own login, or
+  `~/.netrc`, holds it.
+- **Failing closed.** If the checks file or Python 3 is missing, git, `gh`,
+  `glab`, `tea` and docker commands are blocked. A crash in a check denies
+  those, forge API calls through `curl`/`wget`, and forge MCP writes, and
+  lets other tools through so you can still decline enforcement.
 - **What they don't cover** is listed in
   [`ENFORCEMENT.md`](skills/dev-skills/ENFORCEMENT.md), "What they can't
   catch". Everything outside the checks is an instruction, not a control.
@@ -981,6 +1045,14 @@ How this repo is built with regard to security, and what has changed.
   once merged.
 
 ### Changes
+
+- **2026-10-30 (2026.10.30):** the checks now cover forge writes they used
+  to miss entirely: `glab`, `tea`, `curl`/`wget` to a forge REST API, and
+  Gitea/Forgejo/GitLab MCP servers. Before this, a merge, release or tag
+  through any of them skipped every gate. `gh pr merge --delete-branch` is
+  checked as a merge too, and the crash fallback blocks the new commands.
+  Two template pins (`gradle/actions` v6.4.1, `docker/login-action` v4.7.0)
+  were brought current.
 
 - **2026-10-11 (2.52.0):** a git read after a `cd` the checks couldn't
   resolve crashed the check, which blocked the command without naming a
@@ -1053,4 +1125,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2026.10.23` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2026.10.30` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

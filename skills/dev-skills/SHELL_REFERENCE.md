@@ -66,7 +66,7 @@ session start, therefore never need to come back and ask it.
 
 SKILL.md Section 5.8 states the rule: creating a tag ref and deleting any ref go
 to the user in every environment and in both modes, remote containers included.
-This is why.
+This is why. A self-hosted forge is the one exception (`FORGE_REFERENCE.md`).
 
 The credentials Claude runs under are routinely denied on two specific ref
 operations, both narrower than the `contents: write` scope that lets branch
