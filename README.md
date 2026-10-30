@@ -100,7 +100,7 @@ to install.
 
 | Group | What's checked |
 |---|---|
-| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours (on a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab) Claude runs them and you're asked about each one) · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
 | **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · a pre-release tag block waits for the README dev banner to be recorded or declined · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
@@ -500,6 +500,10 @@ ref operations GitHub denies Claude.
 | PR merge | presented | Claude runs it once the PR's checks pass, without `--delete-branch`; CI on the merge commit is confirmed before the tag |
 | **Tag push** | always yours | **always yours — with a full report above the block** |
 | **Branch / tag deletion** | always yours | **always yours** |
+
+On a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab), in both
+modes, Claude runs the tag push and ref deletions and Claude Code asks you
+about each one.
 | Release publish, notes, verification | presented / Claude | Claude runs them |
 | Command blocks | the normal way commands arrive | the tag and ref deletions, plus anything that fails |
 | The six gates and the pre-flight | enforced | enforced, identically |
@@ -649,7 +653,8 @@ The skill detects where the session is running, because in
 [manual mode](#manual-and-semi-autonomous-mode) that determines whether Claude's
 working tree and your terminal are the same clone. (In semi-autonomous mode Claude
 runs every command itself except the tag push and ref deletions, which are
-always yours, and this table describes only the fallback when one fails.)
+yours on GitHub and asked on a self-hosted forge, and this table describes
+only the fallback when one fails.)
 
 | Environment | Git behavior |
 |---|---|
@@ -916,8 +921,8 @@ template you review before anything is written.
 | "just give me the commands" | Same gates as executing them — tracker shown above the block |
 | "looks good" | That's feedback on the diff, not commit approval — Claude asks explicitly |
 | "don't worry about the gates this time" | Gates only leave the workflow as ➖ N/A, for structural reasons |
-| "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it) |
-| "just delete that branch for me" | Ref deletions are yours in both modes — the block is presented, not executed |
+| "just tag it for me" | Tag pushes are yours to run in **both** modes — the block is presented, not executed (semi-autonomous mode adds a full report above it). On a self-hosted forge Claude runs it and you're asked |
+| "just delete that branch for me" | Ref deletions are yours in both modes — the block is presented, not executed. On a self-hosted forge Claude runs it and you're asked |
 | "auto mode" / "take it from here" | Semi-autonomous mode on — Claude runs the commands. Commit approval stays, and the tag push and ref deletions stay yours |
 | "stop asking me to approve commits" | Not what semi-autonomous mode relaxes — you get offered the mode, you keep the approval |
 | "that finding is pre-existing" | Provenance, not a verdict — it stays open and blocks the release until fixed, waived or withdrawn |
