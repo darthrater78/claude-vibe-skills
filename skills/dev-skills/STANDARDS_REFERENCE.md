@@ -20,8 +20,8 @@ rule in full and how to build it. Section numbers point at `SKILL.md`.
    locked-out user. The user decides. Record which were accepted or declined.
 3. **The main page links to GitHub and the latest release notes, without
    exception.** The README's top section, and the app's main page or screen
-   when it has a UI, links to the GitHub repo and to the release notes for the
-   current version (`RELEASE_GATES.md`, Gate 1, checks 5–6). Gate 1 blocks
+   when it has a UI, links to the GitHub repo (or its own forge's page,
+   `FORGE_REFERENCE.md`) and to the release notes for the current version (`RELEASE_GATES.md`, Gate 1, checks 5–6). Gate 1 blocks
    without both.
 4. **Docker projects offer Apprise notifications.** When the project ships as
    a Docker container, offer notifications through

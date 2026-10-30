@@ -35,6 +35,10 @@ it:
 > anything that needs a decision still comes to you. Say "manual mode" to switch
 > back.
 
+On a self-hosted forge (`FORGE_REFERENCE.md`), replace the tag sentence with:
+"the tag push and any ref deletion I run myself, but Claude Code asks you to
+allow each one, right after the full report of everything I did."
+
 Write `Mode: semi-autonomous (approved <date>) — commits and the tag still
 require the user's approval` into
 `.dev-skills-gates.md` in the same turn. A mode that is agreed to in
@@ -101,7 +105,10 @@ unattended: commits, pushes, a PR, CI runs, a merge. Semi-autonomous mode pays
 for that autonomy here, with a full accounting handed over *with* the tag block
 — not a summary, and not a bare set of commands to paste.
 
-**Claude never creates or pushes the tag ref itself, in either mode.** Run
+**Claude never creates or pushes the tag ref itself, in either mode**, except
+on a self-hosted forge, where the report below is followed in the same turn
+by Claude's own tag push, which the checks ask the user to allow
+(`FORGE_REFERENCE.md`). Run
 Gate 6 step 2's merge confirmation and the version guard first, then report and
 hand over the block:
 

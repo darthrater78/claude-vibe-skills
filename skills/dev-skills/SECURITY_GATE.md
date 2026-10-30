@@ -138,7 +138,8 @@ move on":**
 
 #### Workflow audit — every workflow, not only the ones this change touched
 
-Part of every scan in a repo with `.github/workflows/`. The enforcement check
+Part of every scan in a repo with `.github/workflows/` (or a self-hosted
+forge's CI folder, `FORGE_REFERENCE.md`). The enforcement check
 (`ENFORCEMENT.md`, B8) only sees workflow files as they are edited, so a
 workflow written before the skill, inherited from a template or a fork, or
 last audited under an older checklist is never looked at again unless this
@@ -284,6 +285,9 @@ not a suggestion to leave on the table:
 > add one (`WORKFLOW_REFERENCE.md`), or do you want to waive it with a reason?
 
 #### Enabling Dependabot alerts — hand the user these steps, not a menu path
+
+GitHub only. On another forge the watch is Renovate plus an offline
+vulnerability database (`FORGE_REFERENCE.md`, onboarding step 7).
 
 Alerts and security updates are **repository settings, not a file**, so Claude
 cannot turn them on and adding `dependabot.yml` does not turn them on either.

@@ -9,7 +9,7 @@ it writes is a small status marker in the temp directory, so the session
 banner can say whether enforcement is active.
 
 Modes (argv[1]):
-  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5 B6 B7 B8)
+  pre-tool   PreToolUse: commands Claude runs, files Claude edits   (A1 A2 A4 A5 A6 B5 B6 B7 B8 B9)
   stop       Stop: the reply Claude is about to end with            (C1 C2 C3 C4 C5 C7)
   post-ask   PostToolUse on AskUserQuestion: unanswered questions   (D1)
 
@@ -48,6 +48,23 @@ NO_INTENT_GATES = {"VERSION", "RELEASE", "SHIP"}
 # `⏳ open — 0 Critical, 0 High, 2 Medium`: enough for a work commit, not a release.
 OPEN_BELOW_HIGH = re.compile(r"(^|[^0-9])0\s+Critical\b.*(^|[^0-9])0\s+High\b", re.I)
 MAX_STOP_BLOCKS = 2  # per user prompt, then the reply goes through with a visible warning
+SELF_HOSTED = re.compile(r"^Forge:\s*(gitea|forgejo|gitlab)\b", re.I)
+ROLE = re.compile(r"^Role:\s*contributor\b[^;\n]*?\bowns\s+([^;\n]+)", re.I)
+
+
+def role_paths(line: str | None) -> list[str] | None:
+    if not line or not re.match(r"^Role:\s*contributor\b", line, re.I):
+        return None
+    m = ROLE.match(line)
+    # A contributor row that names no folder owns nothing: every edit asks.
+    raw = re.split(r"\s+[—–-]+\s+", m.group(1))[0] if m else ""
+    out = []
+    for p in re.split(r"[,\s]+", raw):
+        p = p.strip("`").replace("\\", "/")
+        p = (p[2:] if p.startswith("./") else p).rstrip("/")
+        if p and p != ".":
+            out.append(p)
+    return out
 
 
 # --- output -------------------------------------------------------------------
@@ -203,6 +220,17 @@ class Gates:
         m = re.match(r"Origin:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", line)
         return (m.group(1) if m else None), ("fork of" in line.lower())
 
+    @property
+    def self_hosted(self) -> bool:
+        """`Forge: gitea|forgejo|gitlab @ <host>`: the user's own forge, where Claude runs
+        tags and ref deletions on the user's yes (FORGE_REFERENCE.md). Added only through B5."""
+        return bool(SELF_HOSTED.match(self.first("Forge:") or ""))
+
+    def owned_paths(self) -> list[str] | None:
+        """`Role: contributor — owns a/b, c`: the folders this session may change
+        (SCOPED_REPO.md). None when the row is absent."""
+        return role_paths(self.first("Role:"))
+
     def host_network_approved(self, name: str | None) -> bool:
         if not name:
             return False
@@ -345,7 +373,7 @@ def simple_commands(text: str, depth: int = 0, ps: bool = False) -> list[list[st
 
 # Compared case-insensitively and without `.exe`, so Windows spellings
 # (`git.exe`, `C:\Program Files\Git\cmd\git.exe`, `Git`) classify like `git`.
-KNOWN_PROGRAMS = {"git", "gh", "docker", "podman", "bash", "sh", "zsh", "dash", "ksh", "fish", "pwsh",
+KNOWN_PROGRAMS = {"git", "gh", "glab", "tea", "curl", "wget", "docker", "podman", "bash", "sh", "zsh", "dash", "ksh", "fish", "pwsh",
                   "powershell", "cmd", "eval", "iex", "invoke-expression", "xargs", "source",
                   "start-process", "saps", "start"}
 
@@ -619,6 +647,14 @@ def classify(argv: list[str], root: str | None, depth: int = 0) -> list["Op"]:
     base = os.path.basename(argv[0]) if argv else ""
     if base == "gh" and len(argv) > 1:
         ops.extend(classify_gh(argv[1:]))
+    elif base == "glab" and len(argv) > 1:
+        ops.extend(classify_glab(argv[1:]))
+    elif base == "tea" and len(argv) > 1:
+        ops.extend(classify_tea(argv[1:]))
+    elif base in ("curl", "wget"):
+        res = classify_http(base, argv[1:])
+        if res:
+            ops.extend(with_branch_deletion(res[0], res[1], base))
     return ops
 
 
@@ -628,8 +664,9 @@ def classify_push(args: list[str], root: str | None) -> list["Op"]:
     flags = [a for a in args if a.startswith("-")]
     pos = [a for a in args if not a.startswith("-")]
     if any(f in ("--tags", "--follow-tags", "--mirror", "--delete", "-d", "--prune") for f in flags):
-        op = Op("user_only", "pushing tags or deleting a ref", "tag push / ref deletion")
-        op.publishes = any(f in ("--tags", "--follow-tags", "--mirror") for f in flags)
+        pushes_tags = any(f in ("--tags", "--follow-tags", "--mirror") for f in flags)
+        op = Op("user_only", "pushing tags or deleting a ref", "tag push / ref deletion" if pushes_tags else "ref deletion")
+        op.publishes = pushes_tags
         return [op]
     remote = pos[0] if pos else None
     refspecs = pos[1:]
@@ -681,9 +718,8 @@ def gh_positionals(args: list[str], valued: set[str]) -> list[str]:
     return out
 
 
-def classify_gh_api(args: list[str], words: list[str]) -> "Op | None":
-    """`gh api` writes that merge, publish, open a PR, or commit."""
-    op = None
+def api_method(args: list[str]) -> str | None:
+    """The HTTP method of a `gh api` / `glab api` call."""
     method = None
     for i, a in enumerate(args):
         if a in ("-X", "--method") and i + 1 < len(args):
@@ -692,43 +728,169 @@ def classify_gh_api(args: list[str], words: list[str]) -> "Op | None":
             method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
     if method is None and any(a in ("-f", "-F", "--field", "--raw-field", "--input") for a in args):
         method = "POST"
-    endpoint = next((w for w in words[1:] if "/" in w), "")
-    if method in ("POST", "PATCH", "PUT", "DELETE"):
-        if re.search(r"git/refs|/git/tags", endpoint):
-            op = Op("user_only", "creating or deleting a ref through gh api", "ref operation")
-        elif re.search(r"/pulls/\d+/merge", endpoint):
-            op = Op("release", "merging a pull request through gh api")
-            op.targets_default = True
-        elif re.search(r"/releases(/|$)", endpoint):
-            op = Op("user_only" if method == "DELETE" else "release", "a release through gh api")
-            op.publishes = method != "DELETE"
-        elif re.search(r"/merges$|/pulls/\d+/update-branch$", endpoint):
-            merges = endpoint.endswith("/merges")
-            op = Op("release" if merges else "work",
-                    "a branch merge through gh api" if merges else "updating a PR branch through gh api")
-            op.targets_default = merges
-        elif re.search(r"/pulls$", endpoint) and method == "POST":
-            op = Op("pr", "opening a pull request through gh api")
-        elif re.search(r"/contents/", endpoint) and method in ("PUT", "DELETE"):
-            # A contents write is a commit. With no branch field it lands on the default branch.
-            on_branch = any(re.match(r"branch=", a) for a in args)
-            op = Op("work" if on_branch else "release", "a file commit through gh api")
-            op.targets_default = not on_branch
+    return method
+
+
+def classify_api(method: str | None, endpoint: str, args: list[str], via: str) -> "Op | None":
+    """Forge API writes that merge, publish, open a PR, commit, or touch a ref. One
+    table for GitHub, Gitea/Forgejo (/api/v1, GitHub-shaped) and GitLab (/api/v4)."""
+    if method not in ("POST", "PATCH", "PUT", "DELETE"):
+        return None
+    endpoint = endpoint.split("?")[0]
+    op = None
+    if re.search(r"/releases(/|$)", endpoint):
+        op = Op("user_only" if method == "DELETE" else "release", f"a release through {via}",
+                "release deletion" if method == "DELETE" else "")
+        op.publishes = method != "DELETE"
+    elif re.search(r"git/refs|/git/tags|/repository/tags|/tags(/|$)", endpoint) or \
+            (method == "DELETE" and re.search(r"/branches/", endpoint)):
+        tag = bool(re.search(r"tags", endpoint)) and method == "POST"
+        op = Op("user_only", f"creating or deleting a ref through {via}",
+                "tag creation" if tag else "ref operation")
+        op.publishes = tag
+    elif re.search(r"/pulls/\d+/merge|/merge_requests/\d+/merge$", endpoint):
+        op = Op("release", f"merging a pull request through {via}")
+        op.targets_default = True
+    elif re.search(r"/merges$|/pulls/\d+/update-branch$|/merge_requests/\d+/rebase$", endpoint):
+        merges = endpoint.endswith("/merges")
+        op = Op("release" if merges else "work",
+                f"a branch merge through {via}" if merges else f"updating a PR branch through {via}")
+        op.targets_default = merges
+    elif re.search(r"/pulls$|/merge_requests$", endpoint) and method == "POST":
+        op = Op("pr", f"opening a pull request through {via}")
+    elif re.search(r"/contents/|/repository/files/|/repository/commits$", endpoint):
+        # A contents write is a commit. With no branch field it lands on the default branch.
+        on_branch = any(re.search(r"(^|[\"'{,&\s])branch[\"']?\s*[=:]", a) for a in args)
+        op = Op("work" if on_branch else "release", f"a file commit through {via}")
+        op.targets_default = not on_branch
     return op
+
+
+def classify_gh_api(args: list[str], words: list[str], via: str = "gh api") -> "Op | None":
+    """`gh api` / `glab api` writes."""
+    endpoint = next((w for w in words[1:] if "/" in w), "")
+    return classify_api(api_method(args), endpoint, args, via)
+
+
+# Matched anywhere in the URL, so `"$GITEA_URL/api/v1/repos/…"` counts too.
+FORGE_API = re.compile(r"(^|[/@])api\.github\.com/|/api/v[134]/(repos|projects)/")
+CURL_VALUED = {"-X", "--request", "-H", "--header", "-d", "--data", "--data-raw", "--data-binary",
+               "--data-urlencode", "--json", "-F", "--form", "-T", "--upload-file", "-o", "--output",
+               "-u", "--user", "-A", "--user-agent", "-e", "--referer", "--cacert", "--cert", "-K", "--config",
+               "-m", "--max-time", "--connect-timeout", "-w", "--write-out", "--retry"}
+
+
+# A merge call whose body also deletes the source branch: that half is a ref deletion.
+BODY_DELETES_BRANCH = re.compile(r"(delete_branch_after_merge|should_remove_source_branch|remove_source_branch)[\"']?\s*[:=]\s*true", re.I)
+
+
+def with_branch_deletion(op: "Op | None", args: list[str], via: str) -> list["Op"]:
+    if op is None:
+        return []
+    if any(BODY_DELETES_BRANCH.search(a) for a in args):
+        return [op, Op("user_only", f"a merge through {via} that deletes the branch", "branch deletion")]
+    return [op]
+
+
+def classify_http(prog: str, args: list[str]) -> "tuple[Op | None, list[str]] | None":
+    """`curl` / `wget` writes to a forge's REST API (GitHub, Gitea/Forgejo, GitLab)."""
+    method, data, url, skip = None, [], None, False
+    for i, a in enumerate(args):
+        if skip:
+            skip = False
+            continue
+        nxt = args[i + 1] if i + 1 < len(args) else ""
+        if a in ("-X", "--request"):
+            method, skip = nxt.upper(), True
+        elif a.startswith("-X") and len(a) > 2 and not a.startswith("--"):
+            method = a[2:].upper()
+        elif a.startswith(("--request=", "--method=")):
+            method = a.split("=", 1)[1].upper()
+        elif a in ("-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json", "-F", "--form"):
+            data.append(nxt)
+            method, skip = method or "POST", True
+        elif a in ("-T", "--upload-file"):
+            method, skip = method or "PUT", True
+        elif re.match(r"^-[dF].", a):  # curl's attached form: -d'{...}', -Fkey=value
+            data.append(a[2:])
+            method = method or "POST"
+        elif re.match(r"^-T.", a):
+            method = method or "PUT"
+        elif a.startswith(("--post-data=", "--post-file=", "--body-data=", "--body-file=")):
+            data.append(a.split("=", 1)[1])
+            method = method or "POST"
+        elif a in CURL_VALUED:
+            skip = True
+        elif not a.startswith("-") and url is None:
+            url = a
+    if not url or not FORGE_API.search(url):
+        return None
+    return classify_api(method, re.sub(r"^https?://[^/]+", "", url), data, prog), data
+
+
+def classify_glab(args: list[str]) -> list["Op"]:
+    words = [a for a in args if not a.startswith("-")]
+    head = words[:2]
+    ops = []
+    if head == ["mr", "create"]:
+        ops.append(Op("pr", "opening a merge request"))
+        if "--remove-source-branch" in args:
+            ops.append(Op("user_only", "glab mr create --remove-source-branch", "branch deletion"))
+    elif head == ["mr", "merge"]:
+        op = Op("release", "merging a merge request")
+        op.targets_default = True
+        ops.append(op)
+        if any(a in ("--remove-source-branch", "-d") for a in args):
+            ops.append(Op("user_only", "glab mr merge --remove-source-branch", "branch deletion"))
+    elif head in (["release", "create"], ["release", "upload"]):
+        op = Op("release", f"glab release {head[1]}")
+        op.publishes = True
+        ops.append(op)
+    elif head == ["release", "delete"]:
+        ops.append(Op("user_only", "deleting a release", "release deletion"))
+    elif head == ["mr", "rebase"]:
+        ops.append(Op("work", "glab mr rebase"))
+    elif words[:1] == ["api"]:
+        ops.extend(with_branch_deletion(classify_gh_api(args, words, "glab api"), args, "glab api"))
+    return ops
+
+
+def classify_tea(args: list[str]) -> list["Op"]:
+    words = [a for a in args if not a.startswith("-")]
+    noun, verb = (words + ["", ""])[:2]
+    ops = []
+    if noun in ("pulls", "pull", "pr"):
+        if verb in ("create", "c"):
+            ops.append(Op("pr", "opening a pull request"))
+        elif verb in ("merge", "m"):
+            op = Op("release", "merging a pull request")
+            op.targets_default = True
+            ops.append(op)
+        elif verb == "clean":
+            ops.append(Op("user_only", "tea pulls clean (deletes the remote branch)", "branch deletion"))
+    elif noun in ("releases", "release", "r"):
+        if verb in ("create", "c", "edit", "e"):
+            op = Op("release", f"tea releases {verb}")
+            op.publishes = True
+            ops.append(op)
+        elif verb in ("delete", "rm"):
+            ops.append(Op("user_only", "deleting a release", "release deletion"))
+    return ops
 
 
 def classify_gh(args: list[str]) -> list["Op"]:
     words = [a for a in args if not a.startswith("-")]
     head = words[:2]
     op = None
+    extra = []
     if head == ["pr", "create"]:
         op = Op("pr", "opening a pull request")
     elif head == ["pr", "merge"]:
+        # Checked as both halves: the deletion is the user's, the merge needs its gates.
+        op = Op("release", "merging a pull request")
+        op.targets_default = True
         if any(a in ("--delete-branch", "-d") for a in args):
-            op = Op("user_only", "gh pr merge --delete-branch", "branch deletion")
-        else:
-            op = Op("release", "merging a pull request")
-            op.targets_default = True
+            extra.append(Op("user_only", "gh pr merge --delete-branch", "branch deletion"))
     elif head == ["release", "create"]:
         op = Op("release", "creating a release")
         op.publishes = True
@@ -746,13 +908,14 @@ def classify_gh(args: list[str]) -> list["Op"]:
     elif words[:1] == ["api"]:
         op = classify_gh_api(args, words)
     if op:
-        op.is_gh = True
-        op.gh_repos = gh_repo_flags(args)
-        return [op]
+        for o in [op, *extra]:
+            o.is_gh = True
+            o.gh_repos = gh_repo_flags(args)
+        return [op, *extra]
     return []
 
 
-REQUIRED = {"work": WORK, "pr": PR, "release": RELEASE}
+REQUIRED ={"work": WORK, "pr": PR, "release": RELEASE}
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "build", "dist"}
 
 
@@ -821,13 +984,20 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
         return ["the operating mode is not chosen (Mode: row). Ask the mode question first."]
     problems = []
     slug, is_fork = gates.origin()
+    owned = gates.owned_paths()
     for op in ops:
+        if owned is not None and (op.kind == "release" or op.publishes):
+            problems.append(f"{op.label}: the gate file's Role: row says contributor, so merges, default-branch "
+                            "writes, tags and releases belong to the repo's maintainers (SCOPED_REPO.md). "
+                            "The open PR is this session's finish line.")
+            continue
         if op.publishes and (gates.work_track or gates.no_intent_rows()):
             problems.append(f"{op.label} publishes, but the gate file is on the work-commit track "
                             "(Track: work commit, or a ➖ no publishing intent row). A release runs all six gates.")
             continue
         if op.kind == "user_only":
-            if not presented:
+            # On a self-hosted forge Claude may run it, and pre_tool asks the user each time.
+            if not presented and not gates.self_hosted:
                 problems.append(f"{op.label} is the user's to run in both modes (SKILL.md §5.8). "
                                 "Present it as a ▶️ RUN THIS block instead.")
                 continue
@@ -1277,6 +1447,8 @@ SENSITIVE = [
     (re.compile(r"^Host network:.*approved"), "a host-network approval"),
     (re.compile(r"test artifact:\s*n/a", re.I), "skipping the test artifact"),
     (re.compile(r"banner\s*➖", re.I), "skipping the README dev banner"),
+    # Lets Claude run tags and ref deletions (each one still asks): FORGE_REFERENCE.md.
+    (SELF_HOSTED, "a self-hosted forge"),
 ]
 NO_APP_CHANGE = re.compile(r"test artifact:\s*n/a\s*[—–-]+\s*no app code changed", re.I)
 # A waiver is keyed by the clause that carries it (from "waive" to the next `;`,
@@ -1333,6 +1505,11 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
     current = read(path)
     new = new_content(tool, inp, current)
     added = sensitive_lines(new) - sensitive_lines(current)
+    # Dropping or widening the contributor role lifts its limits (SCOPED_REPO.md).
+    old_role = role_paths(next((l for l in (current or "").splitlines() if l.startswith("Role:")), None))
+    new_role = role_paths(next((l for l in new.splitlines() if l.startswith("Role:")), None))
+    if old_role is not None and (new_role is None or set(new_role) - set(old_role)):
+        added[f"Role: {'removed' if new_role is None else 'now owns ' + ', '.join(new_role)}"] += 1
     if not added:
         # Answer allow, not silence: silence hands the edit to Claude Code's own
         # permission prompt, which asked the user to approve every row update.
@@ -1352,7 +1529,8 @@ def file_edit_check(tool: str, inp: dict, root: str | None) -> tuple[str, str] |
 # what a line-level read of the YAML can prove. Only problems an edit *adds* are
 # raised, so fixing one thing in an old, unhardened workflow isn't held hostage
 # to everything else wrong with it.
-WORKFLOW_PATH = re.compile(r"(^|[/\\])\.github[/\\]workflows[/\\][^/\\]+\.ya?ml$")
+# Gitea and Forgejo Actions use the same syntax from their own folders (FORGE_GITEA.md).
+WORKFLOW_PATH = re.compile(r"(^|[/\\])\.(github|gitea|forgejo)[/\\]workflows[/\\][^/\\]+\.ya?ml$")
 SHA_PIN = re.compile(r"^[0-9a-f]{40}$")
 # HACS's own guidance is to run hacs/action at @main (WORKFLOW_REFERENCE.md,
 # Security) — the one documented exception to SHA pinning.
@@ -1673,6 +1851,50 @@ def handoff_add_check(argv: list[str]) -> str | None:
 
 # --- pre-tool -----------------------------------------------------------------
 
+# --- forge MCP tools, self-hosted asks, owned folders --------------------------
+
+FORGE_MCP = re.compile(r"github|gitlab|gitea|forgejo", re.I)
+MCP_KINDS = [
+    (re.compile(r"^(create_tag|delete_tag|delete_branch|delete_ref|delete_release)$"), "user_only"),
+    # A merge, or auto-merge: a merge that happens later, with no check at that point.
+    (re.compile(r"^(merge_pull_request|merge_merge_request|accept_merge_request|enable_.*auto_merge)$"), "release"),
+    (re.compile(r"^(create|update|edit)_release$"), "release"),
+    (re.compile(r"^create_(pull_request|merge_request)$"), "pr"),
+    (re.compile(r"^(push_files|create_or_update_file|create_file|update_file|delete_file|create_commit|"
+                r"update_pull_request_branch|rebase_merge_request)$"), "work"),
+]
+
+
+def mcp_kind(name: str) -> str | None:
+    """What a GitHub, Gitea/Forgejo or GitLab MCP tool does, by name."""
+    return next((kind for pat, kind in MCP_KINDS if pat.match(name)), None)
+
+
+def self_hosted_ask(labels: list[str]) -> str:
+    return ("the gate file's Forge: row is a self-hosted forge, so Claude runs this tag or ref operation "
+            "only on your yes, each time (FORGE_REFERENCE.md): " + ", ".join(dict.fromkeys(labels)))
+
+
+SESSION_FILES = re.compile(r"^(\.dev-skills-gates\.md|\.dev-skills-handoff\.md)$")
+
+
+def owned_path_check(inp: dict, root: str | None, gates: Gates) -> tuple[str, str] | None:
+    """B9: in a repo where the session owns only some folders, an edit elsewhere asks."""
+    owned = gates.owned_paths()
+    path = inp.get("file_path") or inp.get("notebook_path")
+    if owned is None or not path or not root:
+        return None
+    # Real paths, so a symlink inside an owned folder can't point the edit elsewhere.
+    rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root)).replace("\\", "/")
+    if rel.startswith("../") or rel == ".." or SESSION_FILES.match(rel):
+        return None
+    if any(rel == p or rel.startswith(p + "/") for p in owned):
+        return None
+    where = ", ".join(owned) or "no folder named"
+    return ("ask", f"{rel} is outside the folder this session owns ({where}; the gate file's Role: row, "
+                   "SCOPED_REPO.md). Changes elsewhere belong to the repo's other owners.")
+
+
 def pre_tool(payload: dict) -> NoReturn:
     tool = payload.get("tool_name", "")
     inp = payload.get("tool_input") or {}
@@ -1688,6 +1910,9 @@ def pre_tool(payload: dict) -> NoReturn:
             res = workflow_edit_check(tool, inp)
             if res:
                 pre_decision(*res)
+            res = owned_path_check(inp, root, gates)
+            if res:
+                pre_decision(*res)
         allow()
 
     if gates.declined:
@@ -1697,6 +1922,7 @@ def pre_tool(payload: dict) -> NoReturn:
         cmd = inp.get("command") or ""
         res = bash_protected_check(cmd)
         problems = []
+        user_ops = []  # tag / ref operations a self-hosted forge lets Claude run, on the user's yes
         cur: str | None = cwd
         for argv in simple_commands(cmd, ps=tool == "PowerShell"):
             if argv and argv[0].lower() in ("cd", "pushd", "set-location", "sl", "chdir", "push-location"):
@@ -1712,12 +1938,15 @@ def pre_tool(payload: dict) -> NoReturn:
                                 "which repo's gates apply. Use a literal path.")
             elif ops:
                 problems.extend(gate_problems(ops, here_gates, presented=False, text_for_fork=cmd))
+                user_ops.extend(o.label for o in ops if o.kind == "user_only")
             staged = gate_file_add_check(argv)
             if staged:
                 problems.append(staged)
             problems.extend(docker_checks(argv, cmd, here or cwd, here_gates))
         if problems:
             pre_decision("deny", "blocked:\n- " + "\n- ".join(problems))
+        if user_ops and not (res and res[0] == "deny"):
+            pre_decision("ask", self_hosted_ask(user_ops) + (f"\nAlso: {res[1]}" if res else ""))
         if res:
             pre_decision(*res)
         for argv in simple_commands(cmd, ps=tool == "PowerShell"):
@@ -1727,27 +1956,24 @@ def pre_tool(payload: dict) -> NoReturn:
         allow()
 
     m = re.match(r"^mcp__(.+)__([a-z_]+)$", tool)
-    if m and "github" in m.group(1).lower():
+    if m and FORGE_MCP.search(m.group(1)):
         name = m.group(2)
-        if name in ("create_tag", "delete_branch", "delete_tag", "delete_ref", "delete_release"):
+        kind, label = mcp_kind(name), name
+        if kind == "user_only" and not gates.self_hosted:
             pre_decision("deny", f"{name} is the user's to run (SKILL.md §5.8). Present the git command instead.")
-        # enable_pr_auto_merge is a merge that happens later, with no check at that point,
-        # so it needs everything a merge needs now.
-        kind = {"create_pull_request": "pr", "merge_pull_request": "release",
-                "enable_pr_auto_merge": "release", "create_release": "release",
-                "push_files": "work", "create_or_update_file": "work", "delete_file": "work",
-                "update_pull_request_branch": "work"}.get(name)
         if kind:
-            op = Op(kind, name)
+            op = Op(kind, label, "tag creation" if name == "create_tag" else "ref operation")
             op.is_gh = True
-            op.publishes = name == "create_release"
-            op.targets_default = name in ("merge_pull_request", "enable_pr_auto_merge")
+            op.publishes = name in ("create_release", "create_tag")
+            op.targets_default = bool(re.match(r"^(merge_|enable_.*auto_merge|accept_merge)", name))
             owner, repo = inp.get("owner"), inp.get("repo")
             if owner and repo:
                 op.gh_repos = [f"{owner}/{repo}"]
             problems = gate_problems([op], gates, presented=False, text_for_fork="GH_REPO=" if op.gh_repos else "")
             if problems:
                 pre_decision("deny", "blocked:\n- " + "\n- ".join(problems))
+            if kind == "user_only":
+                pre_decision("ask", self_hosted_ask([name]))
     allow()
 
 
@@ -1757,7 +1983,7 @@ FENCE = re.compile(r"^(\s*)(```|~~~)")
 BAD_URL = re.compile(r"https?://(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\]|172\.1[7-9](?:\.\d{1,3}){2})(?=[:/\s)`'\"\]]|$)", re.I)
 GIT_CMD = re.compile(r"(^|&&|\|\||[;|(])\s*(sudo\s+|env\s+)?(git\s+(-C\s+\S+\s+)?(add|commit|push|pull|checkout|switch|"
                      r"branch|merge|rebase|tag|reset|clone|remote|stash|cherry-pick|revert)"
-                     r"|gh\s+(pr|release|api|repo|run|issue|auth|workflow))\b", re.M)
+                     r"|gh\s+(pr|release|api|repo|run|issue|auth|workflow)|glab\s+(mr|release|api)|tea\s+(pr|pulls?|releases?))\b", re.M)
 # A block of reads only (git status/log/diff/fetch, ls-remote) is not policed as a run block
 # unless it is labeled one: a bounce costs a whole model request.
 NO_REPLY = re.compile(r"no need to reply|(don'?t|do not) need to (reply|tell me|answer)|nothing (you need )?to reply", re.I)
@@ -2005,10 +2231,11 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except Exception as exc:
-        # Fail closed where it matters: a git, gh or docker command, or a GitHub
-        # MCP write. Everything else goes through, so a bug here can't stop the
-        # user editing the gate file to decline enforcement.
-        risky = re.search(r'(^|[^A-Za-z])(git|gh|docker)\s|"tool_name":\s*"mcp__[^"]*github', RAW["text"])
+        # Fail closed where it matters: a git, gh, glab, tea or docker command, a
+        # forge API call, or a forge MCP write. Everything else goes through, so a
+        # bug here can't stop the user editing the gate file to decline enforcement.
+        risky = re.search(r'(^|[^A-Za-z])(git|gh|glab|tea|docker)\s|(curl|wget)\s[^"]*(/api/v[134]/|api\.github\.com)'
+                          r'|"tool_name":\s*"mcp__[^"]*(github|gitlab|gitea|forgejo)', RAW["text"], re.I)
         if len(sys.argv) > 1 and sys.argv[1] == "pre-tool" and risky:
             pre_decision("deny", f"the enforcement check itself failed ({type(exc).__name__}: {exc}). "
                                  "Blocked rather than allowed. Report it, or decline enforcement for this session.")

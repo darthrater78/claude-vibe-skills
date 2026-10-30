@@ -67,6 +67,17 @@ Origin: owner/repo (not a fork)
 🚀 SHIP       ➖ no publishing intent
 """
 GATES_HOSTNET = GATES_ALL + "Host network: hass approved 2026-09-24 — mDNS discovery\n"
+FORGE_ROW = "Forge: gitea @ git.home.lan — self-hosted, Claude runs tags and ref deletions on the user's yes\n"
+GATES_SELFHOST = GATES_ALL.replace("Origin:", FORGE_ROW + "Origin:")
+GATES_SELFHOST_NONE = GATES_NONE.replace("Origin:", FORGE_ROW + "Origin:")
+GATES_SELFHOST_WORK = GATES_WORK_MERGE.replace("Origin:", FORGE_ROW + "Origin:")
+ROLE_ROW = "Role: contributor — owns services/billing; merge, tags and releases belong to the repo's maintainers\n"
+GATES_ROLE = GATES_ALL.replace("Origin:", ROLE_ROW + "Origin:")
+GATES_ROLE_SELFHOST = GATES_SELFHOST.replace("Origin:", ROLE_ROW + "Origin:")
+
+
+def mcp(tool: str, gates: str, inp: dict | None = None) -> str:
+    return run("pre-tool", {"session_id": "t", "tool_name": tool, "cwd": repo(gates), "tool_input": inp or {}})
 
 
 def lan() -> str | None:
@@ -295,6 +306,24 @@ def wf(tool: str, new: str, existing: str | None = None, gates: str | None = GAT
     inp = ({"file_path": path, "content": new} if tool == "Write"
            else {"file_path": path, "old_string": existing, "new_string": new})
     return run("pre-tool", {"session_id": "t", "tool_name": tool, "cwd": d, "tool_input": inp})
+
+
+def wf_at(folder: str, new: str) -> str:
+    """A Write of <folder>/workflows/ci.yml (Gitea / Forgejo Actions)."""
+    d = repo(GATES_ALL)
+    path = os.path.join(d, folder, "workflows", "ci.yml")
+    os.makedirs(os.path.dirname(path))
+    return run("pre-tool", {"session_id": "t", "tool_name": "Write", "cwd": d, "tool_input": {"file_path": path, "content": new}})
+
+
+def edit_via_symlink() -> str:
+    """A contributor edit through a symlink in the owned folder that points at another folder."""
+    d = repo(GATES_ROLE)
+    os.makedirs(os.path.join(d, "services", "billing"))
+    os.makedirs(os.path.join(d, "services", "auth"))
+    os.symlink(os.path.join(d, "services", "auth"), os.path.join(d, "services", "billing", "link"))
+    return run("pre-tool", {"session_id": "t", "tool_name": "Write", "cwd": d,
+                            "tool_input": {"file_path": os.path.join(d, "services", "billing", "link", "app.py"), "content": "x"}})
 
 
 def stop(msg: str, gates: str | None = GATES_ALL, prompt: str = "p1") -> str:
@@ -872,6 +901,104 @@ CASES = [
     ("D1 string response", lambda: run("post-ask", {"tool_input": {"questions": [
         {"question": "Version?", "options": [{"label": "1.0"}]}]},
         "tool_response": 'The user answered: "Version?" (No answer provided)'}), "context"),
+    # --- Self-hosted forges (FORGE_REFERENCE.md): glab, tea, API calls, their MCP servers
+    ("A4 glab mr create before gates", lambda: bash("glab mr create --fill", gates=GATES_WORK), "deny"),
+    ("A4 glab mr create after gates ok", lambda: bash("glab mr create --fill"), "allow"),
+    ("A4 glab mr merge before RELEASE", lambda: bash("glab mr merge 3", gates=GATES_WORK), "deny"),
+    ("A4 glab mr merge ok", lambda: bash("glab mr merge 3"), "allow"),
+    ("A4 glab release create on work track", lambda: bash("glab release create v1.2.0", gates=GATES_WORK_MERGE), "deny"),
+    ("A4 glab api MR merge", lambda: bash("glab api -X PUT projects/7/merge_requests/3/merge", gates=GATES_WORK), "deny"),
+    ("A4 tea pr create before gates", lambda: bash("tea pr create --head feat/x", gates=GATES_WORK), "deny"),
+    ("A4 tea pulls merge before RELEASE", lambda: bash("tea pulls merge 4", gates=GATES_WORK), "deny"),
+    ("A4 tea.exe by path", lambda: bash("/usr/local/bin/tea.exe pulls merge 4", gates=GATES_WORK), "deny"),
+    ("A4 tea releases create ok", lambda: bash("tea releases create --tag v1.2.0"), "allow"),
+    ("A4 curl Gitea PR merge", lambda: bash('curl -X POST -H "Authorization: token $T" '
+                                            'https://git.home.lan/api/v1/repos/o/r/pulls/4/merge -d \'{"Do":"merge"}\'',
+                                            gates=GATES_WORK), "deny"),
+    ("A4 curl to a variable host", lambda: bash('curl -sS --data \'{"title":"x"}\' "$GITEA/api/v1/repos/o/r/pulls"',
+                                                gates=GATES_NONE), "deny"),
+    ("A4 curl GitLab file commit to default", lambda: bash("curl --request POST https://gl.lan/api/v4/projects/7/repository/commits",
+                                                           gates=GATES_WORK), "deny"),
+    ("A4 wget Gitea release", lambda: bash("wget --post-data='{}' https://git.home.lan/api/v1/repos/o/r/releases",
+                                           gates=GATES_WORK_MERGE), "deny"),
+    ("A4 curl API read ok", lambda: bash("curl -sS https://git.home.lan/api/v1/repos/o/r/pulls/4", gates=GATES_NONE), "allow"),
+    ("A4 curl non-forge POST ok", lambda: bash("curl -X POST -d x https://example.com/hook", gates=GATES_NONE), "allow"),
+    ("A4 Gitea MCP merge before RELEASE", lambda: mcp("mcp__gitea__merge_pull_request", GATES_WORK), "deny"),
+    ("A4 GitLab MCP MR create before gates", lambda: mcp("mcp__gitlab__create_merge_request", GATES_WORK), "deny"),
+    ("A4 GitLab MCP MR create ok", lambda: mcp("mcp__gitlab__create_merge_request", GATES_ALL), "allow"),
+    ("A4 Forgejo MCP file write before SECURITY", lambda: mcp("mcp__forgejo__create_file", GATES_NONE), "deny"),
+    ("A4 gh pr merge --delete-branch presented still needs RELEASE", lambda: stop(RUN_OK.replace(
+        'git add -A && git commit -m "feat: x" && git push -u origin feat/x', "gh pr merge 5 --merge --delete-branch"),
+        gates=GATES_WORK), "block"),
+    ("A6 glab mr merge --remove-source-branch", lambda: bash("glab mr merge 3 --remove-source-branch"), "deny"),
+    ("A6 tea pulls clean", lambda: bash("tea pulls clean 4"), "deny"),
+    ("A6 glab release delete", lambda: bash("glab release delete v1.2.0"), "deny"),
+    ("A6 curl Gitea tag create", lambda: bash("curl -X POST https://git.home.lan/api/v1/repos/o/r/tags -d x"), "deny"),
+    ("A6 curl GitLab branch delete", lambda: bash("curl -X DELETE https://gl.lan/api/v4/projects/7/repository/branches/feat%2Fx"), "deny"),
+    ("A6 Gitea MCP delete_branch", lambda: mcp("mcp__gitea__delete_branch", GATES_ALL), "deny"),
+    ("A6 curl Gitea merge deleting the branch", lambda: bash("curl -n -X POST https://git.home.lan/api/v1/repos/o/r/pulls/4/merge "
+                                                            "-d '{\"Do\":\"merge\",\"delete_branch_after_merge\":true}'"), "deny"),
+    ("A6 self-hosted curl merge deleting the branch asks", lambda: bash("curl -n -X POST https://git.home.lan/api/v1/repos/o/r/pulls/4/merge "
+                                                                       "-d '{\"Do\":\"merge\",\"delete_branch_after_merge\":true}'",
+                                                                       gates=GATES_SELFHOST), "ask"),
+    ("A6 self-hosted glab api merge removing the branch asks", lambda: bash("glab api -X PUT projects/7/merge_requests/3/merge "
+                                                                           "-f should_remove_source_branch=true", gates=GATES_SELFHOST), "ask"),
+    ("A4 self-hosted curl merge ok", lambda: bash("curl -n -X POST https://git.home.lan/api/v1/repos/o/r/pulls/4/merge -d '{\"Do\":\"merge\"}'",
+                                                  gates=GATES_SELFHOST), "allow"),
+    ("A4 curl attached -d form", lambda: bash("curl -n -X POST https://git.home.lan/api/v1/repos/o/r/pulls -d'{\"title\":\"x\"}'",
+                                              gates=GATES_NONE), "deny"),
+    ("A4 curl attached -d implies POST", lambda: bash("curl -n https://git.home.lan/api/v1/repos/o/r/pulls/4/merge -d'{}'",
+                                                      gates=GATES_WORK), "deny"),
+    ("B9 contributor symlink out of the owned folder asks", lambda: edit_via_symlink(), "ask"),
+    # --- A6 on a self-hosted forge: Claude may run it, and the user is asked each time
+    ("A6 self-hosted tag push asks", lambda: bash("git push origin v1.2.0", gates=GATES_SELFHOST), "ask"),
+    ("A6 self-hosted git tag asks", lambda: bash("git tag v1.2.0 abc123", gates=GATES_SELFHOST), "ask"),
+    ("A6 self-hosted branch delete asks", lambda: bash("git push origin --delete feat/x", gates=GATES_SELFHOST_NONE), "ask"),
+    ("A6 self-hosted tag before RELEASE denied", lambda: bash("git push origin v1.2.0", gates=GATES_SELFHOST_NONE), "deny"),
+    ("A6 self-hosted tag on work track denied", lambda: bash("git push origin v1.2.0", gates=GATES_SELFHOST_WORK), "deny"),
+    ("A6 self-hosted merge + delete asks", lambda: bash("glab mr merge 3 --remove-source-branch", gates=GATES_SELFHOST), "ask"),
+    ("A6 self-hosted merge + delete before RELEASE denied", lambda: bash("tea pulls merge 4 && tea pulls clean 4",
+                                                                         gates=GATES_SELFHOST_NONE.replace("🔒 SECURITY   ⬜", "🔒 SECURITY   ✅ 0 open")), "deny"),
+    ("A6 self-hosted MCP create_tag asks", lambda: mcp("mcp__gitea__create_tag", GATES_SELFHOST), "ask"),
+    ("A6 self-hosted MCP delete_branch asks", lambda: mcp("mcp__gitlab__delete_branch", GATES_SELFHOST_NONE), "ask"),
+    ("A6 self-hosted plain push ok", lambda: bash("git push -u origin feat/x", gates=GATES_SELFHOST), "allow"),
+    ("B5 adding a Forge row asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md", "old_string": "Origin:",
+                                                         "new_string": FORGE_ROW + "Origin:"}), "ask"),
+    ("B5 Forge: github row ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md", "old_string": "Origin:",
+                                                      "new_string": "Forge: github\nOrigin:"}), "allow!"),
+    # --- Contributor role (SCOPED_REPO.md): own folder only, the PR is the finish line
+    ("A4 contributor PR ok", lambda: bash("gh pr create --fill", gates=GATES_ROLE), "allow"),
+    ("A4 contributor branch push ok", lambda: bash("git push -u origin feat/x", gates=GATES_ROLE), "allow"),
+    ("A4 contributor merge denied", lambda: bash("gh pr merge 5 --merge", gates=GATES_ROLE), "deny"),
+    ("A4 contributor glab merge denied", lambda: bash("glab mr merge 3", gates=GATES_ROLE), "deny"),
+    ("A4 contributor push to default denied", lambda: bash("git push origin HEAD:master", gates=GATES_ROLE), "deny"),
+    ("A4 contributor release denied", lambda: bash("gh release create v1.2.0", gates=GATES_ROLE), "deny"),
+    ("A4 contributor tag denied, even self-hosted", lambda: bash("git push origin v1.2.0", gates=GATES_ROLE_SELFHOST), "deny"),
+    ("A4 contributor MCP merge denied", lambda: mcp("mcp__github__merge_pull_request", GATES_ROLE), "deny"),
+    ("C2 contributor presented merge blocked", lambda: stop(RUN_OK.replace(
+        'git add -A && git commit -m "feat: x" && git push -u origin feat/x', "gh pr merge 5 --merge"), gates=GATES_ROLE), "block"),
+    ("B9 contributor edit in owned folder ok", lambda: edit("Write", {"file_path": "services/billing/app.py", "content": "x"},
+                                                           gates=GATES_ROLE), "allow"),
+    ("B9 contributor edit outside asks", lambda: edit("Write", {"file_path": "services/auth/app.py", "content": "x"},
+                                                     gates=GATES_ROLE), "ask"),
+    ("B9 contributor sibling prefix asks", lambda: edit("Write", {"file_path": "services/billing-old/a.py", "content": "x"},
+                                                       gates=GATES_ROLE), "ask"),
+    ("B9 contributor root .gitignore asks", lambda: edit("Write", {"file_path": ".gitignore", "content": "x"},
+                                                        gates=GATES_ROLE), "ask"),
+    ("B9 contributor gate file ok", lambda: edit("Edit", dict(GATE_ROW_EDIT, file_path=".dev-skills-gates.md"),
+                                                 gates=GATES_ROLE), "allow!"),
+    ("B9 contributor declined stands down", lambda: edit("Write", {"file_path": "services/auth/app.py", "content": "x"},
+                                                        gates=GATES_ROLE.replace("Mode: manual", "Mode: manual\nHook enforcement: declined (2026-10-30)")), "allow"),
+    ("B9 no role, any edit ok", lambda: edit("Write", {"file_path": "services/auth/app.py", "content": "x"}), "allow"),
+    ("B5 removing the Role row asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md", "old_string": ROLE_ROW,
+                                                            "new_string": ""}, gates=GATES_ROLE), "ask"),
+    ("B5 widening the Role row asks", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md", "old_string": "owns services/billing",
+                                                            "new_string": "owns services/billing, services/auth"}, gates=GATES_ROLE), "ask"),
+    ("B5 adding a Role row ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md", "old_string": "Origin:",
+                                                      "new_string": ROLE_ROW + "Origin:"}), "allow!"),
+    ("B8 Gitea workflow checked", lambda: wf_at(".gitea", GOOD_WF.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")), "deny"),
+    ("B8 Forgejo workflow checked", lambda: wf_at(".forgejo", GOOD_WF.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")), "deny"),
+    ("B8 Gitea hardened workflow ok", lambda: wf_at(".gitea", GOOD_WF), "allow"),
 ]
 
 

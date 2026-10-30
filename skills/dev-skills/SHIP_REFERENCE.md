@@ -8,6 +8,12 @@ workflow, the wrong-commit tag recovery, and the post-ship verification.
 
 Section numbers referenced here (Section 1, 2, 5.7, …) point at `SKILL.md`.
 
+**Self-hosted forge:** every `gh` command here maps through the forge's file
+(`FORGE_REFERENCE.md`). The release workflow is in `.gitea/workflows/`,
+`.forgejo/workflows/` or `.gitlab-ci.yml`, and Claude runs the tag push on
+the user's yes. **A contributor in a shared repo stops at Gate 5**
+(`SCOPED_REPO.md`).
+
 ---
 
 ### Gate 6 — Ship 🚀

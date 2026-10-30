@@ -46,7 +46,8 @@ No build starts until versioning is resolved.
    current version's release notes. Every other place that shows a repo link
    (an "About" dialog, settings screen, footer, help menu) also carries the
    release notes link. Use the pattern
-   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>`; the version in
+   `https://github.com/<owner>/<repo>/releases/tag/v<VERSION>` (another
+   forge: its file's "Links"; a folder in a shared repo: `SCOPED_REPO.md`); the version in
    the URL must match the version being built. A missing link on the main
    page blocks this gate. Add it before passing.
 

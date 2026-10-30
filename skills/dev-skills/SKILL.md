@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2026.10.23
+version: 2026.10.30
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger
@@ -10,15 +10,16 @@ description: >
   "set up CI", "add GitHub Actions", "add CI/CD", "audit my workflows",
   "review my CI", "design audit", "audit the design", "review the mockups",
   "UI redesign", "dev branch", "dev build", "auto mode", "semi-autonomous mode", "manual mode",
-  "take it from here", or any attempt to bypass a gate.
+  "take it from here", "Gitea", "Forgejo", "GitLab", "self-hosted repo",
+  "monorepo", "I only own this folder", or any attempt to bypass a gate.
 # Enforcement checks (ENFORCEMENT.md). Claude Code registers these when the
 # skill loads and runs them until the session ends. They only read and answer
-# allow / deny / ask. If Python 3 or the checks file is missing, git, gh and
-# docker commands are blocked rather than let through unchecked. On Windows they
+# allow / deny / ask. If Python 3 or the checks file is missing, git, gh, glab,
+# tea and docker commands are blocked rather than let through unchecked. On Windows they
 # run in Git Bash (Git for Windows), which Claude Code finds on its own.
 hooks:
   PreToolUse:
-    - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*[Gg][Ii][Tt][Hh][Uu][Bb].*"
+    - matcher: "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*([Gg][Ii][Tt][Hh][Uu][Bb]|[Gg][Ii][Tt][Ll][Aa][Bb]|[Gg][Ii][Tt][Ee][Aa]|[Ff][Oo][Rr][Gg][Ee][Jj][Oo]).*"
       hooks:
         - type: command
           shell: bash
@@ -27,8 +28,8 @@ hooks:
             f="${CLAUDE_PLUGIN_ROOT:-}/checks/enforce.py";
             for py in python3 python "py -3"; do [ -f "$f" ] && $py -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && exec $py "$f" pre-tool; done;
             in=$(cat);
-            printf '%s' "$in" | grep -qE '"tool_name": *"mcp__[^"]*[Gg]it[Hh]ub' || { printf '%s' "$in" | grep -qE '"tool_name": *"(Bash|PowerShell)"' && printf '%s' "$in" | grep -qE '(^|[^A-Za-z])(git|gh|docker)[[:space:]]'; } || exit 0;
-            echo "dev-skills enforcement cannot run (checks file or Python 3 missing), so git, gh and docker are blocked. Reinstall the skill (ENFORCEMENT.md)." >&2; exit 2
+            printf '%s' "$in" | grep -qiE '"tool_name": *"mcp__[^"]*(github|gitlab|gitea|forgejo)' || { printf '%s' "$in" | grep -qE '"tool_name": *"(Bash|PowerShell)"' && printf '%s' "$in" | grep -qE '(^|[^A-Za-z])(git|gh|glab|tea|docker)[[:space:]]'; } || exit 0;
+            echo "dev-skills enforcement cannot run (checks file or Python 3 missing), so git, gh, glab, tea and docker are blocked. Reinstall the skill (ENFORCEMENT.md)." >&2; exit 2
   PostToolUse:
     - matcher: "AskUserQuestion"
       hooks:
@@ -101,7 +102,7 @@ things, detailed in `AUTO_MODE.md`:
   approved, for every commit.
 - **The tag push and every ref deletion go to the user**, including the merged
   PR's own branch, so a merge never carries `--delete-branch`. This is a
-  credential fact, not supervision (Section 5.8). Claude resumes once the tag
+  credential fact, not supervision (Section 5.8; self-hosted forges differ there). Claude resumes once the tag
   is confirmed on the remote. Deleting a release, force-pushing and rewriting
   history keep their own explicit approval on top.
 - **The gates, the pre-flight, the tracker, the state file.** Run them *more*
@@ -157,8 +158,7 @@ explicit approval. Violations of this rule break trust.
   no mode relaxes. When in doubt: ask, don't act.
 - **Presenting a git command IS performing it.** A fenced block containing a git
   write for the user to paste carries the same approval and gate requirements
-  as a tool call. Section 5.8 routes many sessions to presenting, so a check
-  that fired only on tool calls would never fire. The tracker goes in the same
+  as a tool call. The tracker goes in the same
   message, above the block.
 
 **Before ANY git write operation — executed OR presented (commit, push, PR,
@@ -210,7 +210,7 @@ nothing tracked have no gates. That is the entire exemption.
 
 **MANDATORY PRE-FLIGHT.** Before any git write operation — `git commit`,
 `git push`, `git tag`, `gh pr create`, `gh pr merge`, `gh release create`, or
-their GitHub MCP equivalents — **whether you execute it or present it for the
+their GitHub, forge CLI (`glab`, `tea`), API or MCP equivalents — **whether you execute it or present it for the
 user to run** (Section 1), STOP and do all four:
 
 1. **Read the gate state file** (`.dev-skills-gates.md`). If it is missing
@@ -389,9 +389,10 @@ These phrases mean "surface the gates", not "comply silently":
 | Mode not yet chosen | Ask it with the session-start questions — no edits or git writes until recorded |
 | "auto mode" / "take it from here" | Explicit choice — confirm in one line what semi-autonomous mode does and does not change (Operating modes), record `Mode: semi-autonomous`, continue |
 | "stop asking me to approve commits" | Commit approval is not what semi-autonomous mode relaxes — offer semi-autonomous mode for the *commands*, keep the approval |
-| "just tag it" / "push the tag for me" | Tag pushes and ref deletions ("just delete that branch") are the user's in **both** modes (§5.8): present the block, don't execute it, and on a 403 hand it over rather than retry. Semi-autonomous mode adds the full pre-tag report above it |
+| "just tag it" / "push the tag for me" | Tag pushes and ref deletions ("just delete that branch") are the user's in **both** modes, off self-hosted forges (§5.8): present the block, don't execute it, and on a 403 hand it over rather than retry. Semi-autonomous mode adds the full pre-tag report above it |
 | "that finding is pre-existing" / "it's unrelated to this change" | Provenance, not a terminal state (§4.7) — it stays open and blocks the release until fixed, waived or withdrawn |
 | "ignore the Mediums" / "stop flagging that" | Category suppression is not a waiver (§4.7) — ask which specific finding, and record the waiver with their reason |
+| "I only own this folder" / "monorepo" / "I can't merge here" | Read `SCOPED_REPO.md`: the folder is the project, the open PR the finish line |
 | "we'll fix it next release" | Not a terminal state — offer the waiver explicitly so the decision is on the record, or fix it now |
 
 ---
@@ -447,7 +448,8 @@ version stands still while the CVEs accumulate against it.
 not only when it changes (`SECURITY_GATE.md`, Step 1). A dependency with no
 upstream fix is a finding to raise with its options, not to swallow. Upgrades
 are code changes: a security patch rides the current branch, and a major-version
-bump is its own change with its own gates. **Automate the watch, both halves**:
+bump is its own change with its own gates. **Automate the watch, both halves**
+(off GitHub: `FORGE_REFERENCE.md`):
 `.github/dependabot.yml` covering every ecosystem, *and* Dependabot alerts enabled
 in the repository settings. A `403 "…disabled…"` from
 `GET /repos/{owner}/{repo}/dependabot/alerts` is an open Gate 3 finding
@@ -700,6 +702,8 @@ GitHub MCP tool. Re-pushing a tag is a delete plus a create, so both halves go
 to the user. Claude's credentials are routinely denied (`403`) on exactly these
 while branch pushes succeed, and no mode can lift a denial that comes from the
 remote. On a `403`, do not retry, re-route, or act on a different ref.
+**Except on a self-hosted forge** (`Forge:` row): Claude runs them, and the
+checks ask the user each time (`FORGE_REFERENCE.md`).
 🚀 SHIP stays ⏳ until Claude has confirmed on the remote that the tag exists
 **and** points at the merged commit (`SHIP_REFERENCE.md`, step 3).
 
@@ -782,7 +786,7 @@ full, and how to build it.
 2. **Login offers TOTP 2FA, "trust this device for 30 days", and a rescue
    path.** The user decides each.
 3. **The main page links to GitHub and the latest release notes, without
-   exception.** Gate 1 blocks without both.
+   exception** (off GitHub: `FORGE_REFERENCE.md`, `SCOPED_REPO.md`). Gate 1 blocks without both.
 4. **Docker projects offer Apprise notifications** (`APPRISE_URLS`, a secret).
 5. **Docker projects document a compose quickstart.** Every volume is a bind
    mount under `/opt/docker/<container-name>/`. Never `network_mode: host`

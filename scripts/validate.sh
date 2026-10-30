@@ -6,7 +6,7 @@ errors=0
 # The skill's files, in load order: the always-on tier first, then the
 # on-demand references. build-skill.sh bundles exactly this list — keep the
 # two in step.
-files=(SKILL.md SESSION_START.md GATE_REFERENCE.md RELEASE_GATES.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_HYBRID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md WORKFLOW_DEPENDABOT.md WORKFLOW_DEVRELEASE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md DESIGN_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md SESSION_END.md checks/enforce.py)
+files=(SKILL.md SESSION_START.md GATE_REFERENCE.md RELEASE_GATES.md SECURITY_GATE.md SHIP_REFERENCE.md AUTO_MODE.md SECURITY_REFERENCE.md QUALITY_REFERENCE.md SHELL_REFERENCE.md WORKFLOW_REFERENCE.md WORKFLOW_DOCKER.md WORKFLOW_WINDOWS.md WORKFLOW_LINUX.md WORKFLOW_HOMEASSISTANT.md WORKFLOW_SCRIPTS.md WORKFLOW_ANDROID.md WORKFLOW_HYBRID.md WORKFLOW_PYTHON.md WORKFLOW_NODEJS.md WORKFLOW_DEPENDABOT.md WORKFLOW_DEVRELEASE.md SECURITY_WINDOWS.md SECURITY_LINUX.md SECURITY_ANDROID.md QUALITY_ANDROID.md UPDATE_REFERENCE.md REMOTE_SESSION.md STANDARDS_REFERENCE.md DESIGN_REFERENCE.md ENFORCEMENT.md DOCKER_TEST.md LESSONS_REFERENCE.md SESSION_END.md FORGE_REFERENCE.md FORGE_GITEA.md FORGE_GITLAB.md SCOPED_REPO.md WORKFLOW_RENOVATE.md checks/enforce.py)
 
 # Extract versions from each source
 version_file=$(tr -d '[:space:]' < VERSION)
@@ -170,7 +170,9 @@ ceiling_for() {
     # Read once per session, not every turn. Raised to 34 in 2.37.0 for the
     # enforcement disclosure; lowered to 30 in 2.38.0 when the remote-container,
     # out-of-date and fork-case sections moved to the files that need them.
-    SESSION_START.md) echo 30 ;;
+    # Raised to 31 in 2026.10.30 for the probe's forge and role keys, which
+    # decide whether FORGE_REFERENCE.md or SCOPED_REPO.md loads at all.
+    SESSION_START.md) echo 31 ;;
     # Every other reference file: read in full, one purpose each.
     *) echo 32 ;;
   esac

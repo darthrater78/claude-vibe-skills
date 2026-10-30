@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.10.30] — 2026-10-30
+
+### Added
+- **Self-hosted forges: Gitea, Forgejo and GitLab** (`FORGE_REFERENCE.md`,
+  `FORGE_GITEA.md`, `FORGE_GITLAB.md`). The session-start probe reads the
+  forge from `origin`. A repo off github.com runs a once-per-clone
+  onboarding: it identifies the forge from its API, trusts a private CA for
+  that host only, checks the `tea`/`glab` login without the token entering the
+  conversation, finds the canonical repo when there's a mirror, proves a CI
+  runner is online, handles runners with no internet (mirrored actions, local
+  registries), and sets up the dependency watch. Every `gh` step maps to the
+  forge's own command. Scope: a local session on the forge's network.
+- **On a self-hosted forge, Claude runs tag pushes and ref deletions**, and
+  the enforcement checks ask the user about each one in Claude Code's prompt
+  (A6), in place of handing over the block. Gates before the tag are
+  unchanged, and adding the gate file's `Forge:` row asks the user (B5).
+- **Renovate as the dependency watch off GitHub** (`WORKFLOW_RENOVATE.md`):
+  proof that it runs, a `renovate.json` (every ecosystem, SHA-pinned actions in
+  `.gitea`/`.forgejo` workflows, majors held for approval, LTS lines,
+  offline registries), the scheduled job for Gitea/Forgejo Actions and for
+  GitLab, and bot token scopes. The alerts half is `osv-scanner` with an
+  offline database at every Gate 3.
+- **Contributor role for a folder in a shared repo** (`SCOPED_REPO.md`). For
+  a monorepo where the user owns a folder and doesn't merge: the folder is
+  the project (its README is the main page, and its changelog, version,
+  `DESIGN.md`, security architecture and `CLAUDE.md` live there), gates run on
+  the folder, and the open PR is the finish line. The checks deny merges,
+  default-branch writes, tags and releases while the `Role:` row holds (A4),
+  and ask before an edit outside the folder (new check B9).
+
+### Changed
+- **The enforcement checks read more forge writes**: `glab mr|release|api`,
+  `tea pr|pulls|releases`, `curl`/`wget` writes to a forge REST API (GitHub,
+  `/api/v1/repos/`, `/api/v4/projects/`), Gitea/Forgejo/GitLab MCP servers
+  (the hook matcher now includes them), and workflows under `.gitea/` and
+  `.forgejo/` (B8). Without Python, the fallback now also blocks `glab` and `tea`.
+- `gh pr merge --delete-branch` is checked as a merge as well as a branch
+  deletion, so a presented one also needs every merge gate.
+- `scripts/validate.sh`: the `SESSION_START.md` ceiling is 31KB, for the
+  probe's `forge` and `role` keys.
+
 ## [2026.10.23] — 2026-10-23
 
 **Breaking:** release versions are now dates. A project still on semver
