@@ -118,7 +118,11 @@ looks fine and is not:
    `--commit` matches only the full 40-character SHA (`git rev-parse
    <short>`), and a run takes a few seconds to appear after a push, a PR or a
    merge. An empty list, or `gh pr checks` saying "no checks reported", means
-   not started: retry until a run is listed, then watch it.
+   not started: retry until a run is listed, then watch it. **Only
+   `success` passes.** `queued`, `pending`, `waiting` and `in_progress` block
+   the merge like a failure. A run still queued after a few minutes means no
+   runner picked it up: check the runner (self-hosted, or `FORGE_REFERENCE.md`
+   item 5) before anything else.
    The second check matters as much as the first. Being on the default
    branch proves the commit was merged; it says nothing about whether CI
    ran against *that* commit or passed. **Do not proceed to step 3 until

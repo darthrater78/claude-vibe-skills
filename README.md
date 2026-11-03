@@ -7,9 +7,9 @@ say-so, doesn't ship without walking the gates, and can't quietly skip either.
 🔢 VERSION  →  🔨 BUILD  →  🔒 SECURITY  →  📄 DOCS  →  📦 RELEASE  →  🚀 SHIP
 ```
 
-**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2026.10.30`
+**[⬇ Download `dev-skills.skill`](../../releases/latest/download/dev-skills.skill)** — current version `v2026.11.03`
 
-[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2026.10.30](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.30)
+[GitHub repo](https://github.com/darthrater78/claude-vibe-skills) · [Release notes for v2026.11.03](https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.11.03)
 
 ---
 
@@ -100,8 +100,8 @@ to install.
 
 | Group | What's checked |
 |---|---|
-| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours (on a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab) Claude runs them and you're asked about each one) · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind |
-| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking or waive a finding go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
+| **Commands Claude runs** | Git writes need their gates (strict: only the gate's own row counts), including behind `env`/`sudo`/`bash -c`, any write that lands on the default branch, a dev version (`-dev`, `-rc`, …) reaching the default branch, auto-merge, release edits, PR branch updates, commits made by `merge`/`cherry-pick`/`revert` or by pulling another branch, and git aliases that expand to any of these · no git write before the mode is chosen · tags and ref deletions are always yours (on a [self-hosted forge](#self-hosted-forges-gitea-forgejo-gitlab) Claude runs them and you're asked about each one) · test containers publish on your LAN IP only (no `127.0.0.1`, bare ports or Docker-bridge IPs) · host networking only with your recorded permission · no test container with a restart policy mounting from `/tmp` (a reboot turns it into a root-owned folder that breaks Claude Code) · temp-folder mounts are never root-owned (created first, container runs as you) · test containers are labeled, and the next session start finds any left behind (a permanent service under `/opt/docker/<name>/` or labeled `dev-skills.permanent` is left alone) |
+| **Files Claude edits** | Gate-file lines that decline enforcement, approve host networking, waive a finding or let a previous release's missing tag through go to you as a permission prompt (gate rows and the mode line go through with no prompt at all, and shell writes to the gate file are sent back to the Edit tool), as do edits to settings files and the installed checks. Staging the gate file on a local session is blocked · workflow edits that add an unpinned action, a `${{ }}` inside a `run:` script or a checkout that keeps its credential are blocked, and ones that drop the `permissions:` block or a job's timeout, or run `./gradlew` in a job that doesn't validate the wrapper, ask you |
 | **Claude's replies** | No loopback or bridge test URLs · command blocks you're handed obey the same gates as executed ones · a pre-release tag block waits for the README dev banner to be recorded or declined · every run block is labeled `▶️ RUN THIS`, with START/END markers, no `cd`, the tracker above and "No need to reply" below |
 | **Your answers** | A skipped question gets flagged to Claude: re-ask it, and don't pick a default |
 
@@ -1046,6 +1046,10 @@ How this repo is built with regard to security, and what has changed.
 
 ### Changes
 
+- **2026-11-03 (2026.11.03):** the compose check for `network_mode: host`
+  looked only at a file's last service and skipped test stacks entirely, so
+  an unapproved host-network service could start. Every service is checked
+  now.
 - **2026-10-30 (2026.10.30):** the checks now cover forge writes they used
   to miss entirely: `glab`, `tea`, `curl`/`wget` to a forge REST API, and
   Gitea/Forgejo/GitLab MCP servers. Before this, a merge, release or tag
@@ -1125,4 +1129,4 @@ platform security, and lower token costs via tiered loading.
 
 ## Version
 
-`v2026.10.30` — see [CHANGELOG.md](CHANGELOG.md) for the full history.
+`v2026.11.03` — see [CHANGELOG.md](CHANGELOG.md) for the full history.

@@ -355,6 +355,12 @@ git add -A && git commit -m "feat: x" && git push -u origin feat/x \\
 No need to reply.
 """
 
+GATES_RETRO = GATES_ALL.replace("📦 RELEASE    ✅ PR #5", "📦 RELEASE    ⬜").replace(
+    "Origin:", "Retro tag: v1.1.0 — previous release never shipped\nOrigin:")
+RETRO_FILES = {"CHANGELOG.md": "## [1.2.0] — 2026-11-03\n## [1.1.0] — 2026-10-30\n", "VERSION": "1.2.0\n"}
+RETRO_TAG_MSG = RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x',
+                               "git tag v1.1.0 abc1234 && git push origin v1.1.0")
+
 CASES = [
     # --- A1: LAN-only ports
     ("A1 loopback port", lambda: bash("docker run -d -p 127.0.0.1:8080:8080 img"), "deny"),
@@ -393,6 +399,14 @@ CASES = [
     ("A2 approved", lambda: bash("docker run --label dev-skills.test=t -d --name hass --network host img", gates=GATES_HOSTNET), "allow"),
     ("A2 compose host", lambda: bash("docker compose up -d",
                                      compose="services:\n  app:\n    image: a:1\n    network_mode: host\n"), "deny"),
+    ("A2 compose host in a test stack", lambda: bash("docker compose -p dev-skills-test-x up -d",
+                                                  compose="services:\n  app:\n    image: a:1\n    network_mode: host\n"), "deny"),
+    ("A2 compose host, unapproved first service", lambda: bash("docker compose -p dev-skills-test-x up -d", gates=GATES_HOSTNET,
+        compose="services:\n  app:\n    image: a:1\n    network_mode: host\n  hass:\n    image: a:1\n    network_mode: host\n"), "deny"),
+    ("A12 compose permanent label ok", lambda: bash("docker compose up -d",
+        compose=f'services:\n  runner:\n    image: a:1\n    labels:\n      - dev-skills.permanent=ci-runner\n    ports:\n      - "{LAN}:8080:80"\n'), "allow"),
+    ("A12 compose unlabeled still denied", lambda: bash("docker compose up -d",
+        compose=f'services:\n  runner:\n    image: a:1\n    ports:\n      - "{LAN}:8080:80"\n'), "deny"),
     ("A2 compose host approved", lambda: bash("docker compose -p dev-skills-test-x up -d", gates=GATES_HOSTNET,
                                               compose="services:\n  hass:\n    image: a:1\n    network_mode: host\n"), "allow"),
     # --- A9: test containers don't outlive the session
@@ -610,6 +624,8 @@ CASES = [
                                  gates=GATES_UNCHOSEN), "allow!"),
     ("B5 decline", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
                                          "old_string": "Mode: manual", "new_string": "Mode: manual\nHook enforcement: declined"}), "ask"),
+    ("B5 retro tag row asks", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
+                                                 "content": GATES_ALL + "Retro tag: v1.1.0 — never shipped\n"}), "ask"),
     ("B5 host net approval", lambda: edit("Write", {"file_path": ".dev-skills-gates.md",
                                                     "content": GATES_ALL + "Host network: x approved today\n"}), "ask"),
     ("B5 gate to ⏳ ok", lambda: edit("Edit", {"file_path": ".dev-skills-gates.md",
@@ -823,6 +839,25 @@ CASES = [
                                            gates=GATES_ALL.replace("📦 RELEASE    ✅ PR #5", "📦 RELEASE    ⬜")), "block"),
     ("C2 tag after RELEASE ok", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x',
                                                             "git tag v1.2.0 && git push origin v1.2.0")), "allow"),
+    ("C2 retro tag of the unshipped previous release ok", lambda: stop_files(RETRO_TAG_MSG, RETRO_FILES, gates=GATES_RETRO), "allow"),
+    ("C2 retro tag on the work track ok", lambda: stop_files(RETRO_TAG_MSG, RETRO_FILES,
+        gates=GATES_RETRO.replace("Track: release sequence", "Track: work commit")), "allow"),
+    ("C2 retro row can't tag the version being released", lambda: stop_files(RETRO_TAG_MSG.replace("v1.1.0", "v1.2.0"),
+        RETRO_FILES, gates=GATES_RETRO.replace("Retro tag: v1.1.0", "Retro tag: v1.2.0")), "block"),
+    ("C2 retro row needs the version in CHANGELOG.md", lambda: stop_files(RETRO_TAG_MSG,
+        {"CHANGELOG.md": "## [1.2.0]\n", "VERSION": "1.2.0\n"}, gates=GATES_RETRO), "block"),
+    ("C2 retro row doesn't cover a forced tag", lambda: stop_files(RETRO_TAG_MSG.replace("git tag v1.1.0", "git tag -f v1.1.0"),
+        RETRO_FILES, gates=GATES_RETRO), "block"),
+    ("C2 retro row doesn't cover a forced push", lambda: stop_files(RETRO_TAG_MSG.replace("git push origin v1.1.0", "git push --force origin v1.1.0"),
+        RETRO_FILES, gates=GATES_RETRO), "block"),
+    ("C2 retro row doesn't cover a + refspec", lambda: stop_files(RETRO_TAG_MSG.replace("git push origin v1.1.0", "git push origin +v1.1.0"),
+        RETRO_FILES, gates=GATES_RETRO), "block"),
+    ("C2 retro row covers only the tag it names", lambda: stop_files(RETRO_TAG_MSG.replace("v1.1.0", "v1.0.9"),
+        RETRO_FILES | {"CHANGELOG.md": "## [1.2.0]\n## [1.1.0]\n## [1.0.9]\n"}, gates=GATES_RETRO), "block"),
+    ("A6 self-hosted retro tag asks", lambda: bash_files("git tag v1.1.0 abc1234 && git push origin v1.1.0", RETRO_FILES,
+        gates=GATES_RETRO.replace("Origin:", FORGE_ROW + "Origin:")), "ask"),
+    ("A6 self-hosted tag without retro row still gated", lambda: bash_files("git tag v1.1.0 abc1234 && git push origin v1.1.0",
+        RETRO_FILES, gates=GATES_RETRO.replace("Retro tag:", "Note:").replace("Origin:", FORGE_ROW + "Origin:")), "deny"),
     ("C2 pre-release tag without a banner note", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x',
                                                               "git tag v1.2.0-dev.1 && git push origin v1.2.0-dev.1")), "block"),
     ("C2 pre-release tag, banner on default ok", lambda: stop(RUN_OK.replace('git add -A && git commit -m "feat: x" && git push -u origin feat/x',

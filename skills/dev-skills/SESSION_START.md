@@ -431,7 +431,7 @@ write. Long write-ups belong in the commit message or `CHANGELOG.md`.
 Then show the gate tracker:
 
 ```
-Dev Skills v2026.10.30 active.
+Dev Skills v2026.11.03 active.
 
 Repo: <repo-name> | Branch: <current-branch> | Remote: <origin url or "NOT SET">
 Origin: <✅ fork of <parent> / ✅ not a fork / 🚫 points at upstream — fixing first>
@@ -466,7 +466,7 @@ All work on branches — merge to default branch via PR only.
 skill was not repackaged after a bump: tell the user.
 
 **Release notes for this version:**
-https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.10.30
+https://github.com/darthrater78/claude-vibe-skills/releases/tag/v2026.11.03
 **Updates** (only when the version check above was skipped):
 https://github.com/darthrater78/claude-vibe-skills/releases
 
