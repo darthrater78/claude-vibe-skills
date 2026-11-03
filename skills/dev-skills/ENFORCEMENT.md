@@ -147,7 +147,11 @@ refuses a missing one instead of creating it) and named volumes pass.
 **A12. Test containers are labeled, and leftovers are found.** A container
 Claude starts needs `--label dev-skills.test="$CLAUDE_CODE_SESSION_ID"`, and a
 compose stack runs as `-p dev-skills-test-<name>` (or labels its services).
-Every session start lists labeled containers an earlier session left behind,
+A permanent service the user asked for passes without it: its compose file
+sits under `/opt/docker/<name>/` (not `<name>-test/`) or labels its services
+`dev-skills.permanent`, so the sweep never finds it. The compose file is
+read before the command runs, so one written in the same call isn't there
+yet: write it first. Every session start lists labeled containers an earlier session left behind,
 and Claude hands the user a block to remove them before new work. That
 matters because a session that crashes or is cut off never reaches its own
 cleanup. The checks never remove anything themselves.
@@ -248,6 +252,7 @@ user, showing the lines:
 - `test artifact: n/a` (a merge that skips the test artifact, Gate 2)
 - `banner ➖` (a pre-release without the README dev banner, Gate 1)
 - `Forge: gitea|forgejo|gitlab` (it lets Claude run tags and ref deletions, A6)
+- `Retro tag: <tag>` (the previous release's tag without this release's gates, C2)
 - removing a `Role: contributor` row, or adding a folder to it (adding the row
   passes, because it only narrows what the session may do)
 - a new or changed waiver clause: the text from "waive" to the next `;`,
@@ -352,7 +357,11 @@ the LAN URL that `curl` reached.
 checked exactly like A4 and A5, because presenting a command is performing it.
 A tag push or ref deletion in a presented block also needs every gate
 through RELEASE ✅, so it can't be handed over before the merge is confirmed.
-A pre-release tag (`v1.2.0-dev.1`, `-rc`, …) also needs a `banner` note on the
+The exception is the previous release's missing tag (`RELEASE_GATES.md`,
+Gate 1, item 7): a gate-file row `Retro tag: <tag>` lets that tag's block
+through on either track, when its version is in `CHANGELOG.md` and isn't the
+one being released. A forced tag or push (`-f`, `--force`, `+ref`) is never
+covered. A pre-release tag (`v1.2.0-dev.1`, `-rc`, …) also needs a `banner` note on the
 VERSION row (`RELEASE_GATES.md`, Gate 1).
 
 **C3. Run blocks are labeled.** A code block labeled `▶️ RUN THIS`, or one

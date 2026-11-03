@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.11.03] — 2026-11-03
+
+### Fixed
+- **The previous release's missing tag no longer deadlocks.** Gate 1 blocks
+  until the previous version is tagged, but the tag check wanted the new
+  release's gates first. A gate-file row `Retro tag: v<version>` (it asks
+  you) now lets that one tag through, on either track, when the version is in
+  `CHANGELOG.md` and isn't the one being released, and never for a forced
+  tag or push, which could move a published tag. Gate 1 names the fix.
+- **Permanent compose services aren't treated as test stacks.** A compose
+  file under `/opt/docker/<name>/` (not `<name>-test/`), or one whose services
+  carry `dev-skills.permanent`, starts without the test label, so the next
+  session's leftover sweep never removes it. The denial for a compose file
+  written in the same call now says to write it first.
+- **Queued CI is not a pass.** SHIP step 2 and Gate 2 say only `success`
+  passes; `queued`, `pending` and `waiting` block the merge, and a run still
+  queued after a few minutes means checking the runner first.
+  `FORGE_GITEA.md` gains API calls for a commit's runs and for runner status.
+
+### Security
+- **Compose host networking was under-checked.** The `network_mode: host`
+  check looked only at the last service, and never ran for a
+  `-p dev-skills-test-*` stack, so an unapproved host-network service could
+  start. It now checks every service.
+
 ## [2026.10.30] — 2026-10-30
 
 ### Added

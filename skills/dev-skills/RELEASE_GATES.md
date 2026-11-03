@@ -73,7 +73,11 @@ No build starts until versioning is resolved.
 
    Retroactively tagging is usually a one-liner — find the merge commit that
    bumped `VERSION` to that release (`git log --oneline -- VERSION`) and tag it.
-   That block goes to the user like any tag push (Section 5.8).
+   It goes like any tag push (Section 5.8): a block for the user, or on a
+   self-hosted forge Claude runs it on the user's yes. First add `Retro tag:
+   v<that version>` to the gate file (it asks the user, B5): the tag check
+   otherwise wants this release's gates, which can't pass until that tag
+   exists (`ENFORCEMENT.md`, C2).
 
    **Older gaps are advisory,** not blocking: note them, fix them if the merge
    commits are identifiable, flag them otherwise. The distinction is that the

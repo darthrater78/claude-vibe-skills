@@ -33,6 +33,8 @@ same API under `/api/v1` and the same `tea` CLI; differences are marked.
 | PR state | `gh pr view <n> --json state` | `curl -n -sS $A/pulls/<n>` → `state`, `merged`, `merge_commit_sha` |
 | CI on a commit | `gh pr checks` / `gh run list --commit` | `curl -n -sS $A/commits/<sha>/status` → `state` (`pending`, `success`, `failure`, `error`) and `statuses[]` |
 | Watch CI | `gh pr checks --watch` / `gh run watch` | poll that status every 20s until it isn't `pending`, then require `success` (below) |
+| Runs on a commit | `gh run list --commit` | `curl -n -sS "$A/actions/runs?head_sha=<sha>"` → `workflow_runs[].status`, `conclusion` (a 404 on older versions: the Actions tab) |
+| Runner online | (GitHub-hosted) | `curl -n -sS $A/actions/runners` → `runners[].status`, `labels`; then `/orgs/<o>/actions/runners`, `/user/actions/runners` |
 | Merge (Gate 6) | `gh pr merge <n> --merge` | `tea pr merge <n> --style merge` |
 | Merge and delete the branch | `--delete-branch` (the user's) | `curl -n -sS -X POST $A/pulls/<n>/merge -H 'Content-Type: application/json' -d '{"Do":"merge","delete_branch_after_merge":true}'`: asked (`FORGE_REFERENCE.md`) |
 | Release (manual path) | `gh release create` | `tea releases create --tag v<V> --target <sha> --title v<V> --note "…"` |
@@ -66,8 +68,9 @@ tag a separate, asked step.
   (and `.gitea/workflows/` when that one is missing). The B8 checks read
   all three.
 - **Runners:** `runs-on:` must match a label a registered runner
-  (`act_runner` / `forgejo-runner`) offers. Check that one is online under
-  Settings → Actions → Runners (repo, org or site level). A label no runner
+  (`act_runner` / `forgejo-runner`) offers. Check that one is online with
+  the "Runner online" call above, or under Settings → Actions → Runners (repo,
+  org or site level) when the API returns 404. A label no runner
   offers leaves the job waiting forever, which looks like `pending`.
 - **Where `uses:` resolves:** the instance's `[actions] DEFAULT_ACTIONS_URL`
   is `github` (fetch from github.com) or `self` (fetch from this forge).

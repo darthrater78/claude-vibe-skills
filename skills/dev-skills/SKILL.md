@@ -1,6 +1,6 @@
 ---
 name: dev-skills
-version: 2026.10.30
+version: 2026.11.03
 description: >
   Development discipline: commit approval, versioned builds, security scanning,
   cost control, and a strict gate workflow that never advances silently. Trigger

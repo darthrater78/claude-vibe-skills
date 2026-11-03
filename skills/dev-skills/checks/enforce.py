@@ -49,6 +49,7 @@ NO_INTENT_GATES = {"VERSION", "RELEASE", "SHIP"}
 OPEN_BELOW_HIGH = re.compile(r"(^|[^0-9])0\s+Critical\b.*(^|[^0-9])0\s+High\b", re.I)
 MAX_STOP_BLOCKS = 2  # per user prompt, then the reply goes through with a visible warning
 SELF_HOSTED = re.compile(r"^Forge:\s*(gitea|forgejo|gitlab)\b", re.I)
+RETRO_ROW = re.compile(r"^Retro tag:\s*(v?\d[^\s,;—]*)")
 ROLE = re.compile(r"^Role:\s*contributor\b[^;\n]*?\bowns\s+([^;\n]+)", re.I)
 
 
@@ -230,6 +231,25 @@ class Gates:
         """`Role: contributor — owns a/b, c`: the folders this session may change
         (SCOPED_REPO.md). None when the row is absent."""
         return role_paths(self.first("Role:"))
+
+    def retro_tag(self, tag: str | None) -> bool:
+        """`Retro tag: <tag>`: the previous release never got its tag (RELEASE_GATES.md
+        Gate 1, item 7). Its tag push skips this release's gates, but only for a
+        version already in CHANGELOG.md that is not the one being released. Added
+        only through B5."""
+        if not tag:
+            return False
+        ver = tag.lstrip("vV")
+        if not any((m := RETRO_ROW.match(line)) and m.group(1).lstrip("vV") == ver for line in self.lines):
+            return False
+        row = (self.first("Version:") or "Version:").split()[1:2]
+        current = {row[0].lstrip("vV")} if row else set()
+        if self.root:
+            current.add((read(os.path.join(self.root, "VERSION")) or "").strip().lstrip("vV"))
+        if ver in current:
+            return False
+        log = read(os.path.join(self.root, "CHANGELOG.md")) if self.root else None
+        return bool(log and re.search(r"^## \[?v?" + re.escape(ver) + r"\]?(\s|$)", log, re.M))
 
     def host_network_approved(self, name: str | None) -> bool:
         if not name:
@@ -527,6 +547,7 @@ class Op:
         self.is_gh = False
         self.publishes = False  # a tag or a GitHub release: never on the work-commit track
         self.tag = None         # the tag name, when this creates or pushes one
+        self.forced = False     # -f / --force / a + refspec: it can move a published tag
 
 
 # Commands that write a commit without `git commit`. A flag in NO_COMMIT means this
@@ -640,6 +661,7 @@ def classify(argv: list[str], root: str | None, depth: int = 0) -> list["Op"]:
                 ops.append(Op("user_only", "creating a tag", "tag creation"))
                 ops[-1].publishes = True
                 ops[-1].tag = names[0]
+                ops[-1].forced = any(f in ("-f", "--force") for f in flags)
         elif sub == "push":
             ops.extend(classify_push(args, root))
         elif sub == "pull" and pull_merges(args, root):
@@ -683,9 +705,11 @@ def classify_push(args: list[str], root: str | None) -> list["Op"]:
         src, _, dst = spec.partition(":")
         dst = dst or src
         if "refs/tags/" in spec or VERSIONISH.match(dst):
+            forced = any(f in ("-f", "--force") or f.startswith("--force-") for f in flags)
             op = Op("user_only", "pushing a tag", "tag push")
             op.publishes = True
             op.tag = dst.replace("refs/tags/", "")
+            op.forced = forced or any(s.startswith("+") for s in refspecs)
             return [op]
         dst = dst.replace("refs/heads/", "")
         if dst == "HEAD":
@@ -991,7 +1015,11 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
                             "writes, tags and releases belong to the repo's maintainers (SCOPED_REPO.md). "
                             "The open PR is this session's finish line.")
             continue
-        if op.publishes and (gates.work_track or gates.no_intent_rows()):
+        # The previous release's missing tag (Gate 1, item 7): the user still runs it,
+        # but this release's gates can't pass until it exists, so they don't apply.
+        # A forced tag can move one already published, which is not a missing tag.
+        retro = op.kind == "user_only" and "tag" in op.reason and not op.forced and gates.retro_tag(op.tag)
+        if op.publishes and not retro and (gates.work_track or gates.no_intent_rows()):
             problems.append(f"{op.label} publishes, but the gate file is on the work-commit track "
                             "(Track: work commit, or a ➖ no publishing intent row). A release runs all six gates.")
             continue
@@ -1001,7 +1029,7 @@ def gate_problems(ops: list[Op], gates: Gates, presented: bool, text_for_fork: s
                 problems.append(f"{op.label} is the user's to run in both modes (SKILL.md §5.8). "
                                 "Present it as a ▶️ RUN THIS block instead.")
                 continue
-            if "tag" in op.reason:
+            if "tag" in op.reason and not retro:
                 miss = gates.missing(RELEASE)
                 if miss:
                     problems.append(f"{op.label} before the merge is confirmed. Not ✅: " + "; ".join(miss))
@@ -1129,6 +1157,8 @@ def in_temp(path: str, base: str) -> bool:
 RESTARTS = ("always", "unless-stopped", "on-failure")
 TEST_LABEL = "dev-skills.test"
 TEST_PROJECT = "dev-skills-test"
+PERMANENT_LABEL = "dev-skills.permanent"
+PERMANENT_DIR = re.compile(r"^/opt/docker/(?![^/]*-test/)[^/]+/")  # <name>-test/ is a test stack's mount
 
 
 def mkdir_targets(text: str, base: str) -> set[str]:
@@ -1410,7 +1440,9 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
         cdir = os.path.join(cwd, os.path.expanduser(pdir)) if pdir else cwd
         path = compose_file(args, cdir)
         if path is None:
-            return ["docker compose: no compose file found to check."]
+            return ["docker compose: no compose file found to check. A file written earlier in this same "
+                    "command doesn't exist yet when the check runs: write it first (Write tool or its own "
+                    "call), then run compose in the next call."]
         text_c = read(path)
         if text_c is None:
             return [f"docker compose: can't read {path} to check it."]
@@ -1424,14 +1456,18 @@ def docker_checks(argv: list[str], text: str, cwd: str, gates: Gates) -> list[st
             if p:
                 problems.append(p)
             problems.extend(temp_mount_problems(f"service {svc['name']}", svc["volumes"], svc["as_user"], text, base))
-        project = next((args[i + 1] for i, a in enumerate(args[:-1]) if a in ("-p", "--project-name")), "")
-        project = project or next((a.split("=", 1)[1] for a in args if a.startswith("--project-name=")), "")
-        if not project.startswith(TEST_PROJECT) and TEST_LABEL not in text_c:
-            problems.append(f"docker compose: run test stacks as -p {TEST_PROJECT}-<name> (or label the services "
-                            f"{TEST_LABEL}), so the next session start can find any that were left behind.")
-            if svc["host"] and not (gates.host_network_approved(svc["name"])):
+            if svc["host"] and not gates.host_network_approved(svc["name"]):
                 problems.append(f"service {svc['name']} uses network_mode: host without a "
                                 "'Host network: <name> approved' row. It needs the user's explicit permission.")
+        project = next((args[i + 1] for i, a in enumerate(args[:-1]) if a in ("-p", "--project-name")), "")
+        project = project or next((a.split("=", 1)[1] for a in args if a.startswith("--project-name=")), "")
+        # A real service the user asked for (SKILL.md §10: bind mounts under /opt/docker/<name>/)
+        # is not a test stack, so the next session's leftover sweep must not find it.
+        permanent = PERMANENT_DIR.match(os.path.realpath(path)) or PERMANENT_LABEL in text_c
+        if not permanent and not project.startswith(TEST_PROJECT) and TEST_LABEL not in text_c:
+            problems.append(f"docker compose: run test stacks as -p {TEST_PROJECT}-<name> (or label the services "
+                            f"{TEST_LABEL}), so the next session start can find any that were left behind. A "
+                            f"permanent service lives under /opt/docker/<name>/ or labels its services {PERMANENT_LABEL}.")
     return problems
 
 
@@ -1449,6 +1485,8 @@ SENSITIVE = [
     (re.compile(r"banner\s*➖", re.I), "skipping the README dev banner"),
     # Lets Claude run tags and ref deletions (each one still asks): FORGE_REFERENCE.md.
     (SELF_HOSTED, "a self-hosted forge"),
+    # Lets the previous release's missing tag through without this release's gates.
+    (RETRO_ROW, "tagging a previous release that never shipped"),
 ]
 NO_APP_CHANGE = re.compile(r"test artifact:\s*n/a\s*[—–-]+\s*no app code changed", re.I)
 # A waiver is keyed by the clause that carries it (from "waive" to the next `;`,
